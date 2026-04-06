@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useThemeStore } from '../../store/themeStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { useNavigation } from '@react-navigation/native';
 
 // ── STORIES ROW ──────────────────────────────────────────────
 function StoriesRow({ theme }: { theme: typeof colors.dark }) {
@@ -157,6 +158,7 @@ function PostCard({
 
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function SocialScreen() {
+    const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const [activeTab, setActiveTab] = useState<'Discover' | 'Following'>('Discover');
@@ -233,13 +235,15 @@ export default function SocialScreen() {
           ))}
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={[styles.bellBtn, {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          }]}>
-            <Text>🔔</Text>
-            <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
-          </TouchableOpacity>
+          <TouchableOpacity
+  onPress={() => navigation.getParent()?.navigate('Community')}
+  style={[styles.bellBtn, {
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+  }]}
+>
+  <Ionicons name="people" size={18} color={theme.accent} />
+</TouchableOpacity>
           <View style={[styles.avatarBtn, {
             backgroundColor: theme.accentDim as string,
             borderColor: theme.accent,

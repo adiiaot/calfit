@@ -123,11 +123,15 @@ function SmallStatCards({ theme }: { theme: typeof colors.dark }) {
 
 // ── STREAK CARD ──────────────────────────────────────────────
 function StreakCard({ theme }: { theme: typeof colors.dark }) {
+  const navigation = useNavigation<any>();
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const completedDays = 5;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+    <TouchableOpacity
+      onPress={() => navigation.getParent()?.navigate('Streaks')}
+      style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
+    >
       <View style={styles.streakHeader}>
         <Text style={[styles.streakTitle, { color: theme.textPrimary }]}>
           14-Day Streak 🔥
@@ -154,7 +158,7 @@ function StreakCard({ theme }: { theme: typeof colors.dark }) {
           </View>
         ))}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

@@ -17,6 +17,8 @@ import CoachScreen from '../screens/coach/CoachScreen';
 import CreditsScreen from '../screens/earnings/CreditsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProgressScreen from '../screens/progress/ProgressScreen';
+import StreaksScreen from '../screens/streaks/StreaksScreen';
+import CommunityScreen from '../screens/community/CommunityScreen';
 
 // Auth + Onboarding screens
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -115,23 +117,26 @@ export default function AppNavigator() {
         {!isAuthenticated ? (
           // ── AUTH FLOW ──────────────────────────────────────
           // Shown when user is not logged in
-          <>
-            <RootStack.Screen name="Welcome"    component={WelcomeScreen} />
-            <RootStack.Screen name="Login"      component={LoginScreen} />
-            <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
-            {/* Tabs registered here too so onboarding can navigate to Main */}
-            <RootStack.Screen name="Main"       component={TabNavigator} />
-            <RootStack.Screen name="Settings"   component={SettingsScreen} />
-            <RootStack.Screen name="Progress"   component={ProgressScreen} />
-          </>
+         <>
+          <RootStack.Screen name="Welcome"    component={WelcomeScreen} />
+          <RootStack.Screen name="Login"      component={LoginScreen} />
+          <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+          <RootStack.Screen name="Main"       component={TabNavigator} />
+          <RootStack.Screen name="Settings"   component={SettingsScreen} />
+          <RootStack.Screen name="Progress"   component={ProgressScreen} />
+          <RootStack.Screen name="Streaks"    component={StreaksScreen} />
+          <RootStack.Screen name="Community"  component={CommunityScreen} />
+        </>
         ) : (
           // ── MAIN APP ───────────────────────────────────────
           // Shown when user is logged in
           <>
-            <RootStack.Screen name="Main"     component={TabNavigator} />
-            <RootStack.Screen name="Settings" component={SettingsScreen} />
-            <RootStack.Screen name="Progress" component={ProgressScreen} />
-          </>
+          <RootStack.Screen name="Main"      component={TabNavigator} />
+          <RootStack.Screen name="Settings"  component={SettingsScreen} />
+          <RootStack.Screen name="Progress"  component={ProgressScreen} />
+          <RootStack.Screen name="Streaks"   component={StreaksScreen} />
+          <RootStack.Screen name="Community" component={CommunityScreen} />
+        </>
         )}
       </RootStack.Navigator>
     </NavigationContainer>

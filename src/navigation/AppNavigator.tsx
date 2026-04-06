@@ -19,6 +19,10 @@ import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProgressScreen from '../screens/progress/ProgressScreen';
 import StreaksScreen from '../screens/streaks/StreaksScreen';
 import CommunityScreen from '../screens/community/CommunityScreen';
+import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+
+// Food Scanner screen
+import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 
 // Auth + Onboarding screens
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -126,6 +130,8 @@ export default function AppNavigator() {
           <RootStack.Screen name="Progress"   component={ProgressScreen} />
           <RootStack.Screen name="Streaks"    component={StreaksScreen} />
           <RootStack.Screen name="Community"  component={CommunityScreen} />
+          <RootStack.Screen name="FoodScanner" component={FoodScannerScreen} />
+          <RootStack.Screen name="Notifications" component={NotificationsScreen} />
         </>
         ) : (
           // ── MAIN APP ───────────────────────────────────────
@@ -136,6 +142,8 @@ export default function AppNavigator() {
           <RootStack.Screen name="Progress"  component={ProgressScreen} />
           <RootStack.Screen name="Streaks"   component={StreaksScreen} />
           <RootStack.Screen name="Community" component={CommunityScreen} />
+          <RootStack.Screen name="FoodScanner" component={FoodScannerScreen} />
+          <RootStack.Screen name="Notifications" component={NotificationsScreen} />
         </>
         )}
       </RootStack.Navigator>

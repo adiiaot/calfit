@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   TextInput,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 
@@ -57,7 +58,6 @@ function CalorieSummary({ theme }: { theme: typeof colors.dark }) {
         Today's Calories
       </Text>
       <View style={styles.donutRow}>
-        {/* Donut */}
         <View style={styles.donutContainer}>
           <View style={[styles.donutRingOuter, { borderColor: theme.border }]} />
           <View style={[styles.donutRingProgress, { borderColor: theme.accent }]} />
@@ -68,8 +68,6 @@ function CalorieSummary({ theme }: { theme: typeof colors.dark }) {
             <Text style={[styles.donutSub, { color: theme.textMuted }]}>left</Text>
           </View>
         </View>
-
-        {/* Stats */}
         <View style={styles.donutStats}>
           {[
             { dot: theme.textMuted, label: 'Goal', value: `${goal} kcal` },
@@ -145,9 +143,7 @@ function WaterCard({ theme }: { theme: typeof colors.dark }) {
         {['+250ml', '+500ml', '+1L'].map((amt) => (
           <TouchableOpacity
             key={amt}
-            style={[styles.waterAddBtn, {
-              borderColor: theme.accentSecond,
-            }]}
+            style={[styles.waterAddBtn, { borderColor: theme.accentSecond }]}
           >
             <Text style={[styles.waterAddText, { color: theme.accentSecond }]}>
               {amt}
@@ -173,7 +169,6 @@ function MealSection({
 }) {
   return (
     <View style={styles.mealSection}>
-      {/* Section header */}
       <View style={styles.mealHeader}>
         <Text style={[styles.mealTitle, { color: theme.textSecondary }]}>
           {title}
@@ -182,8 +177,6 @@ function MealSection({
           {calories}
         </Text>
       </View>
-
-      {/* Food items */}
       {items.map((item) => (
         <View key={item.name} style={[styles.foodItem, {
           backgroundColor: theme.card,
@@ -197,8 +190,6 @@ function MealSection({
           </Text>
         </View>
       ))}
-
-      {/* Add food button */}
       <TouchableOpacity style={[styles.addFoodBtn, { borderColor: theme.border }]}>
         <Text style={[styles.addFoodText, { color: theme.textMuted }]}>
           + Add food
@@ -210,8 +201,13 @@ function MealSection({
 
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function CalorieScreen() {
+  const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
+
+  const handleOpenScanner = () => {
+    navigation.getParent()?.navigate('FoodScanner');
+  };
 
   const meals = [
     {
@@ -244,7 +240,6 @@ export default function CalorieScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
           Calorie Tracker
@@ -262,12 +257,12 @@ export default function CalorieScreen() {
       >
         <SearchBar
           theme={theme}
-          onScanPress={() => console.log('Open scanner')}
+          onScanPress={handleOpenScanner}
         />
         <CalorieSummary theme={theme} />
         <ScanFoodButton
           theme={theme}
-          onPress={() => console.log('Open scanner')}
+          onPress={handleOpenScanner}
         />
         <WaterCard theme={theme} />
 
@@ -285,8 +280,8 @@ export default function CalorieScreen() {
           />
         ))}
 
-        {/* Meal Planner CTA */}
-        <TouchableOpacity
+      <TouchableOpacity
+          onPress={() => navigation.navigate('Meals')}
           style={[styles.mealPlannerBtn, { backgroundColor: theme.accent }]}
         >
           <Text style={styles.mealPlannerText}>📅   Open Meal Planner</Text>
@@ -309,7 +304,6 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
   pageDate: { fontSize: fontSize.md, marginTop: 2 },
 
-  // Search
   searchRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -331,7 +325,6 @@ const styles = StyleSheet.create({
   },
   scanBtnText: { fontSize: 22, color: '#0C0D10', fontWeight: '700' },
 
-  // Cards
   card: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -347,17 +340,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Donut
-  donutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
+  donutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   donutContainer: {
     width: 90, height: 90,
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
   donutRingOuter: {
@@ -385,7 +372,6 @@ const styles = StyleSheet.create({
   donutLabel: { fontSize: fontSize.sm, flex: 1 },
   donutVal: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Scan food button
   scanFoodBtn: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -397,7 +383,6 @@ const styles = StyleSheet.create({
   },
   scanFoodText: { fontSize: fontSize.base, fontWeight: '600' },
 
-  // Water
   waterValue: { fontSize: 26, fontWeight: '800', marginBottom: 2 },
   waterSub: { fontSize: fontSize.sm, marginBottom: spacing.sm },
   waterBarBg: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: spacing.md },
@@ -406,12 +391,10 @@ const styles = StyleSheet.create({
   waterAddBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.sm, borderWidth: 1,
   },
   waterAddText: { fontSize: fontSize.sm, fontWeight: '600' },
 
-  // Section label
   sectionLabel: {
     fontSize: fontSize.sm,
     fontWeight: '600',
@@ -421,7 +404,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Meal section
   mealSection: { marginBottom: spacing.sm },
   mealHeader: {
     flexDirection: 'row',
@@ -433,7 +415,6 @@ const styles = StyleSheet.create({
   mealTitle: { fontSize: fontSize.base, fontWeight: '600' },
   mealCal: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Food items
   foodItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -441,13 +422,11 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginBottom: 6,
     padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.sm, borderWidth: 1,
   },
   foodName: { fontSize: fontSize.base },
   foodCal: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Add food
   addFoodBtn: {
     marginHorizontal: spacing.lg,
     padding: spacing.sm,
@@ -459,7 +438,6 @@ const styles = StyleSheet.create({
   },
   addFoodText: { fontSize: fontSize.sm },
 
-  // Meal planner CTA
   mealPlannerBtn: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,

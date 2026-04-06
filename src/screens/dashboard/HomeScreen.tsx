@@ -260,13 +260,16 @@ export default function HomeScreen() {
         </View>
         <View style={styles.topBarRight}>
           {/* Notification Bell */}
-          <TouchableOpacity style={[
-            styles.bellBtn,
-            { backgroundColor: theme.card, borderColor: theme.border }
-          ]}>
-            <Text style={styles.bellIcon}>🔔</Text>
-            <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
-          </TouchableOpacity>
+         <TouchableOpacity
+  onPress={() => navigation.getParent()?.navigate('Notifications')}
+  style={[
+    styles.bellBtn,
+    { backgroundColor: theme.card, borderColor: theme.border }
+  ]}
+>
+  <Text style={styles.bellIcon}>🔔</Text>
+  <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
+</TouchableOpacity>
           {/* Profile Avatar — navigates to Settings */}
           <TouchableOpacity
   onPress={() => navigation.getParent()?.navigate('Settings')}

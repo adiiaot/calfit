@@ -5,7 +5,11 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Alert,
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
+
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -92,12 +96,64 @@ function Step1({
 }
 
 // ── STEP 2 — BODY STATS ──────────────────────────────────────
-function Step2({ theme }: { theme: typeof colors.dark }) {
+function Step2({
+  theme,
+  age,
+  setAge,
+  height,
+  setHeight,
+  weight,
+  setWeight,
+  targetWeight,
+  setTargetWeight,
+}: {
+  theme: typeof colors.dark;
+  age: string;
+  setAge: (v: string) => void;
+  height: string;
+  setHeight: (v: string) => void;
+  weight: string;
+  setWeight: (v: string) => void;
+  targetWeight: string;
+  setTargetWeight: (v: string) => void;
+}) {
   const fields = [
-    { label: 'Age', placeholder: '25 years', icon: 'calendar-outline' },
-    { label: 'Height', placeholder: '175 cm', icon: 'resize-outline' },
-    { label: 'Current Weight', placeholder: '75 kg', icon: 'scale-outline' },
-    { label: 'Target Weight', placeholder: '70 kg', icon: 'flag-outline' },
+    {
+      label: 'Age',
+      value: age,
+      onChange: setAge,
+      placeholder: '25',
+      icon: 'calendar-outline',
+      keyboardType: 'number-pad',
+      suffix: 'years',
+    },
+    {
+      label: 'Height',
+      value: height,
+      onChange: setHeight,
+      placeholder: '175',
+      icon: 'resize-outline',
+      keyboardType: 'decimal-pad',
+      suffix: 'cm',
+    },
+    {
+      label: 'Current Weight',
+      value: weight,
+      onChange: setWeight,
+      placeholder: '75',
+      icon: 'scale-outline',
+      keyboardType: 'decimal-pad',
+      suffix: 'kg',
+    },
+    {
+      label: 'Target Weight',
+      value: targetWeight,
+      onChange: setTargetWeight,
+      placeholder: '70',
+      icon: 'flag-outline',
+      keyboardType: 'decimal-pad',
+      suffix: 'kg',
+    },
   ];
 
   return (
@@ -109,19 +165,27 @@ function Step2({ theme }: { theme: typeof colors.dark }) {
         This calculates your daily calorie target and macro split.
       </Text>
       <View style={styles.fieldsWrap}>
-        {fields.map((f, i) => (
+        {fields.map((f) => (
           <View key={f.label}>
             <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
               {f.label}
             </Text>
             <View style={[styles.fieldInput, {
               backgroundColor: theme.card,
-              borderColor: i === 0 ? theme.accent : theme.border,
-              borderWidth: i === 0 ? 2 : 1,
+              borderColor: theme.border,
+              borderWidth: 1,
             }]}>
               <Ionicons name={f.icon as any} size={18} color={theme.textMuted} />
-              <Text style={[styles.fieldPlaceholder, { color: theme.textMuted }]}>
-                {f.placeholder}
+              <TextInput
+                value={f.value}
+                onChangeText={f.onChange}
+                placeholder={f.placeholder}
+                placeholderTextColor={theme.textMuted}
+                keyboardType={f.keyboardType as any}
+                style={[styles.stepTextInput, { color: theme.textPrimary }]}
+              />
+              <Text style={[styles.fieldSuffix, { color: theme.textMuted }]}>
+                {f.suffix}
               </Text>
             </View>
           </View>
@@ -309,7 +373,15 @@ function Step5({
 }
 
 // ── STEP 6 — CALFIT ID ───────────────────────────────────────
-function Step6({ theme }: { theme: typeof colors.dark }) {
+function Step6({
+  theme,
+  calfitId,
+  setCalfitId,
+}: {
+  theme: typeof colors.dark;
+  calfitId: string;
+  setCalfitId: (v: string) => void;
+}) {
   return (
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: theme.textPrimary }]}>
@@ -327,16 +399,23 @@ function Step6({ theme }: { theme: typeof colors.dark }) {
         borderWidth: 2,
       }]}>
         <Text style={[styles.atSign, { color: theme.accent }]}>@</Text>
-        <Text style={[styles.fieldPlaceholder, { color: theme.textPrimary }]}>
-          favour
-        </Text>
+        <TextInput
+          value={calfitId}
+          onChangeText={setCalfitId}
+          placeholder="your_username"
+          placeholderTextColor={theme.textMuted}
+          autoCapitalize="none"
+          style={[styles.stepTextInput, { color: theme.textPrimary }]}
+        />
       </View>
-      <View style={styles.availableRow}>
-        <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
-        <Text style={[styles.availableText, { color: theme.accent }]}>
-          calfit.app/@favour is available
-        </Text>
-      </View>
+      {calfitId.length > 0 && (
+        <View style={styles.availableRow}>
+          <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
+          <Text style={[styles.availableText, { color: theme.accent }]}>
+            calfit.app/@{calfitId} is available
+          </Text>
+        </View>
+      )}
       <Text style={[styles.idNote, { color: theme.textMuted }]}>
         This is how friends will find you on CalFit.
       </Text>
@@ -344,8 +423,22 @@ function Step6({ theme }: { theme: typeof colors.dark }) {
   );
 }
 
-// ── STEP 7 — PERSONALIZATION ─────────────────────────────────
-function Step7({ theme }: { theme: typeof colors.dark }) {
+// ── STEP 7 — CREATE ACCOUNT ───────────────────────────────────
+function Step7({
+  theme,
+  email,
+  setEmail,
+  password,
+  setPassword,
+}: {
+  theme: typeof colors.dark;
+  email: string;
+  setEmail: (v: string) => void;
+  password: string;
+  setPassword: (v: string) => void;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+
   const settings = [
     { label: 'Appearance', value: 'Dark Mode', icon: 'moon-outline', toggle: true },
     { label: 'Units', value: 'Metric (kg, cm)', icon: 'scale-outline', toggle: false },
@@ -357,7 +450,62 @@ function Step7({ theme }: { theme: typeof colors.dark }) {
   return (
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: theme.textPrimary }]}>
-        Last step!{'\n'}Personalise your app
+        Last step!{'\n'}Create your account
+      </Text>
+
+      {/* Email */}
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
+      <View style={[styles.fieldInput, {
+        backgroundColor: theme.card,
+        borderColor: theme.border,
+        borderWidth: 1,
+        marginBottom: spacing.md,
+      }]}>
+        <Ionicons name="mail-outline" size={18} color={theme.textMuted} />
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="your@email.com"
+          placeholderTextColor={theme.textMuted}
+          style={[styles.stepTextInput, { color: theme.textPrimary }]}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
+
+      {/* Password */}
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
+      <View style={[styles.fieldInput, {
+        backgroundColor: theme.card,
+        borderColor: theme.border,
+        borderWidth: 1,
+        marginBottom: spacing.md,
+      }]}>
+        <Ionicons name="lock-closed-outline" size={18} color={theme.textMuted} />
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Min. 8 characters"
+          placeholderTextColor={theme.textMuted}
+          style={[styles.stepTextInput, { color: theme.textPrimary }]}
+          secureTextEntry={!showPassword}
+        />
+        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+          <Ionicons
+            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+            size={18}
+            color={theme.textMuted}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={[styles.idNote, { color: theme.textMuted, marginBottom: spacing.lg }]}>
+        Your data is encrypted and never sold. Delete your account anytime.
+      </Text>
+
+      {/* App preferences preview */}
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
+        App Preferences
       </Text>
       <View style={styles.personalList}>
         {settings.map((s) => (
@@ -388,9 +536,6 @@ function Step7({ theme }: { theme: typeof colors.dark }) {
           </View>
         ))}
       </View>
-      <Text style={[styles.idNote, { color: theme.textMuted }]}>
-        You can change all of this later in Settings.
-      </Text>
     </View>
   );
 }
@@ -403,9 +548,17 @@ export default function OnboardingScreen() {
 
   const [step, setStep] = useState(1);
   const [goal, setGoal] = useState('');
+  const [age, setAge] = useState('');
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
+  const [targetWeight, setTargetWeight] = useState('');
   const [activity, setActivity] = useState('');
   const [tracking, setTracking] = useState<string[]>(['Calories', 'Water Intake', 'Workouts']);
   const [diet, setDiet] = useState<string[]>(['No Preference']);
+  const [calfitId, setCalfitId] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const totalSteps = 7;
 
   const toggleTracking = (item: string) => {
@@ -420,12 +573,52 @@ export default function OnboardingScreen() {
     );
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < totalSteps) {
       setStep(step + 1);
-    } else {
-      // Onboarding complete — go to main app
-      navigation.navigate('Main');
+      return;
+    }
+
+    // Step 7 — create account and save profile
+    if (!email || !password) {
+      Alert.alert('Almost there!', 'Please enter your email and password.');
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert('Weak password', 'Password must be at least 8 characters.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const { supabase } = await import('../../services/supabase');
+
+      // Create the auth account
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+
+      // Save profile details to the profiles table
+      if (data.user) {
+        await supabase.from('profiles').update({
+          calfit_id: calfitId || null,
+          goal: goal || null,
+          activity_level: activity || null,
+          dietary_preference: diet,
+          tracking_preferences: tracking,
+          age: parseInt(age) || null,
+          height_cm: parseFloat(height) || null,
+          current_weight_kg: parseFloat(weight) || null,
+          target_weight_kg: parseFloat(targetWeight) || null,
+        }).eq('id', data.user.id);
+      }
+
+      // Auth listener in App.tsx detects session and redirects automatically
+
+    } catch (error: any) {
+      Alert.alert('Sign Up Failed', error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -456,24 +649,53 @@ export default function OnboardingScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {step === 1 && <Step1 theme={theme} selected={goal} onSelect={setGoal} />}
-        {step === 2 && <Step2 theme={theme} />}
-        {step === 3 && <Step3 theme={theme} selected={activity} onSelect={setActivity} />}
-        {step === 4 && <Step4 theme={theme} selected={tracking} onToggle={toggleTracking} />}
-        {step === 5 && <Step5 theme={theme} selected={diet} onToggle={toggleDiet} />}
-        {step === 6 && <Step6 theme={theme} />}
-        {step === 7 && <Step7 theme={theme} />}
+        {step === 1 && (
+          <Step1 theme={theme} selected={goal} onSelect={setGoal} />
+        )}
+        {step === 2 && (
+          <Step2
+            theme={theme}
+            age={age} setAge={setAge}
+            height={height} setHeight={setHeight}
+            weight={weight} setWeight={setWeight}
+            targetWeight={targetWeight} setTargetWeight={setTargetWeight}
+          />
+        )}
+        {step === 3 && (
+          <Step3 theme={theme} selected={activity} onSelect={setActivity} />
+        )}
+        {step === 4 && (
+          <Step4 theme={theme} selected={tracking} onToggle={toggleTracking} />
+        )}
+        {step === 5 && (
+          <Step5 theme={theme} selected={diet} onToggle={toggleDiet} />
+        )}
+        {step === 6 && (
+          <Step6 theme={theme} calfitId={calfitId} setCalfitId={setCalfitId} />
+        )}
+        {step === 7 && (
+          <Step7
+            theme={theme}
+            email={email} setEmail={setEmail}
+            password={password} setPassword={setPassword}
+          />
+        )}
       </ScrollView>
 
-      {/* Bottom buttons */}
+      {/* Bottom button */}
       <View style={[styles.bottomBar, { backgroundColor: theme.bg }]}>
         <TouchableOpacity
           onPress={handleNext}
+          disabled={isLoading}
           style={[styles.continueBtn, { backgroundColor: theme.accent }]}
         >
-          <Text style={[styles.continueBtnText, { color: theme.bg }]}>
-            {step === totalSteps ? "Let's Go! 🚀" : 'Continue'}
-          </Text>
+          {isLoading ? (
+            <ActivityIndicator color={theme.bg} />
+          ) : (
+            <Text style={[styles.continueBtnText, { color: theme.bg }]}>
+              {step === totalSteps ? "Let's Go! 🚀" : 'Continue'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -494,33 +716,22 @@ const styles = StyleSheet.create({
   },
   logo: { fontSize: fontSize.xl, fontWeight: '800' },
 
-  // Progress
   progressWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   progressBg: { height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 6 },
   progressFill: { height: '100%', borderRadius: 2 },
   progressLabel: { fontSize: fontSize.xs, fontWeight: '600' },
 
-  // Step content
   stepContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   stepTitle: { fontSize: 30, fontWeight: '800', marginBottom: spacing.sm, lineHeight: 36 },
   stepSub: { fontSize: fontSize.base, marginBottom: spacing.xl, lineHeight: 22 },
 
-  // Goal grid
-  goalGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
+  goalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   goalCard: {
-    width: '47%',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
+    width: '47%', padding: spacing.md,
+    borderRadius: radius.md, borderWidth: 1, gap: spacing.sm,
   },
   goalLabel: { fontSize: fontSize.base, fontWeight: '600' },
 
-  // Fields
   fieldsWrap: { gap: spacing.md },
   fieldLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: 6 },
   fieldInput: {
@@ -529,71 +740,51 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.md,
-    borderWidth: 1,
   },
+  stepTextInput: { flex: 1, fontSize: fontSize.lg, paddingVertical: 2 },
+  fieldSuffix: { fontSize: fontSize.base, fontWeight: '600' },
   fieldPlaceholder: { fontSize: fontSize.lg },
   atSign: { fontSize: fontSize.xl, fontWeight: '700' },
   availableRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm },
   availableText: { fontSize: fontSize.sm, fontWeight: '600' },
   idNote: { fontSize: fontSize.sm, marginTop: spacing.sm },
 
-  // Levels
   levelList: { gap: spacing.sm },
   levelCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center',
+    gap: spacing.md, padding: spacing.md,
+    borderRadius: radius.md, borderWidth: 1,
   },
   levelIconWrap: {
     width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   levelInfo: { flex: 1 },
   levelLabel: { fontSize: fontSize.lg, fontWeight: '700' },
   levelSub: { fontSize: fontSize.sm, marginTop: 2 },
 
-  // Personalization
   personalList: { gap: spacing.sm },
   personalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center',
+    gap: spacing.md, padding: spacing.md,
+    borderRadius: radius.md, borderWidth: 1,
   },
   personalIcon: {
     width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   personalInfo: { flex: 1 },
   personalLabel: { fontSize: fontSize.base, fontWeight: '600' },
   personalValue: { fontSize: fontSize.sm, marginTop: 2 },
-  toggleOn: {
-    width: 38, height: 22, borderRadius: 11,
-    paddingLeft: 18, justifyContent: 'center',
-  },
-  toggleKnob: {
-    width: 16, height: 16, borderRadius: 8,
-    backgroundColor: 'white',
-  },
+  toggleOn: { width: 38, height: 22, borderRadius: 11, paddingLeft: 18, justifyContent: 'center' },
+  toggleKnob: { width: 16, height: 16, borderRadius: 8, backgroundColor: 'white' },
 
-  // Bottom bar
   bottomBar: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  continueBtn: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-  },
+  continueBtn: { padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center' },
   continueBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
 });

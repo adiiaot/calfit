@@ -19,10 +19,12 @@ function ProfileCard({
   theme,
   firstName,
   onProgressPress,
+  onEditPress,
 }: {
   theme: typeof colors.dark;
   firstName: string;
   onProgressPress: () => void;
+  onEditPress: () => void;
 }) {
   return (
     <>
@@ -45,7 +47,7 @@ function ProfileCard({
           <Text style={[styles.profileHandle, { color: theme.textSecondary }]}>
             @{firstName.toLowerCase()} · calfit.app/@{firstName.toLowerCase()}
           </Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={onEditPress}>
             <Text style={[styles.profileEdit, { color: theme.accent }]}>
               Edit Profile →
             </Text>
@@ -179,12 +181,17 @@ export default function SettingsScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+          <Text style={[styles.backText, { color: theme.textPrimary }]}>
+            Home
+          </Text>
         </TouchableOpacity>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
           Settings
         </Text>
+        <View style={{ width: 60 }} />
       </View>
 
       <ScrollView
@@ -195,6 +202,7 @@ export default function SettingsScreen() {
           theme={theme}
           firstName={firstName}
           onProgressPress={() => navigation.navigate('Progress' as never)}
+          onEditPress={() => navigation.navigate('EditProfile' as never)}
         />
 
         <SettingsGroup
@@ -374,15 +382,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
-    gap: spacing.sm,
   },
   backBtn: {
-    padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
-  pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
+  backText: { fontSize: fontSize.lg, fontWeight: '400' },
+  pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
 
   // Profile
   profileCard: {

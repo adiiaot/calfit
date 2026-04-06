@@ -21,6 +21,9 @@ import StreaksScreen from '../screens/streaks/StreaksScreen';
 import CommunityScreen from '../screens/community/CommunityScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 
+//Profile Edit screen
+import EditProfileScreen from '../screens/settings/EditProfileScreen';
+
 // Food Scanner screen
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 
@@ -132,6 +135,7 @@ export default function AppNavigator() {
           <RootStack.Screen name="Community"  component={CommunityScreen} />
           <RootStack.Screen name="FoodScanner" component={FoodScannerScreen} />
           <RootStack.Screen name="Notifications" component={NotificationsScreen} />
+          <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
         </>
         ) : (
           // ── MAIN APP ───────────────────────────────────────
@@ -144,6 +148,7 @@ export default function AppNavigator() {
           <RootStack.Screen name="Community" component={CommunityScreen} />
           <RootStack.Screen name="FoodScanner" component={FoodScannerScreen} />
           <RootStack.Screen name="Notifications" component={NotificationsScreen} />
+          <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
         </>
         )}
       </RootStack.Navigator>

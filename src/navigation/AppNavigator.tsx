@@ -3,10 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StyleSheet } from 'react-native';
 import { useThemeStore } from '../store/themeStore';
+import { useAuthStore } from '../store/authStore';
 import { colors } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 
-// Screens
+// Main screens
 import HomeScreen from '../screens/dashboard/HomeScreen';
 import CalorieScreen from '../screens/calorie/CalorieScreen';
 import MealsScreen from '../screens/meals/MealsScreen';
@@ -16,6 +17,11 @@ import CoachScreen from '../screens/coach/CoachScreen';
 import CreditsScreen from '../screens/earnings/CreditsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProgressScreen from '../screens/progress/ProgressScreen';
+
+// Auth + Onboarding screens
+import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
+import LoginScreen from '../screens/onboarding/LoginScreen';
+import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
@@ -37,7 +43,7 @@ function TabIcon({
     Calorie:  { active: 'nutrition',           inactive: 'nutrition-outline' },
     Meals:    { active: 'restaurant',          inactive: 'restaurant-outline' },
     Activity: { active: 'barbell',             inactive: 'barbell-outline' },
-    Social:   { active: 'people',             inactive: 'people-outline' },
+    Social:   { active: 'people',              inactive: 'people-outline' },
     Coach:    { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' },
     Credits:  { active: 'star',                inactive: 'star-outline' },
   };
@@ -54,7 +60,7 @@ function TabIcon({
   );
 }
 
-// ── 7 TAB NAVIGATOR — no Profile tab ─────────────────────────
+// ── 7 TABS ────────────────────────────────────────────────────
 function TabNavigator() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
@@ -99,26 +105,34 @@ function TabNavigator() {
   );
 }
 
-// ── ROOT STACK — tabs + settings + progress ───────────────────
-// Settings and Progress are NOT tabs
-// They are full screen pages accessible via navigation.navigate()
+// ── ROOT NAVIGATOR ────────────────────────────────────────────
 export default function AppNavigator() {
+  const { isAuthenticated } = useAuthStore();
+
   return (
     <NavigationContainer>
-      <RootStack.Navigator
-        screenOptions={{
-          headerShown: false,
-          presentation: 'card',
-        }}
-      >
-        {/* Main app with 7 tabs */}
-        <RootStack.Screen name="Tabs" component={TabNavigator} />
-
-        {/* Settings — opened by tapping F avatar on Home */}
-        <RootStack.Screen name="Settings" component={SettingsScreen} />
-
-        {/* Progress — opened from Settings */}
-        <RootStack.Screen name="Progress" component={ProgressScreen} />
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        {!isAuthenticated ? (
+          // ── AUTH FLOW ──────────────────────────────────────
+          // Shown when user is not logged in
+          <>
+            <RootStack.Screen name="Welcome"    component={WelcomeScreen} />
+            <RootStack.Screen name="Login"      component={LoginScreen} />
+            <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+            {/* Tabs registered here too so onboarding can navigate to Main */}
+            <RootStack.Screen name="Main"       component={TabNavigator} />
+            <RootStack.Screen name="Settings"   component={SettingsScreen} />
+            <RootStack.Screen name="Progress"   component={ProgressScreen} />
+          </>
+        ) : (
+          // ── MAIN APP ───────────────────────────────────────
+          // Shown when user is logged in
+          <>
+            <RootStack.Screen name="Main"     component={TabNavigator} />
+            <RootStack.Screen name="Settings" component={SettingsScreen} />
+            <RootStack.Screen name="Progress" component={ProgressScreen} />
+          </>
+        )}
       </RootStack.Navigator>
     </NavigationContainer>
   );

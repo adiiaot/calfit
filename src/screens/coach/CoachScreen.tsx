@@ -255,7 +255,9 @@ export default function CoachScreen() {
         </ScrollView>
 
         {/* QUICK CHIPS */}
-        <QuickChips theme={theme} onSelect={handleChipSelect} />
+        <View style={{ backgroundColor: 'transparent' }}>
+          <QuickChips theme={theme} onSelect={handleChipSelect} />
+        </View>
 
         {/* INPUT BAR */}
         <View style={[styles.inputBar, {
@@ -347,47 +349,45 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: fontSize.base, lineHeight: 20 },
   bubbleTime: { fontSize: fontSize.xs, marginTop: 2 },
 
-  // Chips
 // Chips
-  chipsRow: {
+chipsRow: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: 6,
     gap: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
     borderRadius: radius.sm,
     borderWidth: 1,
-    height: 32,
+    height: 28,
     justifyContent: 'center',
   },
   chipText: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: '500',
   },
 
   // Input bar
   inputBar: {
     flexDirection: 'row',
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.sm,
     borderTopWidth: 1,
-    alignItems: 'flex-end',
-    paddingBottom: spacing.md,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   inputField: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: radius.md,
     borderWidth: 1,
     gap: spacing.sm,
-    minHeight: 48,
+    height: 48,
   },
   inputText: { flex: 1, fontSize: fontSize.base, maxHeight: 100 },
   micIcon: { fontSize: 20 },

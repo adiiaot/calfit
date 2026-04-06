@@ -13,6 +13,7 @@ import { supabase } from './src/services/supabase';
 import { useAuthStore } from './src/store/authStore';
 import { useThemeStore } from './src/store/themeStore';
 import { colors } from './src/theme';
+import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
   const { setSession } = useAuthStore();
@@ -28,8 +29,6 @@ export default function App() {
   });
 
   useEffect(() => {
-    // Listen for auth state changes
-    // This runs whenever the user logs in or out
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
@@ -43,18 +42,23 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Show loading spinner while fonts load
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.bg }}>
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: theme.bg
+      }}>
         <ActivityIndicator color={theme.accent} size="large" />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-    </View>
+      <AppNavigator />
+    </>
   );
 }

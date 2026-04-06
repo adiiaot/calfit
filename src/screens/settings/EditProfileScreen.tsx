@@ -142,18 +142,20 @@ function UnitToggle({
 export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { user } = useAuthStore();
+  const { user, profile, updateProfile: updateStore } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const firstName = user?.email?.split('@')[0] ?? 'Favour';
+  const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'Favour';
 
-  const [fullName, setFullName] = useState(firstName);
-  const [username, setUsername] = useState(firstName.toLowerCase());
-  const [age, setAge] = useState('25');
-  const [height, setHeight] = useState('175');
-  const [weight, setWeight] = useState('75');
-  const [targetWeight, setTargetWeight] = useState('70');
-  const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
+  const [fullName, setFullName] = useState(profile?.full_name ?? firstName);
+  const [username, setUsername] = useState(profile?.calfit_id ?? firstName.toLowerCase());
+  const [age, setAge] = useState(profile?.age?.toString() ?? '');
+  const [height, setHeight] = useState(profile?.height_cm?.toString() ?? '');
+  const [weight, setWeight] = useState(profile?.current_weight_kg?.toString() ?? '');
+  const [targetWeight, setTargetWeight] = useState(profile?.target_weight_kg?.toString() ?? '');
+  const [unit, setUnit] = useState<'metric' | 'imperial'>(
+    (profile?.units as 'metric' | 'imperial') ?? 'metric'
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const heightSuffix = unit === 'metric' ? 'cm' : 'ft';
@@ -164,14 +166,40 @@ export default function EditProfileScreen() {
       Alert.alert('Missing fields', 'Name and username are required.');
       return;
     }
+
     setIsSaving(true);
-    // Will connect to Supabase profiles table in Phase 2
-    setTimeout(() => {
+    try {
+      const { updateProfile } = await import('../../services/profileService');
+      const userId = user?.id;
+
+      if (!userId) throw new Error('Not logged in');
+
+      const updates = {
+        full_name: fullName,
+        calfit_id: username,
+        age: parseInt(age) || null,
+        height_cm: parseFloat(height) || null,
+        current_weight_kg: parseFloat(weight) || null,
+        target_weight_kg: parseFloat(targetWeight) || null,
+        units: unit,
+      };
+
+      const success = await updateProfile(userId, updates);
+
+      if (success) {
+        // Update local store so changes reflect immediately everywhere
+        updateStore(updates);
+        Alert.alert('Profile Updated ✓', 'Your profile has been saved.', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      } else {
+        throw new Error('Save failed');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Could not save profile.');
+    } finally {
       setIsSaving(false);
-      Alert.alert('Profile Updated', 'Your profile has been saved.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-    }, 1000);
+    }
   };
 
   return (
@@ -235,7 +263,7 @@ export default function EditProfileScreen() {
             placeholder="calfit_username"
             icon="at-outline"
           />
-          <View style={[styles.availableRow]}>
+          <View style={styles.availableRow}>
             <Ionicons name="checkmark-circle" size={14} color={theme.accent} />
             <Text style={[styles.availableText, { color: theme.accent }]}>
               calfit.app/@{username || 'username'} is available
@@ -302,14 +330,14 @@ export default function EditProfileScreen() {
           />
         </View>
 
-        {/* Photo upload note */}
+        {/* Info card */}
         <View style={[styles.infoCard, {
           backgroundColor: theme.accentDim as string,
           borderColor: theme.accent,
         }]}>
           <Ionicons name="information-circle-outline" size={18} color={theme.accent} />
           <Text style={[styles.infoText, { color: theme.textPrimary }]}>
-            Profile photo upload and live data saving will be fully active once your account is connected to the server in the next update.
+            Profile photo upload will be fully active in the next update.
           </Text>
         </View>
 
@@ -337,7 +365,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -351,7 +378,6 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
   saveBtn: { fontSize: fontSize.lg, fontWeight: '700' },
 
-  // Avatar
   avatarSection: {
     alignItems: 'center',
     paddingVertical: spacing.xl,
@@ -375,7 +401,6 @@ const styles = StyleSheet.create({
   changePhotoText: { fontSize: fontSize.base, fontWeight: '600' },
   photoNote: { fontSize: fontSize.xs },
 
-  // Section
   sectionLabel: {
     fontSize: fontSize.xs,
     fontWeight: '700',
@@ -395,7 +420,6 @@ const styles = StyleSheet.create({
   },
   divider: { height: 1 },
 
-  // Input
   inputGroup: { gap: 6 },
   inputLabel: { fontSize: fontSize.sm, fontWeight: '600' },
   inputRow: {
@@ -409,7 +433,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: fontSize.lg },
   inputSuffix: { fontSize: fontSize.base, fontWeight: '600' },
 
-  // Username available
   availableRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -418,7 +441,6 @@ const styles = StyleSheet.create({
   },
   availableText: { fontSize: fontSize.xs, fontWeight: '600' },
 
-  // Unit toggle
   unitToggle: {
     flexDirection: 'row',
     borderRadius: radius.md,
@@ -435,7 +457,6 @@ const styles = StyleSheet.create({
   },
   unitBtnText: { fontSize: fontSize.sm },
 
-  // Info card
   infoCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -448,7 +469,6 @@ const styles = StyleSheet.create({
   },
   infoText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
 
-  // Save button
   saveFullBtn: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.lg,

@@ -242,7 +242,8 @@ export default function HomeScreen() {
     hour < 12 ? 'Good morning' :
     hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const firstName = user?.email?.split('@')[0] ?? 'Favour';
+ const { profile } = useAuthStore();
+const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'Favour';
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
+import { Profile } from '../services/profileService';
 
 interface AuthState {
   user: User | null;
   session: Session | null;
+  profile: Profile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   userTier: 'free' | 'pro' | 'premium';
@@ -11,21 +13,49 @@ interface AuthState {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   setSession: (session: Session | null) => void;
+  loadProfile: (userId: string) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   session: null,
+  profile: null,
   isLoading: false,
   isAuthenticated: false,
   userTier: 'free',
 
-  setSession: (session) =>
+  setSession: async (session) => {
     set({
       session,
       user: session?.user ?? null,
       isAuthenticated: !!session,
-    }),
+    });
+
+    // Load profile when session is set
+    if (session?.user) {
+      get().loadProfile(session.user.id);
+    }
+  },
+
+  loadProfile: async (userId: string) => {
+    try {
+      const { getProfile } = await import('../services/profileService');
+      const profile = await getProfile(userId);
+      if (profile) {
+        set({ profile });
+      }
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+    }
+  },
+
+  updateProfile: (updates: Partial<Profile>) => {
+    const current = get().profile;
+    if (current) {
+      set({ profile: { ...current, ...updates } });
+    }
+  },
 
   signIn: async (email, password) => {
     set({ isLoading: true });
@@ -45,10 +75,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { supabase } = await import('../services/supabase');
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
     } finally {
       set({ isLoading: false });
@@ -61,6 +88,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({
       user: null,
       session: null,
+      profile: null,
       isAuthenticated: false,
       userTier: 'free',
     });

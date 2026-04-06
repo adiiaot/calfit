@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
@@ -58,14 +59,9 @@ function CalorieCard({ theme }: { theme: typeof colors.dark }) {
         Today's Calories
       </Text>
       <View style={styles.donutRow}>
-
-        {/* Donut ring — fixed size container */}
         <View style={styles.donutContainer}>
-          {/* Outer grey ring */}
           <View style={[styles.donutRingOuter, { borderColor: theme.border }]} />
-          {/* Green progress arc — top right quadrant */}
           <View style={[styles.donutRingProgress, { borderColor: theme.accent }]} />
-          {/* Center text sits on top */}
           <View style={styles.donutCenterText}>
             <Text style={[styles.donutValue, { color: theme.textPrimary }]}>
               {remaining}
@@ -73,8 +69,6 @@ function CalorieCard({ theme }: { theme: typeof colors.dark }) {
             <Text style={[styles.donutSub, { color: theme.textMuted }]}>left</Text>
           </View>
         </View>
-
-        {/* Stats to the right */}
         <View style={styles.donutStats}>
           {[
             { dot: theme.textMuted, label: 'Goal', value: `${goal} kcal` },
@@ -234,6 +228,7 @@ function FriendsTicker({ theme }: { theme: typeof colors.dark }) {
 
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function HomeScreen() {
+  const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { user } = useAuthStore();
   const theme = colors[colorScheme];
@@ -268,15 +263,18 @@ export default function HomeScreen() {
             <Text style={styles.bellIcon}>🔔</Text>
             <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
           </TouchableOpacity>
-          {/* Profile Avatar */}
-          <TouchableOpacity style={[
-            styles.avatarBtn,
-            { backgroundColor: theme.accentDim, borderColor: theme.accent }
-          ]}>
-            <Text style={[styles.avatarText, { color: theme.accent }]}>
-              {firstName[0].toUpperCase()}
-            </Text>
-          </TouchableOpacity>
+          {/* Profile Avatar — navigates to Settings */}
+          <TouchableOpacity
+  onPress={() => navigation.getParent()?.navigate('Settings')}
+  style={[
+    styles.avatarBtn,
+    { backgroundColor: theme.accentDim, borderColor: theme.accent }
+  ]}
+>
+  <Text style={[styles.avatarText, { color: theme.accent }]}>
+    {firstName[0].toUpperCase()}
+  </Text>
+</TouchableOpacity>
         </View>
       </View>
 
@@ -313,7 +311,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: spacing.massive },
 
-  // Top bar
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -342,7 +339,6 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: fontSize.lg, fontWeight: '700' },
 
-  // Cards
   card: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -358,7 +354,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Readiness
   readinessRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -371,16 +366,13 @@ const styles = StyleSheet.create({
   progressBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 3 },
 
-  // Donut
-// Donut
   donutRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
   },
   donutContainer: {
-    width: 90,
-    height: 90,
+    width: 90, height: 90,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -388,17 +380,13 @@ const styles = StyleSheet.create({
   },
   donutRingOuter: {
     position: 'absolute',
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 8,
+    width: 84, height: 84,
+    borderRadius: 42, borderWidth: 8,
   },
   donutRingProgress: {
     position: 'absolute',
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 8,
+    width: 84, height: 84,
+    borderRadius: 42, borderWidth: 8,
     borderTopColor: 'transparent',
     borderLeftColor: 'transparent',
     transform: [{ rotate: '45deg' }],
@@ -408,39 +396,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  donutValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '800',
-    lineHeight: 20,
-  },
-  donutSub: {
-    fontSize: fontSize.xs,
-    lineHeight: 14,
-  },
-  donutStats: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  donutStatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  donutDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    flexShrink: 0,
-  },
-  donutLabel: {
-    fontSize: fontSize.sm,
-    flex: 1,
-  },
-  donutVal: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-  },
-  // Small cards
+  donutValue: { fontSize: fontSize.lg, fontWeight: '800', lineHeight: 20 },
+  donutSub: { fontSize: fontSize.xs, lineHeight: 14 },
+  donutStats: { flex: 1, gap: spacing.sm },
+  donutStatRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  donutDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  donutLabel: { fontSize: fontSize.sm, flex: 1 },
+  donutVal: { fontSize: fontSize.sm, fontWeight: '700' },
+
   smallCardsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -455,7 +418,6 @@ const styles = StyleSheet.create({
   smallCardValue: { fontSize: fontSize.xxl, fontWeight: '800', marginBottom: 2 },
   smallCardSub: { fontSize: fontSize.xs },
 
-  // Section label
   sectionLabel: {
     fontSize: fontSize.sm,
     fontWeight: '600',
@@ -465,7 +427,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Streak
   streakHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -488,7 +449,6 @@ const styles = StyleSheet.create({
   },
   streakDotText: { fontSize: fontSize.xs, fontWeight: '700' },
 
-  // Quick log
   quickLogRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -502,7 +462,6 @@ const styles = StyleSheet.create({
   },
   quickLogText: { fontSize: fontSize.sm, fontWeight: '600' },
 
-  // Mood
   moodCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -517,7 +476,6 @@ const styles = StyleSheet.create({
   moodSub: { fontSize: fontSize.xs, marginTop: 2 },
   moodArrow: { fontSize: fontSize.xl, fontWeight: '700' },
 
-  // Ticker
   tickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

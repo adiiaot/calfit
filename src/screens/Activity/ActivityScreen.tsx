@@ -321,7 +321,7 @@ function HistoryTab({ theme }: { theme: typeof colors.dark }) {
 }
 
 // ── MAIN SCREEN ──────────────────────────────────────────────
-export default function WorkoutScreen() {
+export default function ActivityScreen() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const [activeTab, setActiveTab] = useState('Today');

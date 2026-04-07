@@ -5,16 +5,27 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native';
+import { useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import {
+  getTodayCalories,
+  getTodayWater,
+  getTodaySteps,
+  logWater,
+} from '../../services/profileService';
 
 // ── READINESS CARD ───────────────────────────────────────────
-function ReadinessCard({ theme }: { theme: typeof colors.dark }) {
-  const score = 78;
+function ReadinessCard({ theme, score }: {
+  theme: typeof colors.dark;
+  score: number;
+}) {
   const pct = score / 100;
+  const label = score >= 80 ? 'Great recovery' : score >= 60 ? 'Good recovery' : 'Rest recommended';
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -30,7 +41,7 @@ function ReadinessCard({ theme }: { theme: typeof colors.dark }) {
             </Text>
           </Text>
           <Text style={[styles.readinessSub, { color: theme.textMuted }]}>
-            Good recovery · Sleep 7.2h
+            {label}
           </Text>
         </View>
         <View style={styles.readinessBarWrap}>
@@ -47,11 +58,13 @@ function ReadinessCard({ theme }: { theme: typeof colors.dark }) {
 }
 
 // ── CALORIE DONUT CARD ───────────────────────────────────────
-function CalorieCard({ theme }: { theme: typeof colors.dark }) {
-  const goal = 2000;
-  const consumed = 1340;
-  const burned = 320;
-  const remaining = goal - consumed + burned;
+function CalorieCard({ theme, consumed, goal }: {
+  theme: typeof colors.dark;
+  consumed: number;
+  goal: number;
+}) {
+  const burned = 0;
+  const remaining = Math.max(goal - consumed + burned, 0);
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -92,11 +105,22 @@ function CalorieCard({ theme }: { theme: typeof colors.dark }) {
 }
 
 // ── SMALL STAT CARDS ─────────────────────────────────────────
-function SmallStatCards({ theme }: { theme: typeof colors.dark }) {
+function SmallStatCards({ theme, waterMl, waterGoalMl, steps, stepGoal }: {
+  theme: typeof colors.dark;
+  waterMl: number;
+  waterGoalMl: number;
+  steps: number;
+  stepGoal: number;
+}) {
+  const waterL = (waterMl / 1000).toFixed(1);
+  const waterGoalL = (waterGoalMl / 1000).toFixed(1);
+  const stepsFormatted = steps >= 1000 ? `${(steps / 1000).toFixed(1)}K` : steps.toString();
+  const stepGoalFormatted = stepGoal >= 1000 ? `${stepGoal / 1000}K` : stepGoal.toString();
+
   const stats = [
-    { label: 'Water', value: '1.6L', sub: 'of 2.5L', color: theme.accentSecond },
-    { label: 'Steps', value: '6,420', sub: 'of 10K', color: theme.accent },
-    { label: 'Sleep', value: '7.2h', sub: 'of 8h', color: theme.purple },
+    { label: 'Water', value: `${waterL}L`, sub: `of ${waterGoalL}L`, color: theme.accentSecond },
+    { label: 'Steps', value: stepsFormatted, sub: `of ${stepGoalFormatted}`, color: theme.accent },
+    { label: 'Sleep', value: '—', sub: 'not logged', color: theme.purple },
   ];
 
   return (
@@ -122,10 +146,14 @@ function SmallStatCards({ theme }: { theme: typeof colors.dark }) {
 }
 
 // ── STREAK CARD ──────────────────────────────────────────────
-function StreakCard({ theme }: { theme: typeof colors.dark }) {
+function StreakCard({ theme, streakCount }: {
+  theme: typeof colors.dark;
+  streakCount: number;
+}) {
   const navigation = useNavigation<any>();
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const completedDays = 5;
+  const today = new Date().getDay();
+  const adjustedToday = today === 0 ? 6 : today - 1;
 
   return (
     <TouchableOpacity
@@ -134,10 +162,12 @@ function StreakCard({ theme }: { theme: typeof colors.dark }) {
     >
       <View style={styles.streakHeader}>
         <Text style={[styles.streakTitle, { color: theme.textPrimary }]}>
-          14-Day Streak 🔥
+          {streakCount}-Day Streak 🔥
         </Text>
         <View style={[styles.goldBadge, { borderColor: theme.gold }]}>
-          <Text style={[styles.goldBadgeText, { color: theme.gold }]}>Gold</Text>
+          <Text style={[styles.goldBadgeText, { color: theme.gold }]}>
+            {streakCount >= 30 ? 'Gold' : streakCount >= 7 ? 'Silver' : 'Bronze'}
+          </Text>
         </View>
       </View>
       <View style={styles.streakDots}>
@@ -145,13 +175,13 @@ function StreakCard({ theme }: { theme: typeof colors.dark }) {
           <View key={`${day}-${i}`} style={[
             styles.streakDot,
             {
-              backgroundColor: i < completedDays ? theme.accent : theme.card,
-              borderColor: i < completedDays ? theme.accent : theme.border,
+              backgroundColor: i <= adjustedToday ? theme.accent : theme.card,
+              borderColor: i <= adjustedToday ? theme.accent : theme.border,
             }
           ]}>
             <Text style={[
               styles.streakDotText,
-              { color: i < completedDays ? theme.bg : theme.textMuted }
+              { color: i <= adjustedToday ? theme.bg : theme.textMuted }
             ]}>
               {day}
             </Text>
@@ -163,19 +193,37 @@ function StreakCard({ theme }: { theme: typeof colors.dark }) {
 }
 
 // ── QUICK LOG ────────────────────────────────────────────────
-function QuickLog({ theme }: { theme: typeof colors.dark }) {
-  const actions = ['+ Food', '+ Water', '+ Sleep', 'Workout'];
+function QuickLog({ theme, onWaterLog }: {
+  theme: typeof colors.dark;
+  onWaterLog: () => void;
+}) {
+  const navigation = useNavigation<any>();
 
   return (
     <View style={styles.quickLogRow}>
-      {actions.map((a) => (
-        <TouchableOpacity key={a} style={[
-          styles.quickLogBtn,
-          { backgroundColor: theme.card, borderColor: theme.border }
-        ]}>
-          <Text style={[styles.quickLogText, { color: theme.accent }]}>{a}</Text>
-        </TouchableOpacity>
-      ))}
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Calorie')}
+        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
+        <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Food</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onWaterLog}
+        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
+        <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Water</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
+        <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Sleep</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Activity')}
+        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
+        <Text style={[styles.quickLogText, { color: theme.accent }]}>Workout</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -234,16 +282,69 @@ function FriendsTicker({ theme }: { theme: typeof colors.dark }) {
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
+
+  // Real data from Supabase
+  const [caloriesConsumed, setCaloriesConsumed] = useState(0);
+  const [waterMl, setWaterMl] = useState(0);
+  const [steps, setSteps] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const calorieGoal = profile?.daily_calorie_goal ?? 2000;
+  const waterGoalMl = profile?.water_goal_ml ?? 2500;
+  const stepGoal = profile?.step_goal ?? 10000;
+  const streakCount = profile?.streak_count ?? 0;
+
+  const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'there';
 
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? 'Good morning' :
     hour < 17 ? 'Good afternoon' : 'Good evening';
 
- const { profile } = useAuthStore();
-const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'Favour';
+  // Calculate readiness score from real data
+  const readinessScore = Math.min(
+    Math.round(
+      (waterMl / waterGoalMl) * 30 +
+      (steps / stepGoal) * 30 +
+      40 // base score
+    ),
+    100
+  );
+
+  // Load real data on mount
+  useEffect(() => {
+    if (!user?.id) return;
+    loadDashboardData();
+  }, [user?.id]);
+
+  const loadDashboardData = async () => {
+    if (!user?.id) return;
+    setIsLoading(true);
+    try {
+      const [calories, water, stepCount] = await Promise.all([
+        getTodayCalories(user.id),
+        getTodayWater(user.id),
+        getTodaySteps(user.id),
+      ]);
+      setCaloriesConsumed(calories);
+      setWaterMl(water);
+      setSteps(stepCount);
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickWater = async () => {
+    if (!user?.id) return;
+    const success = await logWater(user.id, 250);
+    if (success) {
+      setWaterMl((prev) => prev + 250);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
@@ -251,7 +352,7 @@ const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'Favour';
       <View style={[styles.topBar, { backgroundColor: theme.bg }]}>
         <View>
           <Text style={[styles.greeting, { color: theme.textPrimary }]}>
-            {greeting}, {firstName}
+            {greeting}, {firstName} 👋
           </Text>
           <Text style={[styles.date, { color: theme.textSecondary }]}>
             {new Date().toLocaleDateString('en-US', {
@@ -260,51 +361,56 @@ const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'Favour';
           </Text>
         </View>
         <View style={styles.topBarRight}>
-          {/* Notification Bell */}
-         <TouchableOpacity
-  onPress={() => navigation.getParent()?.navigate('Notifications')}
-  style={[
-    styles.bellBtn,
-    { backgroundColor: theme.card, borderColor: theme.border }
-  ]}
->
-  <Text style={styles.bellIcon}>🔔</Text>
-  <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
-</TouchableOpacity>
-          {/* Profile Avatar — navigates to Settings */}
           <TouchableOpacity
-  onPress={() => navigation.getParent()?.navigate('Settings')}
-  style={[
-    styles.avatarBtn,
-    { backgroundColor: theme.accentDim, borderColor: theme.accent }
-  ]}
->
-  <Text style={[styles.avatarText, { color: theme.accent }]}>
-    {firstName[0].toUpperCase()}
-  </Text>
-</TouchableOpacity>
+            onPress={() => navigation.getParent()?.navigate('Notifications')}
+            style={[styles.bellBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
+            <Text style={styles.bellIcon}>🔔</Text>
+            <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.getParent()?.navigate('Settings')}
+            style={[styles.avatarBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
+          >
+            <Text style={[styles.avatarText, { color: theme.accent }]}>
+              {firstName[0].toUpperCase()}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* SCROLLABLE CONTENT */}
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={loadDashboardData}
+            tintColor={theme.accent}
+            colors={[theme.accent]}
+          />
+        }
       >
-        <ReadinessCard theme={theme} />
-        <CalorieCard theme={theme} />
-        <SmallStatCards theme={theme} />
+        <ReadinessCard theme={theme} score={readinessScore} />
+        <CalorieCard theme={theme} consumed={caloriesConsumed} goal={calorieGoal} />
+        <SmallStatCards
+          theme={theme}
+          waterMl={waterMl}
+          waterGoalMl={waterGoalMl}
+          steps={steps}
+          stepGoal={stepGoal}
+        />
 
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           Personal Streak
         </Text>
-        <StreakCard theme={theme} />
+        <StreakCard theme={theme} streakCount={streakCount} />
 
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           Quick Log
         </Text>
-        <QuickLog theme={theme} />
+        <QuickLog theme={theme} onWaterLog={handleQuickWater} />
 
         <MoodCard theme={theme} />
         <FriendsTicker theme={theme} />
@@ -374,16 +480,11 @@ const styles = StyleSheet.create({
   progressBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 3 },
 
-  donutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
+  donutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   donutContainer: {
     width: 90, height: 90,
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
   donutRingOuter: {
@@ -401,8 +502,7 @@ const styles = StyleSheet.create({
   },
   donutCenterText: {
     position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   donutValue: { fontSize: fontSize.lg, fontWeight: '800', lineHeight: 20 },
   donutSub: { fontSize: fontSize.xs, lineHeight: 14 },

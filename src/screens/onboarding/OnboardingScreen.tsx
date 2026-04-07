@@ -439,27 +439,24 @@ function Step7({
 }) {
   const [showPassword, setShowPassword] = useState(false);
 
-  const settings = [
-    { label: 'Appearance', value: 'Dark Mode', icon: 'moon-outline', toggle: true },
-    { label: 'Units', value: 'Metric (kg, cm)', icon: 'scale-outline', toggle: false },
-    { label: 'Instagram', value: 'Link account', icon: 'logo-instagram', toggle: false },
-    { label: 'Step Tracking', value: 'Use phone sensors', icon: 'footsteps-outline', toggle: true },
-    { label: 'Smartwatch', value: 'Connect device', icon: 'watch-outline', toggle: false },
-  ];
-
   return (
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: theme.textPrimary }]}>
         Last step!{'\n'}Create your account
       </Text>
+      <Text style={[styles.stepSub, { color: theme.textSecondary }]}>
+        Your CalFit account is ready. Just set your email and password.
+      </Text>
 
       {/* Email */}
-      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+        Email
+      </Text>
       <View style={[styles.fieldInput, {
         backgroundColor: theme.card,
         borderColor: theme.border,
         borderWidth: 1,
-        marginBottom: spacing.md,
+        marginBottom: spacing.lg,
       }]}>
         <Ionicons name="mail-outline" size={18} color={theme.textMuted} />
         <TextInput
@@ -470,11 +467,14 @@ function Step7({
           style={[styles.stepTextInput, { color: theme.textPrimary }]}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
         />
       </View>
 
       {/* Password */}
-      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+        Password
+      </Text>
       <View style={[styles.fieldInput, {
         backgroundColor: theme.card,
         borderColor: theme.border,
@@ -489,8 +489,12 @@ function Step7({
           placeholderTextColor={theme.textMuted}
           style={[styles.stepTextInput, { color: theme.textPrimary }]}
           secureTextEntry={!showPassword}
+          autoCorrect={false}
         />
-        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+        <TouchableOpacity
+          onPress={() => setShowPassword(!showPassword)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Ionicons
             name={showPassword ? 'eye-off-outline' : 'eye-outline'}
             size={18}
@@ -499,43 +503,20 @@ function Step7({
         </TouchableOpacity>
       </View>
 
-      <Text style={[styles.idNote, { color: theme.textMuted, marginBottom: spacing.lg }]}>
-        Your data is encrypted and never sold. Delete your account anytime.
-      </Text>
-
-      {/* App preferences preview */}
-      <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: spacing.sm }]}>
-        App Preferences
-      </Text>
-      <View style={styles.personalList}>
-        {settings.map((s) => (
-          <View key={s.label} style={[styles.personalRow, {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          }]}>
-            <View style={[styles.personalIcon, {
-              backgroundColor: theme.accentDim as string,
-            }]}>
-              <Ionicons name={s.icon as any} size={18} color={theme.accent} />
-            </View>
-            <View style={styles.personalInfo}>
-              <Text style={[styles.personalLabel, { color: theme.textPrimary }]}>
-                {s.label}
-              </Text>
-              <Text style={[styles.personalValue, { color: theme.textMuted }]}>
-                {s.value}
-              </Text>
-            </View>
-            {s.toggle ? (
-              <View style={[styles.toggleOn, { backgroundColor: theme.accent }]}>
-                <View style={styles.toggleKnob} />
-              </View>
-            ) : (
-              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-            )}
-          </View>
-        ))}
+      {/* Privacy note */}
+      <View style={[styles.privacyCard, {
+        backgroundColor: theme.accentDim as string,
+        borderColor: theme.accent,
+      }]}>
+        <Ionicons name="shield-checkmark-outline" size={18} color={theme.accent} />
+        <Text style={[styles.privacyText, { color: theme.textPrimary }]}>
+          Your data is encrypted and never sold. You can delete your account at any time from Settings.
+        </Text>
       </View>
+
+      <Text style={[styles.idNote, { color: theme.textMuted, marginTop: spacing.md }]}>
+        You can set your appearance, units, and connected apps in Settings after signing up.
+      </Text>
     </View>
   );
 }
@@ -715,6 +696,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   logo: { fontSize: fontSize.xl, fontWeight: '800' },
+
+  //Privacy card style on step 7
+  privacyCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+  },
+  privacyText: {
+    fontSize: fontSize.sm,
+    flex: 1,
+    lineHeight: 18,
+  },
 
   progressWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   progressBg: { height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 6 },

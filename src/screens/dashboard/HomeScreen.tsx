@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
@@ -25,7 +26,9 @@ function ReadinessCard({ theme, score }: {
   score: number;
 }) {
   const pct = score / 100;
-  const label = score >= 80 ? 'Great recovery' : score >= 60 ? 'Good recovery' : 'Rest recommended';
+  const label =
+    score >= 80 ? 'Great recovery' :
+    score >= 60 ? 'Good recovery' : 'Rest recommended';
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -105,22 +108,42 @@ function CalorieCard({ theme, consumed, goal }: {
 }
 
 // ── SMALL STAT CARDS ─────────────────────────────────────────
-function SmallStatCards({ theme, waterMl, waterGoalMl, steps, stepGoal }: {
+function SmallStatCards({ theme, waterMl, waterGoalMl, steps, stepGoal, sleepHrs }: {
   theme: typeof colors.dark;
   waterMl: number;
   waterGoalMl: number;
   steps: number;
   stepGoal: number;
+  sleepHrs: number;
 }) {
   const waterL = (waterMl / 1000).toFixed(1);
   const waterGoalL = (waterGoalMl / 1000).toFixed(1);
-  const stepsFormatted = steps >= 1000 ? `${(steps / 1000).toFixed(1)}K` : steps.toString();
-  const stepGoalFormatted = stepGoal >= 1000 ? `${stepGoal / 1000}K` : stepGoal.toString();
+  const stepsFormatted = steps >= 1000
+    ? `${(steps / 1000).toFixed(1)}K`
+    : steps.toString();
+  const stepGoalFormatted = stepGoal >= 1000
+    ? `${stepGoal / 1000}K`
+    : stepGoal.toString();
 
   const stats = [
-    { label: 'Water', value: `${waterL}L`, sub: `of ${waterGoalL}L`, color: theme.accentSecond },
-    { label: 'Steps', value: stepsFormatted, sub: `of ${stepGoalFormatted}`, color: theme.accent },
-    { label: 'Sleep', value: '—', sub: 'not logged', color: theme.purple },
+    {
+      label: 'Water',
+      value: `${waterL}L`,
+      sub: `of ${waterGoalL}L`,
+      color: theme.accentSecond,
+    },
+    {
+      label: 'Steps',
+      value: stepsFormatted === '0' ? '—' : stepsFormatted,
+      sub: `of ${stepGoalFormatted}`,
+      color: theme.accent,
+    },
+    {
+      label: 'Sleep',
+      value: sleepHrs > 0 ? `${sleepHrs}h` : '—',
+      sub: sleepHrs > 0 ? 'of 8h' : 'not logged',
+      color: theme.purple,
+    },
   ];
 
   return (
@@ -155,6 +178,10 @@ function StreakCard({ theme, streakCount }: {
   const today = new Date().getDay();
   const adjustedToday = today === 0 ? 6 : today - 1;
 
+  const badgeLabel =
+    streakCount >= 30 ? 'Gold' :
+    streakCount >= 7 ? 'Silver' : 'Bronze';
+
   return (
     <TouchableOpacity
       onPress={() => navigation.getParent()?.navigate('Streaks')}
@@ -162,11 +189,11 @@ function StreakCard({ theme, streakCount }: {
     >
       <View style={styles.streakHeader}>
         <Text style={[styles.streakTitle, { color: theme.textPrimary }]}>
-          {streakCount}-Day Streak 🔥
+          {streakCount > 0 ? `${streakCount}-Day Streak 🔥` : 'Start Your Streak 🔥'}
         </Text>
         <View style={[styles.goldBadge, { borderColor: theme.gold }]}>
           <Text style={[styles.goldBadgeText, { color: theme.gold }]}>
-            {streakCount >= 30 ? 'Gold' : streakCount >= 7 ? 'Silver' : 'Bronze'}
+            {badgeLabel}
           </Text>
         </View>
       </View>
@@ -188,14 +215,19 @@ function StreakCard({ theme, streakCount }: {
           </View>
         ))}
       </View>
+      <Text style={[styles.streakHint, { color: theme.textMuted }]}>
+        Tap to check in today →
+      </Text>
     </TouchableOpacity>
   );
 }
 
 // ── QUICK LOG ────────────────────────────────────────────────
-function QuickLog({ theme, onWaterLog }: {
+function QuickLog({ theme, onWaterLog, onSleepLog, onStepsLog }: {
   theme: typeof colors.dark;
   onWaterLog: () => void;
+  onSleepLog: () => void;
+  onStepsLog: () => void;
 }) {
   const navigation = useNavigation<any>();
 
@@ -214,6 +246,7 @@ function QuickLog({ theme, onWaterLog }: {
         <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Water</Text>
       </TouchableOpacity>
       <TouchableOpacity
+        onPress={onSleepLog}
         style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
       >
         <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Sleep</Text>
@@ -228,13 +261,50 @@ function QuickLog({ theme, onWaterLog }: {
   );
 }
 
+// ── SLEEP LOG MODAL ───────────────────────────────────────────
+function SleepLogModal({ theme, onLog }: {
+  theme: typeof colors.dark;
+  onLog: (hrs: number) => void;
+}) {
+  const options = [5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
+
+  return (
+    <View style={[styles.sleepModal, {
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+    }]}>
+      <Text style={[styles.sleepModalTitle, { color: theme.textPrimary }]}>
+        How many hours did you sleep?
+      </Text>
+      <View style={styles.sleepOptions}>
+        {options.map((hrs) => (
+          <TouchableOpacity
+            key={hrs}
+            onPress={() => onLog(hrs)}
+            style={[styles.sleepOption, {
+              backgroundColor: theme.accentDim as string,
+              borderColor: theme.accent,
+            }]}
+          >
+            <Text style={[styles.sleepOptionText, { color: theme.accent }]}>
+              {hrs}h
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ── MOOD CARD ────────────────────────────────────────────────
 function MoodCard({ theme }: { theme: typeof colors.dark }) {
+  const navigation = useNavigation<any>();
+
   return (
-    <TouchableOpacity style={[
-      styles.moodCard,
-      { backgroundColor: theme.card, borderColor: theme.border }
-    ]}>
+    <TouchableOpacity
+      onPress={() => navigation.navigate('Coach')}
+      style={[styles.moodCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+    >
       <View style={styles.moodText}>
         <Text style={[styles.moodTitle, { color: theme.textPrimary }]}>
           How are you feeling today?
@@ -250,10 +320,43 @@ function MoodCard({ theme }: { theme: typeof colors.dark }) {
 
 // ── FRIENDS TICKER ───────────────────────────────────────────
 function FriendsTicker({ theme }: { theme: typeof colors.dark }) {
-  const items = [
-    { text: 'Alex just completed a workout', dot: theme.accent },
-    { text: 'Jordan hit 10,000 steps', dot: theme.accentSecond },
-  ];
+  const navigation = useNavigation<any>();
+
+  // Will be populated with real friends data in Phase 4
+  const hasFriends = false;
+
+  if (!hasFriends) {
+    return (
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.tickerHeader}>
+          <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
+            Friends Activity
+          </Text>
+          <View style={styles.liveBadge}>
+            <View style={[styles.liveDot, { backgroundColor: theme.border }]} />
+            <Text style={[styles.liveText, { color: theme.textMuted }]}>LIVE</Text>
+          </View>
+        </View>
+        <Text style={[styles.emptyFriendsText, { color: theme.textSecondary }]}>
+          No friends activity yet.
+        </Text>
+        <Text style={[styles.emptyFriendsSub, { color: theme.textMuted }]}>
+          Invite friends to join CalFit and see their activity here in real time.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Credits')}
+          style={[styles.inviteBtn, {
+            backgroundColor: theme.accentDim as string,
+            borderColor: theme.accent,
+          }]}
+        >
+          <Text style={[styles.inviteBtnText, { color: theme.accent }]}>
+            📨 Copy Invite Link
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -266,14 +369,6 @@ function FriendsTicker({ theme }: { theme: typeof colors.dark }) {
           <Text style={[styles.liveText, { color: theme.accent }]}>LIVE</Text>
         </View>
       </View>
-      {items.map((item, i) => (
-        <View key={i} style={styles.tickerItem}>
-          <View style={[styles.tickerDot, { backgroundColor: item.dot }]} />
-          <Text style={[styles.tickerText, { color: theme.textPrimary }]}>
-            {item.text}
-          </Text>
-        </View>
-      ))}
     </View>
   );
 }
@@ -285,35 +380,30 @@ export default function HomeScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  // Real data from Supabase
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [waterMl, setWaterMl] = useState(0);
   const [steps, setSteps] = useState(0);
+  const [sleepHrs, setSleepHrs] = useState(0);
+  const [showSleepModal, setShowSleepModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const calorieGoal = profile?.daily_calorie_goal ?? 2000;
   const waterGoalMl = profile?.water_goal_ml ?? 2500;
   const stepGoal = profile?.step_goal ?? 10000;
   const streakCount = profile?.streak_count ?? 0;
-
   const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'there';
+
+  // Readiness score calculated from real data
+  const waterScore = Math.min((waterMl / waterGoalMl) * 30, 30);
+  const stepScore = Math.min((steps / stepGoal) * 30, 30);
+  const sleepScore = sleepHrs >= 7 ? 40 : sleepHrs >= 5 ? 20 : 10;
+  const readinessScore = Math.round(waterScore + stepScore + sleepScore);
 
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? 'Good morning' :
     hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  // Calculate readiness score from real data
-  const readinessScore = Math.min(
-    Math.round(
-      (waterMl / waterGoalMl) * 30 +
-      (steps / stepGoal) * 30 +
-      40 // base score
-    ),
-    100
-  );
-
-  // Load real data on mount
   useEffect(() => {
     if (!user?.id) return;
     loadDashboardData();
@@ -344,6 +434,26 @@ export default function HomeScreen() {
     if (success) {
       setWaterMl((prev) => prev + 250);
     }
+  };
+
+  const handleSleepLog = (hrs: number) => {
+    setSleepHrs(hrs);
+    setShowSleepModal(false);
+    // Will write to sleep_logs table in Phase 2
+    Alert.alert(
+      'Sleep Logged ✓',
+      `${hrs} hours logged for last night.`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleStepsLog = () => {
+    // Will connect to Expo Sensors in Phase 2
+    Alert.alert(
+      'Steps',
+      'Step tracking via your phone sensors will be connected in the next update. Your steps will count automatically.',
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -400,7 +510,13 @@ export default function HomeScreen() {
           waterGoalMl={waterGoalMl}
           steps={steps}
           stepGoal={stepGoal}
+          sleepHrs={sleepHrs}
         />
+
+        {/* Sleep log inline modal */}
+        {showSleepModal && (
+          <SleepLogModal theme={theme} onLog={handleSleepLog} />
+        )}
 
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           Personal Streak
@@ -410,7 +526,12 @@ export default function HomeScreen() {
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           Quick Log
         </Text>
-        <QuickLog theme={theme} onWaterLog={handleQuickWater} />
+        <QuickLog
+          theme={theme}
+          onWaterLog={handleQuickWater}
+          onSleepLog={() => setShowSleepModal(!showSleepModal)}
+          onStepsLog={handleStepsLog}
+        />
 
         <MoodCard theme={theme} />
         <FriendsTicker theme={theme} />
@@ -549,13 +670,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   goldBadgeText: { fontSize: fontSize.xs, fontWeight: '700' },
-  streakDots: { flexDirection: 'row', gap: spacing.xs },
+  streakDots: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
   streakDot: {
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1,
   },
   streakDotText: { fontSize: fontSize.xs, fontWeight: '700' },
+  streakHint: { fontSize: fontSize.xs, marginTop: 4 },
 
   quickLogRow: {
     flexDirection: 'row',
@@ -569,6 +691,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quickLogText: { fontSize: fontSize.sm, fontWeight: '600' },
+
+  // Sleep modal
+  sleepModal: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  sleepModalTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.md },
+  sleepOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  sleepOption: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+  },
+  sleepOptionText: { fontSize: fontSize.base, fontWeight: '700' },
 
   moodCard: {
     marginHorizontal: spacing.lg,
@@ -584,6 +728,7 @@ const styles = StyleSheet.create({
   moodSub: { fontSize: fontSize.xs, marginTop: 2 },
   moodArrow: { fontSize: fontSize.xl, fontWeight: '700' },
 
+  // Friends ticker
   tickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -593,12 +738,13 @@ const styles = StyleSheet.create({
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   liveDot: { width: 6, height: 6, borderRadius: 3 },
   liveText: { fontSize: fontSize.xs, fontWeight: '700' },
-  tickerItem: {
-    flexDirection: 'row',
+  emptyFriendsText: { fontSize: fontSize.base, fontWeight: '600', marginBottom: 4 },
+  emptyFriendsSub: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
+  inviteBtn: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: 4,
   },
-  tickerDot: { width: 6, height: 6, borderRadius: 3 },
-  tickerText: { fontSize: fontSize.sm },
+  inviteBtnText: { fontSize: fontSize.base, fontWeight: '700' },
 });

@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
+import { searchFood, commonFoods, FoodResult } from '../../services/foodSearchService';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { logFood, logWater, getTodayCalories, getTodayWater } from '../../services/profileService';
 
@@ -546,6 +547,92 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center', justifyContent: 'center',
   },
+
+  // Food search modal
+  foodSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
+  foodSearchInput: { flex: 1, fontSize: fontSize.base },
+  foodListLabel: { fontSize: fontSize.xs, fontWeight: '600', marginBottom: spacing.xs },
+  foodList: { maxHeight: 300 },
+
+  foodResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.xs,
+    gap: spacing.md,
+  },
+  foodResultInfo: { flex: 1 },
+  foodResultName: { fontSize: fontSize.base, fontWeight: '600' },
+  foodResultMeta: { fontSize: fontSize.xs, marginTop: 2 },
+  foodResultCal: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  foodResultCalText: { fontSize: fontSize.lg, fontWeight: '800' },
+  foodResultCalLabel: { fontSize: 8, fontWeight: '600' },
+
+  // Selected food
+  selectedFood: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  selectedFoodHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedFoodName: { fontSize: fontSize.lg, fontWeight: '700', flex: 1 },
+  changeFood: { fontSize: fontSize.sm, fontWeight: '600' },
+  portionLabel: { fontSize: fontSize.sm, fontWeight: '600' },
+  portionInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.sm,
+  },
+  portionText: { flex: 1, fontSize: 28, fontWeight: '800' },
+  portionSuffix: { fontSize: fontSize.lg, fontWeight: '600' },
+  portionBtns: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+  portionBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+  },
+  portionBtnText: { fontSize: fontSize.sm, fontWeight: '600' },
+
+  // Nutrition preview
+  nutritionPreview: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  nutritionItem: {
+    flex: 1,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  nutritionValue: { fontSize: fontSize.base, fontWeight: '800' },
+  nutritionLabel: { fontSize: 9, marginTop: 2 },
 
   card: {
     marginHorizontal: spacing.lg,

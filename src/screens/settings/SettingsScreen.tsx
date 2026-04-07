@@ -237,11 +237,12 @@ export default function SettingsScreen() {
           title="Tracking & Goals"
           items={[
             {
-              label: 'Update Goals',
-              value: 'Calories, macros, water',
-              icon: 'flag-outline',
-              iconColor: theme.accent,
-            },
+  label: 'Update Goals',
+  value: 'Calories, macros, water',
+  icon: 'flag-outline',
+  iconColor: theme.accent,
+  onPress: () => navigation.navigate('Goals' as never),
+},
             {
               label: 'Micronutrients',
               value: 'Track vitamins & minerals',

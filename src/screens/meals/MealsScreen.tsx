@@ -5,227 +5,611 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
+import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 
-// ── DURATION SELECTOR ────────────────────────────────────────
-function DurationSelector({
-  theme,
-  active,
-  onSelect,
-}: {
-  theme: typeof colors.dark;
-  active: string;
-  onSelect: (d: string) => void;
-}) {
-  const durations = ['1 Day', '3 Days', '7 Days', '14 Days', '1 Month'];
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.durationRow}
-    >
-      {durations.map((d) => (
-        <TouchableOpacity
-          key={d}
-          onPress={() => onSelect(d)}
-          style={[
-            styles.durationTab,
-            {
-              backgroundColor: active === d ? theme.accent : theme.card,
-              borderColor: active === d ? theme.accent : theme.border,
-            },
-          ]}
-        >
-          <Text style={[
-            styles.durationText,
-            { color: active === d ? theme.bg : theme.textSecondary },
-            active === d && { fontWeight: '700' },
-          ]}>
-            {d}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+// ── TYPES ─────────────────────────────────────────────────────
+interface MealPlan {
+  id: string;
+  title: string;
+  duration_days: number;
+  calories_per_day: number;
+  created_at: string;
+  plan: DayPlan[];
 }
 
-// ── MODE SWITCH ──────────────────────────────────────────────
-function ModeSwitch({
+interface DayPlan {
+  day: number;
+  meals: {
+    type: string;
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+  }[];
+  total_calories: number;
+}
+
+// ── CONVERSATION QUESTIONS ────────────────────────────────────
+const questions = [
+  {
+    id: 'cooking',
+    question: 'How do you usually get your meals?',
+    options: ['I cook at home', 'I buy food mostly', 'Mix of both'],
+  },
+  {
+    id: 'time',
+    question: 'How much time can you spend cooking daily?',
+    options: ['Under 30 mins', '30–60 mins', 'Over 1 hour', 'I prefer no cooking'],
+  },
+  {
+    id: 'budget',
+    question: "What's your daily food budget?",
+    options: ['Under ₦2,000', '₦2,000–₦5,000', '₦5,000–₦10,000', 'Over ₦10,000'],
+  },
+  {
+    id: 'dislikes',
+    question: 'Any foods you strongly dislike or are allergic to?',
+    options: ['None', 'Seafood', 'Dairy', 'Gluten', 'Red meat', 'Nuts'],
+  },
+  {
+    id: 'cuisine',
+    question: 'Preferred cuisine style?',
+    options: ['Nigerian / African', 'Mixed (local + international)', 'International only', 'Whatever fits my goals'],
+  },
+];
+
+// ── QUESTION CARD ─────────────────────────────────────────────
+function QuestionCard({
   theme,
-  active,
-  onSwitch,
+  question,
+  options,
+  onSelect,
+  questionNum,
+  total,
 }: {
   theme: typeof colors.dark;
-  active: 'Manual' | 'AI Generated';
-  onSwitch: (m: 'Manual' | 'AI Generated') => void;
+  question: string;
+  options: string[];
+  onSelect: (answer: string) => void;
+  questionNum: number;
+  total: number;
 }) {
   return (
-    <View style={[styles.modeSwitch, {
-      backgroundColor: theme.card,
-      borderColor: theme.border,
-    }]}>
-      {(['Manual', 'AI Generated'] as const).map((m) => (
-        <TouchableOpacity
-          key={m}
-          onPress={() => onSwitch(m)}
-          style={[
-            styles.modeBtn,
-            active === m && {
-              backgroundColor: theme.bg,
-              borderColor: theme.accent,
-              borderWidth: 1,
-            },
-          ]}
-        >
-          <Text style={[
-            styles.modeBtnText,
-            { color: active === m ? theme.accent : theme.textMuted },
-            active === m && { fontWeight: '700' },
-          ]}>
-            {m}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <View style={styles.questionWrap}>
+      <View style={styles.questionProgress}>
+        {Array.from({ length: total }).map((_, i) => (
+          <View
+            key={i}
+            style={[styles.progressDot, {
+              backgroundColor: i < questionNum ? theme.accent : theme.border,
+            }]}
+          />
+        ))}
+      </View>
+
+      <Text style={[styles.questionLabel, { color: theme.textMuted }]}>
+        Question {questionNum} of {total}
+      </Text>
+
+      <Text style={[styles.questionText, { color: theme.textPrimary }]}>
+        {question}
+      </Text>
+
+      <View style={styles.optionsWrap}>
+        {options.map((opt) => (
+          <TouchableOpacity
+            key={opt}
+            onPress={() => onSelect(opt)}
+            style={[styles.optionBtn, {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            }]}
+          >
+            <Text style={[styles.optionText, { color: theme.textPrimary }]}>
+              {opt}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
 
-// ── AI PREFERENCES CARD ──────────────────────────────────────
-function AIPrefsCard({ theme }: { theme: typeof colors.dark }) {
-  const questions = [
-    'Do you cook, buy food, or both?',
-    'Any foods you dislike or are allergic to?',
-    'Preferred cuisines? (e.g. African, Asian)',
-    'How much time do you have to cook daily?',
-    "What's your daily food budget?",
+// ── GENERATING SCREEN ─────────────────────────────────────────
+function GeneratingScreen({ theme }: { theme: typeof colors.dark }) {
+  const steps = [
+    'Analysing your goals and preferences...',
+    'Calculating your calorie targets...',
+    'Selecting foods that match your diet...',
+    'Building your personalised meal plan...',
+    'Adding Nigerian and local food options...',
+    'Finalising your plan...',
   ];
+  const [currentStep, setCurrentStep] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <View style={[styles.aiCard, {
-      backgroundColor: theme.card,
-      borderColor: theme.accent,
-    }]}>
-      <Text style={[styles.aiCardTitle, { color: theme.accent }]}>
-        CalFit Coach will ask you:
+    <View style={styles.generatingWrap}>
+      <View style={[styles.generatingIcon, {
+        backgroundColor: theme.accentDim as string,
+        borderColor: theme.accent,
+      }]}>
+        <ActivityIndicator size="large" color={theme.accent} />
+      </View>
+      <Text style={[styles.generatingTitle, { color: theme.textPrimary }]}>
+        Building Your Meal Plan
       </Text>
-      {questions.map((q) => (
-        <View key={q} style={styles.aiQuestion}>
-          <View style={[styles.aiDot, { backgroundColor: theme.accent }]} />
-          <Text style={[styles.aiQuestionText, { color: theme.textPrimary }]}>
-            {q}
+      <Text style={[styles.generatingStep, { color: theme.accent }]}>
+        {steps[currentStep]}
+      </Text>
+      <Text style={[styles.generatingHint, { color: theme.textMuted }]}>
+        CalFit Coach is crafting a plan personalised to your goals, diet, budget and lifestyle.
+      </Text>
+    </View>
+  );
+}
+
+// ── MEAL PLAN CARD ────────────────────────────────────────────
+function MealPlanCard({
+  theme,
+  plan,
+  onView,
+  onDelete,
+}: {
+  theme: typeof colors.dark;
+  plan: MealPlan;
+  onView: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <View style={[styles.planCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={styles.planCardHeader}>
+        <View style={[styles.planIcon, { backgroundColor: theme.accentDim as string }]}>
+          <Ionicons name="restaurant" size={20} color={theme.accent} />
+        </View>
+        <View style={styles.planInfo}>
+          <Text style={[styles.planTitle, { color: theme.textPrimary }]}>{plan.title}</Text>
+          <Text style={[styles.planMeta, { color: theme.textMuted }]}>
+            {plan.duration_days} days · {plan.calories_per_day} kcal/day
+          </Text>
+          <Text style={[styles.planDate, { color: theme.textMuted }]}>
+            Created {new Date(plan.created_at).toLocaleDateString('en-GB', {
+              day: 'numeric', month: 'short', year: 'numeric'
+            })}
           </Text>
         </View>
-      ))}
+        <TouchableOpacity
+          onPress={() => Alert.alert(
+            'Delete Plan',
+            'Are you sure you want to delete this meal plan?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: onDelete },
+            ]
+          )}
+        >
+          <Ionicons name="trash-outline" size={18} color={theme.red} />
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        onPress={onView}
+        style={[styles.viewPlanBtn, { backgroundColor: theme.accent }]}
+      >
+        <Text style={[styles.viewPlanBtnText, { color: theme.bg }]}>View Plan →</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-// ── DAY SELECTOR ─────────────────────────────────────────────
-function DaySelector({
+// ── DAY PLAN VIEWER ───────────────────────────────────────────
+function DayPlanViewer({
   theme,
-  activeDay,
-  onSelect,
+  plan,
+  onBack,
 }: {
   theme: typeof colors.dark;
-  activeDay: number;
-  onSelect: (i: number) => void;
+  plan: MealPlan;
+  onBack: () => void;
 }) {
-  const days = [
-    { label: 'Mon', kcal: '1820' },
-    { label: 'Tue', kcal: '1950' },
-    { label: 'Wed', kcal: '2080' },
-    { label: 'Thu', kcal: '1890' },
-    { label: 'Fri', kcal: '2010' },
-    { label: 'Sat', kcal: '1750' },
-    { label: 'Sun', kcal: '2100' },
-  ];
+  const [activeDay, setActiveDay] = useState(0);
+  const dayPlan = plan.plan[activeDay];
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.daySelectorRow}
-    >
-      {days.map((d, i) => (
-        <TouchableOpacity
-          key={d.label}
-          onPress={() => onSelect(i)}
-          style={[
-            styles.dayPill,
-            {
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+          <Text style={[styles.backText, { color: theme.textPrimary }]}>Plans</Text>
+        </TouchableOpacity>
+        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
+          {plan.title}
+        </Text>
+        <View style={{ width: 60 }} />
+      </View>
+
+      {/* Day selector */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.daySelectorRow}
+      >
+        {plan.plan.map((d, i) => (
+          <TouchableOpacity
+            key={i}
+            onPress={() => setActiveDay(i)}
+            style={[styles.dayPill, {
               backgroundColor: activeDay === i ? theme.accent : theme.card,
               borderColor: activeDay === i ? theme.accent : theme.border,
-            },
-          ]}
-        >
-          <Text style={[
-            styles.dayLabel,
-            { color: activeDay === i ? theme.bg : theme.textSecondary },
-          ]}>
-            {d.label}
-          </Text>
-          <Text style={[
-            styles.dayKcal,
-            { color: activeDay === i ? theme.bg : theme.accent },
-            activeDay === i && { opacity: 0.8 },
-          ]}>
-            {d.kcal}
-          </Text>
-          <Text style={[
-            styles.dayKcalLabel,
-            { color: activeDay === i ? theme.bg : theme.textMuted },
-            activeDay === i && { opacity: 0.6 },
-          ]}>
-            kcal
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-}
+            }]}
+          >
+            <Text style={[styles.dayPillText, {
+              color: activeDay === i ? theme.bg : theme.textSecondary,
+              fontWeight: activeDay === i ? '700' : '400',
+            }]}>
+              Day {d.day}
+            </Text>
+            <Text style={[styles.dayPillCal, {
+              color: activeDay === i ? theme.bg : theme.accent,
+              opacity: activeDay === i ? 0.8 : 1,
+            }]}>
+              {d.total_calories} kcal
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-// ── MEAL PLAN ROWS ───────────────────────────────────────────
-function MealPlanRows({ theme }: { theme: typeof colors.dark }) {
-  const meals = [
-    { type: 'Breakfast', food: 'Oats + banana + protein', kcal: '420' },
-    { type: 'Lunch', food: 'Grilled chicken + quinoa', kcal: '580' },
-    { type: 'Dinner', food: 'Salmon + sweet potato', kcal: '640' },
-    { type: 'Snack', food: 'Greek yogurt + berries', kcal: '180' },
-  ];
-
-  return (
-    <>
-      {meals.map((m) => (
-        <View key={m.type} style={[styles.mealRow, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
-          <Text style={[styles.mealType, { color: theme.textSecondary }]}>
-            {m.type}
-          </Text>
-          <Text style={[styles.mealFood, { color: theme.textPrimary }]}>
-            {m.food}
-          </Text>
-          <Text style={[styles.mealKcal, { color: theme.accent }]}>
-            {m.kcal}
-          </Text>
-        </View>
-      ))}
-    </>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.dayViewContent}
+      >
+        {dayPlan?.meals.map((meal, i) => (
+          <View key={i} style={[styles.dayMealCard, {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }]}>
+            <View style={styles.dayMealHeader}>
+              <Text style={[styles.dayMealType, { color: theme.textSecondary }]}>
+                {meal.type}
+              </Text>
+              <Text style={[styles.dayMealCal, { color: theme.accent }]}>
+                {meal.calories} kcal
+              </Text>
+            </View>
+            <Text style={[styles.dayMealName, { color: theme.textPrimary }]}>
+              {meal.name}
+            </Text>
+            <View style={styles.dayMealMacros}>
+              {[
+                { label: 'P', value: meal.protein, color: theme.accent },
+                { label: 'C', value: meal.carbs, color: theme.accentSecond },
+                { label: 'F', value: meal.fats, color: theme.purple },
+              ].map((m) => (
+                <View key={m.label} style={[styles.macroBadge, {
+                  backgroundColor: m.color + '22',
+                }]}>
+                  <Text style={[styles.macroBadgeText, { color: m.color }]}>
+                    {m.label}: {m.value}g
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function MealsScreen() {
   const { colorScheme } = useThemeStore();
+  const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
-  const [duration, setDuration] = useState('7 Days');
-  const [mode, setMode] = useState<'Manual' | 'AI Generated'>('AI Generated');
-  const [activeDay, setActiveDay] = useState(2);
 
+  const [view, setView] = useState<'home' | 'questions' | 'generating' | 'viewPlan'>('home');
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [savedPlans, setSavedPlans] = useState<MealPlan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null);
+  const [duration, setDuration] = useState(7);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user?.id) loadSavedPlans();
+  }, [user?.id]);
+
+  const loadSavedPlans = async () => {
+    if (!user?.id) return;
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const { data } = await supabase
+        .from('meal_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (data) setSavedPlans(data);
+    } catch (error) {
+      console.error('Failed to load meal plans:', error);
+    }
+  };
+
+  const handleAnswer = (answer: string) => {
+    const question = questions[questionIndex];
+    const newAnswers = { ...answers, [question.id]: answer };
+    setAnswers(newAnswers);
+
+    if (questionIndex < questions.length - 1) {
+      setQuestionIndex(questionIndex + 1);
+    } else {
+      generateMealPlan(newAnswers);
+    }
+  };
+
+  const generateMealPlan = async (finalAnswers: Record<string, string>) => {
+    setView('generating');
+    try {
+      const goal = profile?.goal ?? 'Get Fit';
+      const calories = profile?.daily_calorie_goal ?? 2000;
+      const diet = profile?.dietary_preference?.join(', ') ?? 'No preference';
+      const weight = profile?.current_weight_kg ?? 70;
+      const targetWeight = profile?.target_weight_kg ?? 65;
+
+      const prompt = `You are a professional nutritionist and meal planner. Create a detailed ${duration}-day meal plan for this person:
+
+PROFILE:
+- Goal: ${goal}
+- Current weight: ${weight}kg, Target: ${targetWeight}kg
+- Daily calorie target: ${calories} kcal
+- Dietary preferences: ${diet}
+- Activity level: ${profile?.activity_level ?? 'Moderately Active'}
+
+THEIR ANSWERS:
+- Meal source: ${finalAnswers.cooking}
+- Cooking time available: ${finalAnswers.time}
+- Daily food budget: ${finalAnswers.budget}
+- Foods to avoid: ${finalAnswers.dislikes}
+- Preferred cuisine: ${finalAnswers.cuisine}
+
+Create a realistic, practical meal plan using common Nigerian and local foods where appropriate, with some international options.
+
+IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
+{
+  "title": "Short descriptive title for this plan",
+  "calories_per_day": number,
+  "days": [
+    {
+      "day": 1,
+      "meals": [
+        {
+          "type": "Breakfast",
+          "name": "Food name and brief description",
+          "calories": number,
+          "protein": number,
+          "carbs": number,
+          "fats": number
+        },
+        {
+          "type": "Lunch",
+          "name": "Food name and brief description",
+          "calories": number,
+          "protein": number,
+          "carbs": number,
+          "fats": number
+        },
+        {
+          "type": "Dinner",
+          "name": "Food name and brief description",
+          "calories": number,
+          "protein": number,
+          "carbs": number,
+          "fats": number
+        },
+        {
+          "type": "Snack",
+          "name": "Food name and brief description",
+          "calories": number,
+          "protein": number,
+          "carbs": number,
+          "fats": number
+        }
+      ],
+      "total_calories": number
+    }
+  ]
+}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      const data = await response.json();
+      const text = data.content?.[0]?.text ?? '';
+
+      // Parse JSON from response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Invalid response from AI');
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      // Build the meal plan object
+      const newPlan: MealPlan = {
+        id: Date.now().toString(),
+        title: parsed.title,
+        duration_days: duration,
+        calories_per_day: parsed.calories_per_day,
+        created_at: new Date().toISOString(),
+        plan: parsed.days.map((d: any) => ({
+          day: d.day,
+          meals: d.meals,
+          total_calories: d.total_calories,
+        })),
+      };
+
+      // Save to Supabase
+      if (user?.id) {
+        const { supabase } = await import('../../services/supabase');
+        const { data: saved } = await supabase
+          .from('meal_plans')
+          .insert({
+            user_id: user.id,
+            title: newPlan.title,
+            duration_days: newPlan.duration_days,
+            calories_per_day: newPlan.calories_per_day,
+            goal: goal,
+            preferences: finalAnswers,
+            plan: newPlan.plan,
+          })
+          .select()
+          .single();
+
+        if (saved) newPlan.id = saved.id;
+      }
+
+      setSavedPlans((prev) => [newPlan, ...prev]);
+      setSelectedPlan(newPlan);
+      setView('viewPlan');
+
+    } catch (error: any) {
+      console.error('Meal plan generation failed:', error);
+      Alert.alert(
+        'Generation Failed',
+        'Could not generate your meal plan. Please check your internet connection and try again.',
+        [{ text: 'OK', onPress: () => setView('home') }]
+      );
+    }
+  };
+
+  const handleDeletePlan = async (planId: string) => {
+    try {
+      const { supabase } = await import('../../services/supabase');
+      await supabase.from('meal_plans').delete().eq('id', planId);
+      setSavedPlans((prev) => prev.filter((p) => p.id !== planId));
+    } catch (error) {
+      console.error('Failed to delete plan:', error);
+    }
+  };
+
+  const startNewPlan = () => {
+    setQuestionIndex(0);
+    setAnswers({});
+    setView('questions');
+  };
+
+  // ── VIEWS ──────────────────────────────────────────────────
+
+  if (view === 'viewPlan' && selectedPlan) {
+    return (
+      <DayPlanViewer
+        theme={theme}
+        plan={selectedPlan}
+        onBack={() => setView('home')}
+      />
+    );
+  }
+
+  if (view === 'generating') {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
+        <GeneratingScreen theme={theme} />
+      </SafeAreaView>
+    );
+  }
+
+  if (view === 'questions') {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => {
+              if (questionIndex > 0) setQuestionIndex(questionIndex - 1);
+              else setView('home');
+            }}
+            style={styles.backBtn}
+          >
+            <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+            <Text style={[styles.backText, { color: theme.textPrimary }]}>
+              {questionIndex === 0 ? 'Back' : 'Previous'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
+            Meal Planner
+          </Text>
+          <View style={{ width: 60 }} />
+        </View>
+
+        {/* Duration selector */}
+        {questionIndex === 0 && (
+          <View style={styles.durationWrap}>
+            <Text style={[styles.durationLabel, { color: theme.textSecondary }]}>
+              Plan Duration
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.durationRow}
+            >
+              {[1, 3, 7, 14, 30].map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  onPress={() => setDuration(d)}
+                  style={[styles.durationPill, {
+                    backgroundColor: duration === d ? theme.accent : theme.card,
+                    borderColor: duration === d ? theme.accent : theme.border,
+                  }]}
+                >
+                  <Text style={[styles.durationPillText, {
+                    color: duration === d ? theme.bg : theme.textSecondary,
+                    fontWeight: duration === d ? '700' : '400',
+                  }]}>
+                    {d === 1 ? '1 Day' : d === 30 ? '1 Month' : `${d} Days`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.questionScrollContent}
+        >
+          <QuestionCard
+            theme={theme}
+            question={questions[questionIndex].question}
+            options={questions[questionIndex].options}
+            onSelect={handleAnswer}
+            questionNum={questionIndex + 1}
+            total={questions.length}
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── HOME VIEW ──────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
       <View style={styles.header}>
@@ -233,7 +617,7 @@ export default function MealsScreen() {
           Meal Planner
         </Text>
         <Text style={[styles.pageSub, { color: theme.textSecondary }]}>
-          Plan your nutrition your way
+          AI-powered nutrition plans
         </Text>
       </View>
 
@@ -241,33 +625,85 @@ export default function MealsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          Plan Duration
-        </Text>
-        <DurationSelector theme={theme} active={duration} onSelect={setDuration} />
-
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          Plan Method
-        </Text>
-        <ModeSwitch theme={theme} active={mode} onSwitch={setMode} />
-
-        {mode === 'AI Generated' && <AIPrefsCard theme={theme} />}
-
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          {duration} Preview
-        </Text>
-        <DaySelector theme={theme} activeDay={activeDay} onSelect={setActiveDay} />
-
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][activeDay]}'s Meals
-        </Text>
-        <MealPlanRows theme={theme} />
-
-        <TouchableOpacity style={[styles.generateBtn, { backgroundColor: theme.accent }]}>
-          <Text style={styles.generateBtnText}>
-            {mode === 'AI Generated' ? '✨  Generate AI Meal Plan' : '+ Create Manual Plan'}
-          </Text>
+        {/* Generate new plan CTA */}
+        <TouchableOpacity
+          onPress={startNewPlan}
+          style={[styles.generateCard, {
+            backgroundColor: theme.accent,
+          }]}
+        >
+          <View>
+            <Text style={[styles.generateCardTitle, { color: theme.bg }]}>
+              ✨ Generate AI Meal Plan
+            </Text>
+            <Text style={[styles.generateCardSub, { color: theme.bg, opacity: 0.8 }]}>
+              Answer 5 quick questions and CalFit Coach builds your personalised plan in seconds
+            </Text>
+          </View>
+          <Ionicons name="arrow-forward-circle" size={36} color={theme.bg} style={{ opacity: 0.9 }} />
         </TouchableOpacity>
+
+        {/* Profile summary */}
+        <View style={[styles.profileSummary, {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }]}>
+          <Text style={[styles.profileSummaryTitle, { color: theme.textPrimary }]}>
+            Your Plan Will Be Based On
+          </Text>
+          {[
+            { icon: 'flag-outline', label: 'Goal', value: profile?.goal ?? 'Not set — complete onboarding' },
+            { icon: 'flame-outline', label: 'Daily Calories', value: profile?.daily_calorie_goal ? `${profile.daily_calorie_goal} kcal` : '2,000 kcal (default)' },
+            { icon: 'leaf-outline', label: 'Diet', value: profile?.dietary_preference?.join(', ') ?? 'No preference' },
+            { icon: 'body-outline', label: 'Activity', value: profile?.activity_level ?? 'Moderately Active' },
+          ].map((item) => (
+            <View key={item.label} style={styles.profileSummaryRow}>
+              <Ionicons name={item.icon as any} size={16} color={theme.accent} />
+              <Text style={[styles.profileSummaryLabel, { color: theme.textSecondary }]}>
+                {item.label}:
+              </Text>
+              <Text style={[styles.profileSummaryValue, { color: theme.textPrimary }]}>
+                {item.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Saved plans */}
+        {savedPlans.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+              Saved Plans ({savedPlans.length})
+            </Text>
+            {savedPlans.map((plan) => (
+              <MealPlanCard
+                key={plan.id}
+                theme={theme}
+                plan={plan}
+                onView={() => {
+                  setSelectedPlan(plan);
+                  setView('viewPlan');
+                }}
+                onDelete={() => handleDeletePlan(plan.id)}
+              />
+            ))}
+          </>
+        )}
+
+        {savedPlans.length === 0 && (
+          <View style={[styles.emptyState, {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }]}>
+            <Ionicons name="restaurant-outline" size={44} color={theme.textMuted} />
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+              No plans yet
+            </Text>
+            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
+              Tap Generate above and CalFit Coach will build your first personalised meal plan in seconds.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -285,68 +721,140 @@ const styles = StyleSheet.create({
   },
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
   pageSub: { fontSize: fontSize.md, marginTop: 2 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  backText: { fontSize: fontSize.lg, fontWeight: '400' },
 
-  sectionLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
+  // Generate card
+  generateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    gap: spacing.md,
   },
+  generateCardTitle: { fontSize: fontSize.xl, fontWeight: '800', marginBottom: 6 },
+  generateCardSub: { fontSize: fontSize.sm, lineHeight: 18, maxWidth: 260 },
 
-  // Duration
-  durationRow: {
-    paddingHorizontal: spacing.lg,
+  // Profile summary
+  profileSummary: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     gap: spacing.sm,
   },
-  durationTab: {
+  profileSummaryTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.xs },
+  profileSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  profileSummaryLabel: { fontSize: fontSize.sm, width: 80 },
+  profileSummaryValue: { fontSize: fontSize.sm, flex: 1, fontWeight: '500' },
+
+  // Section label
+  sectionLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+
+  // Plan cards
+  planCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: spacing.md,
+  },
+  planCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  planIcon: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  planInfo: { flex: 1 },
+  planTitle: { fontSize: fontSize.lg, fontWeight: '700' },
+  planMeta: { fontSize: fontSize.sm, marginTop: 2 },
+  planDate: { fontSize: fontSize.xs, marginTop: 2 },
+  viewPlanBtn: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  viewPlanBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+
+  // Empty state
+  emptyState: {
+    marginHorizontal: spacing.lg,
+    padding: spacing.xxl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  emptyTitle: { fontSize: fontSize.xl, fontWeight: '700' },
+  emptySub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 20 },
+
+  // Questions
+  questionScrollContent: { paddingBottom: 100 },
+  questionWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.lg,
+  },
+  questionProgress: { flexDirection: 'row', gap: spacing.xs },
+  progressDot: { flex: 1, height: 4, borderRadius: 2 },
+  questionLabel: { fontSize: fontSize.sm, fontWeight: '600' },
+  questionText: { fontSize: 24, fontWeight: '800', lineHeight: 30 },
+  optionsWrap: { gap: spacing.sm },
+  optionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  optionText: { fontSize: fontSize.lg, fontWeight: '500', flex: 1 },
+
+  // Duration
+  durationWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  durationLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.sm },
+  durationRow: { gap: spacing.sm },
+  durationPill: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.sm,
     borderWidth: 1,
   },
-  durationText: { fontSize: fontSize.sm },
+  durationPillText: { fontSize: fontSize.sm },
 
-  // Mode switch
-  modeSwitch: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 4,
-    gap: 4,
-  },
-  modeBtn: {
+  // Generating
+  generatingWrap: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xxl,
+    gap: spacing.lg,
   },
-  modeBtnText: { fontSize: fontSize.base },
+  generatingIcon: {
+    width: 80, height: 80, borderRadius: 40,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2,
+  },
+  generatingTitle: { fontSize: fontSize.xxl, fontWeight: '800', textAlign: 'center' },
+  generatingStep: { fontSize: fontSize.base, fontWeight: '600', textAlign: 'center' },
+  generatingHint: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
 
-  // AI card
-  aiCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  aiCardTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.md },
-  aiQuestion: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  aiDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6, flexShrink: 0 },
-  aiQuestionText: { fontSize: fontSize.sm, flex: 1 },
-
-  // Day selector
+  // Day viewer
   daySelectorRow: {
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     gap: spacing.sm,
   },
   dayPill: {
@@ -355,37 +863,22 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     alignItems: 'center',
-    minWidth: 58,
+    minWidth: 70,
   },
-  dayLabel: { fontSize: fontSize.xs, fontWeight: '600' },
-  dayKcal: { fontSize: fontSize.sm, fontWeight: '700', marginTop: 2 },
-  dayKcalLabel: { fontSize: 8 },
-
-  // Meal rows
-  mealRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  mealType: { fontSize: fontSize.xs, fontWeight: '600', width: 70 },
-  mealFood: { fontSize: fontSize.sm, flex: 1 },
-  mealKcal: { fontSize: fontSize.sm, fontWeight: '700' },
-
-  // Generate button
-  generateBtn: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
+  dayPillText: { fontSize: fontSize.sm },
+  dayPillCal: { fontSize: fontSize.xs, marginTop: 2 },
+  dayViewContent: { paddingHorizontal: spacing.lg, paddingBottom: 100, gap: spacing.sm },
+  dayMealCard: {
     padding: spacing.lg,
     borderRadius: radius.lg,
-    alignItems: 'center',
+    borderWidth: 1,
+    gap: spacing.sm,
   },
-  generateBtnText: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: '#0C0D10',
-  },
+  dayMealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dayMealType: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  dayMealCal: { fontSize: fontSize.sm, fontWeight: '700' },
+  dayMealName: { fontSize: fontSize.lg, fontWeight: '600' },
+  dayMealMacros: { flexDirection: 'row', gap: spacing.xs },
+  macroBadge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm },
+  macroBadgeText: { fontSize: fontSize.xs, fontWeight: '600' },
 });

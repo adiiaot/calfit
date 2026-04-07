@@ -20,6 +20,8 @@ export interface Profile {
   streak_count: number;
   theme: string;
   units: string;
+  dietary_preference: string[] | null;
+  tracking_preferences: string[] | null;
 }
 
 // Fetch the current user's profile

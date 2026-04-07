@@ -40,31 +40,55 @@ function AddFoodModal({
   mealType: MealType;
   visible: boolean;
   onClose: () => void;
-  onAdd: (entry: { food_name: string; calories: number; meal_type: MealType }) => void;
+  onAdd: (entry: {
+    food_name: string;
+    calories: number;
+    meal_type: MealType;
+    protein_g?: number;
+    carbs_g?: number;
+    fats_g?: number;
+  }) => void;
 }) {
-  const [foodName, setFoodName] = useState('');
-  const [calories, setCalories] = useState('');
-  const [protein, setProtein] = useState('');
-  const [carbs, setCarbs] = useState('');
-  const [fats, setFats] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<FoodResult[]>(commonFoods.slice(0, 10));
+  const [selected, setSelected] = useState<FoodResult | null>(null);
+  const [portion, setPortion] = useState('100');
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleAdd = async () => {
-    if (!foodName || !calories) {
-      Alert.alert('Missing fields', 'Please enter food name and calories.');
-      return;
+  useEffect(() => {
+    if (visible) {
+      setQuery('');
+      setResults(commonFoods.slice(0, 10));
+      setSelected(null);
+      setPortion('100');
     }
+  }, [visible]);
+
+  const handleSearch = (text: string) => {
+    setQuery(text);
+    setResults(searchFood(text));
+  };
+
+  const scaled = selected
+    ? {
+        calories: Math.round(selected.calories * (parseFloat(portion) || 100) / 100),
+        protein_g: Math.round(selected.protein_g * (parseFloat(portion) || 100) / 100),
+        carbs_g: Math.round(selected.carbs_g * (parseFloat(portion) || 100) / 100),
+        fats_g: Math.round(selected.fats_g * (parseFloat(portion) || 100) / 100),
+      }
+    : null;
+
+  const handleAdd = async () => {
+    if (!selected || !scaled) return;
     setIsSaving(true);
     await onAdd({
-      food_name: foodName,
-      calories: parseInt(calories),
+      food_name: selected.name,
       meal_type: mealType,
+      calories: scaled.calories,
+      protein_g: scaled.protein_g,
+      carbs_g: scaled.carbs_g,
+      fats_g: scaled.fats_g,
     });
-    setFoodName('');
-    setCalories('');
-    setProtein('');
-    setCarbs('');
-    setFats('');
     setIsSaving(false);
     onClose();
   };
@@ -78,58 +102,189 @@ function AddFoodModal({
     >
       <View style={styles.modalOverlay}>
         <View style={[styles.modalCard, {
-          backgroundColor: theme.surface,
+          backgroundColor: theme.card,
           borderColor: theme.border,
         }]}>
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-              Add to {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.textMuted} />
+            <TouchableOpacity
+              onPress={selected ? () => setSelected(null) : onClose}
+              style={styles.modalBackBtn}
+            >
+              <Ionicons
+                name={selected ? 'chevron-back' : 'close'}
+                size={22}
+                color={theme.textPrimary}
+              />
             </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+              {selected
+                ? selected.name
+                : `Add to ${mealType.charAt(0).toUpperCase() + mealType.slice(1)}`
+              }
+            </Text>
           </View>
 
-          {[
-            { label: 'Food Name *', value: foodName, onChange: setFoodName, placeholder: 'e.g. Grilled chicken', keyboard: 'default' },
-            { label: 'Calories *', value: calories, onChange: setCalories, placeholder: '350', keyboard: 'number-pad' },
-            { label: 'Protein (g)', value: protein, onChange: setProtein, placeholder: '0', keyboard: 'decimal-pad' },
-            { label: 'Carbs (g)', value: carbs, onChange: setCarbs, placeholder: '0', keyboard: 'decimal-pad' },
-            { label: 'Fats (g)', value: fats, onChange: setFats, placeholder: '0', keyboard: 'decimal-pad' },
-          ].map((f) => (
-            <View key={f.label} style={styles.modalField}>
-              <Text style={[styles.modalFieldLabel, { color: theme.textSecondary }]}>
-                {f.label}
-              </Text>
-              <View style={[styles.modalInput, {
-                backgroundColor: theme.card,
+          {/* ── SEARCH VIEW ── */}
+          {!selected && (
+            <>
+              <View style={[styles.modalSearchBar, {
+                backgroundColor: theme.bg,
                 borderColor: theme.border,
               }]}>
+                <Ionicons name="search-outline" size={18} color={theme.textMuted} />
                 <TextInput
-                  value={f.value}
-                  onChangeText={f.onChange}
-                  placeholder={f.placeholder}
+                  value={query}
+                  onChangeText={handleSearch}
+                  placeholder="Search e.g. jollof rice, chicken..."
                   placeholderTextColor={theme.textMuted}
-                  keyboardType={f.keyboard as any}
-                  style={[styles.modalInputText, { color: theme.textPrimary }]}
+                  style={[styles.modalSearchInput, { color: theme.textPrimary }]}
+                  returnKeyType="search"
                 />
+                {query.length > 0 && (
+                  <TouchableOpacity onPress={() => handleSearch('')}>
+                    <Ionicons name="close-circle" size={18} color={theme.textMuted} />
+                  </TouchableOpacity>
+                )}
               </View>
-            </View>
-          ))}
 
-          <TouchableOpacity
-            onPress={handleAdd}
-            disabled={isSaving}
-            style={[styles.modalAddBtn, { backgroundColor: theme.accent }]}
-          >
-            {isSaving ? (
-              <ActivityIndicator color={theme.bg} />
-            ) : (
-              <Text style={[styles.modalAddBtnText, { color: theme.bg }]}>
-                Add Food
+              <Text style={[styles.modalListLabel, { color: theme.textMuted }]}>
+                {query.length === 0 ? 'Common foods' : `${results.length} results`}
               </Text>
-            )}
-          </TouchableOpacity>
+
+              <ScrollView
+                style={styles.modalFoodList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {results.length === 0 ? (
+                  <View style={styles.modalEmptyState}>
+                    <Text style={[styles.modalEmptyText, { color: theme.textMuted }]}>
+                      No results for "{query}"
+                    </Text>
+                    <Text style={[styles.modalEmptyHint, { color: theme.textMuted }]}>
+                      Try a different spelling
+                    </Text>
+                  </View>
+                ) : (
+                  results.map((food) => (
+                    <TouchableOpacity
+                      key={food.id}
+                      onPress={() => setSelected(food)}
+                      style={[styles.foodResultRow, {
+                        backgroundColor: theme.bg,
+                        borderColor: theme.border,
+                      }]}
+                    >
+                      <View style={styles.foodResultLeft}>
+                        <Text style={[styles.foodResultName, { color: theme.textPrimary }]}>
+                          {food.name}
+                        </Text>
+                        <Text style={[styles.foodResultMacros, { color: theme.textMuted }]}>
+                          {food.serving_size}{'  ·  '}
+                          P {food.protein_g}g{'  ·  '}
+                          C {food.carbs_g}g{'  ·  '}
+                          F {food.fats_g}g
+                        </Text>
+                      </View>
+                      <View style={[styles.foodResultCalBadge, {
+                        backgroundColor: theme.accentDim as string,
+                      }]}>
+                        <Text style={[styles.foodResultCalNum, { color: theme.accent }]}>
+                          {food.calories}
+                        </Text>
+                        <Text style={[styles.foodResultCalUnit, { color: theme.accent }]}>
+                          kcal
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            </>
+          )}
+
+          {/* ── PORTION VIEW ── */}
+          {selected && scaled && (
+            <>
+              <Text style={[styles.servingNote, { color: theme.textMuted }]}>
+                Default serving: {selected.serving_size}
+              </Text>
+
+              <Text style={[styles.portionTitle, { color: theme.textSecondary }]}>
+                Portion size (grams)
+              </Text>
+              <View style={[styles.portionInputRow, {
+                backgroundColor: theme.bg,
+                borderColor: theme.accent,
+              }]}>
+                <TextInput
+                  value={portion}
+                  onChangeText={setPortion}
+                  keyboardType="number-pad"
+                  style={[styles.portionInput, { color: theme.accent }]}
+                />
+                <Text style={[styles.portionUnit, { color: theme.textMuted }]}>g</Text>
+              </View>
+
+              <View style={styles.portionPills}>
+                {['50', '100', '150', '200', '250', '300'].map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    onPress={() => setPortion(p)}
+                    style={[styles.portionPill, {
+                      backgroundColor: portion === p ? theme.accent : theme.card,
+                      borderColor: portion === p ? theme.accent : theme.border,
+                    }]}
+                  >
+                    <Text style={[styles.portionPillText, {
+                      color: portion === p ? theme.bg : theme.textSecondary,
+                    }]}>
+                      {p}g
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.nutritionGrid}>
+                {[
+                  { label: 'Calories', value: `${scaled.calories}`, unit: 'kcal', color: theme.orange },
+                  { label: 'Protein',  value: `${scaled.protein_g}`, unit: 'g', color: theme.accent },
+                  { label: 'Carbs',    value: `${scaled.carbs_g}`, unit: 'g', color: theme.accentSecond },
+                  { label: 'Fats',     value: `${scaled.fats_g}`, unit: 'g', color: theme.purple },
+                ].map((n) => (
+                  <View key={n.label} style={[styles.nutritionCell, {
+                    backgroundColor: theme.bg,
+                    borderColor: theme.border,
+                  }]}>
+                    <Text style={[styles.nutritionCellValue, { color: n.color }]}>
+                      {n.value}
+                      <Text style={[styles.nutritionCellUnit, { color: n.color }]}>
+                        {' '}{n.unit}
+                      </Text>
+                    </Text>
+                    <Text style={[styles.nutritionCellLabel, { color: theme.textMuted }]}>
+                      {n.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                onPress={handleAdd}
+                disabled={isSaving}
+                style={[styles.modalAddBtn, { backgroundColor: theme.accent }]}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color={theme.bg} />
+                ) : (
+                  <Text style={[styles.modalAddBtnText, { color: theme.bg }]}>
+                    Add to {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
     </Modal>
@@ -370,7 +525,6 @@ export default function CalorieScreen() {
     try {
       const { supabase } = await import('../../services/supabase');
       const today = new Date().toISOString().split('T')[0];
-
       const [caloriesData, waterData, foodData] = await Promise.all([
         getTodayCalories(user.id),
         getTodayWater(user.id),
@@ -381,7 +535,6 @@ export default function CalorieScreen() {
           .eq('date', today)
           .order('logged_at', { ascending: true }),
       ]);
-
       setCaloriesConsumed(caloriesData);
       setWaterMl(waterData);
       if (foodData.data) {
@@ -402,24 +555,26 @@ export default function CalorieScreen() {
   const handleAddWater = async (ml: number) => {
     if (!user?.id) return;
     const success = await logWater(user.id, ml);
-    if (success) {
-      setWaterMl((prev) => prev + ml);
-    }
+    if (success) setWaterMl((prev) => prev + ml);
   };
 
   const handleAddFood = async (entry: {
     food_name: string;
     calories: number;
     meal_type: MealType;
+    protein_g?: number;
+    carbs_g?: number;
+    fats_g?: number;
   }) => {
     if (!user?.id) return;
     const success = await logFood(user.id, entry);
     if (success) {
-      const newEntry: FoodEntry = {
+      setFoodEntries((prev) => [...prev, {
         id: Date.now().toString(),
-        ...entry,
-      };
-      setFoodEntries((prev) => [...prev, newEntry]);
+        food_name: entry.food_name,
+        calories: entry.calories,
+        meal_type: entry.meal_type,
+      }]);
       setCaloriesConsumed((prev) => prev + entry.calories);
     }
   };
@@ -449,13 +604,7 @@ export default function CalorieScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <SearchBar theme={theme} onScanPress={handleOpenScanner} />
-
-        <CalorieSummary
-          theme={theme}
-          consumed={caloriesConsumed}
-          goal={calorieGoal}
-        />
-
+        <CalorieSummary theme={theme} consumed={caloriesConsumed} goal={calorieGoal} />
         <TouchableOpacity
           onPress={handleOpenScanner}
           style={[styles.scanFoodBtn, {
@@ -468,13 +617,7 @@ export default function CalorieScreen() {
             Scan Food / Barcode / Food Label
           </Text>
         </TouchableOpacity>
-
-        <WaterCard
-          theme={theme}
-          waterMl={waterMl}
-          goalMl={waterGoalMl}
-          onAdd={handleAddWater}
-        />
+        <WaterCard theme={theme} waterMl={waterMl} goalMl={waterGoalMl} onAdd={handleAddWater} />
 
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           Meals
@@ -504,7 +647,6 @@ export default function CalorieScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Add Food Modal */}
       <AddFoodModal
         theme={theme}
         mealType={activeMeal}
@@ -548,92 +690,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // Food search modal
-  foodSearchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginBottom: spacing.sm,
-  },
-  foodSearchInput: { flex: 1, fontSize: fontSize.base },
-  foodListLabel: { fontSize: fontSize.xs, fontWeight: '600', marginBottom: spacing.xs },
-  foodList: { maxHeight: 300 },
-
-  foodResultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginBottom: spacing.xs,
-    gap: spacing.md,
-  },
-  foodResultInfo: { flex: 1 },
-  foodResultName: { fontSize: fontSize.base, fontWeight: '600' },
-  foodResultMeta: { fontSize: fontSize.xs, marginTop: 2 },
-  foodResultCal: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-  },
-  foodResultCalText: { fontSize: fontSize.lg, fontWeight: '800' },
-  foodResultCalLabel: { fontSize: 8, fontWeight: '600' },
-
-  // Selected food
-  selectedFood: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  selectedFoodHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  selectedFoodName: { fontSize: fontSize.lg, fontWeight: '700', flex: 1 },
-  changeFood: { fontSize: fontSize.sm, fontWeight: '600' },
-  portionLabel: { fontSize: fontSize.sm, fontWeight: '600' },
-  portionInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  portionText: { flex: 1, fontSize: 28, fontWeight: '800' },
-  portionSuffix: { fontSize: fontSize.lg, fontWeight: '600' },
-  portionBtns: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
-  portionBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-  },
-  portionBtnText: { fontSize: fontSize.sm, fontWeight: '600' },
-
-  // Nutrition preview
-  nutritionPreview: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  nutritionItem: {
-    flex: 1,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  nutritionValue: { fontSize: fontSize.base, fontWeight: '800' },
-  nutritionLabel: { fontSize: 9, marginTop: 2 },
-
   card: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -653,20 +709,12 @@ const styles = StyleSheet.create({
   donutContainer: {
     width: 90, height: 90,
     position: 'relative',
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  donutRingOuter: {
-    position: 'absolute',
-    width: 84, height: 84,
-    borderRadius: 42, borderWidth: 8,
-  },
+  donutRingOuter: { position: 'absolute', width: 84, height: 84, borderRadius: 42, borderWidth: 8 },
   donutRingProgress: {
-    position: 'absolute',
-    width: 84, height: 84,
-    borderRadius: 42, borderWidth: 8,
-    borderTopColor: 'transparent',
-    borderLeftColor: 'transparent',
+    position: 'absolute', width: 84, height: 84, borderRadius: 42, borderWidth: 8,
+    borderTopColor: 'transparent', borderLeftColor: 'transparent',
     transform: [{ rotate: '45deg' }],
   },
   donutCenterText: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
@@ -679,16 +727,9 @@ const styles = StyleSheet.create({
   donutVal: { fontSize: fontSize.sm, fontWeight: '700' },
 
   scanFoodBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md,
+    padding: spacing.md, borderRadius: radius.md, borderWidth: 1.5, borderStyle: 'dashed',
   },
   scanFoodText: { fontSize: fontSize.base, fontWeight: '600' },
 
@@ -697,114 +738,104 @@ const styles = StyleSheet.create({
   waterBarBg: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: spacing.md },
   waterBarFill: { height: '100%', borderRadius: 4 },
   waterBtns: { flexDirection: 'row', gap: spacing.sm },
-  waterAddBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
+  waterAddBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center' },
   waterAddText: { fontSize: fontSize.sm, fontWeight: '700' },
 
   sectionLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: fontSize.sm, fontWeight: '600',
+    marginHorizontal: spacing.lg, marginBottom: spacing.xs,
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
 
   mealSection: { marginBottom: spacing.sm },
   mealHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: spacing.lg, marginBottom: spacing.xs,
   },
   mealTitle: { fontSize: fontSize.base, fontWeight: '700' },
   mealCal: { fontSize: fontSize.sm, fontWeight: '700' },
-
   emptyMeal: {
-    marginHorizontal: spacing.lg,
-    marginBottom: 6,
-    padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
+    marginHorizontal: spacing.lg, marginBottom: 6,
+    padding: spacing.md, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center',
   },
   emptyMealText: { fontSize: fontSize.sm },
-
   foodItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginBottom: 6,
-    padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginHorizontal: spacing.lg, marginBottom: 6,
+    padding: spacing.md, borderRadius: radius.sm, borderWidth: 1,
   },
   foodName: { fontSize: fontSize.base, flex: 1 },
   foodCal: { fontSize: fontSize.sm, fontWeight: '700' },
-
   addFoodBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginHorizontal: spacing.lg,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    marginBottom: spacing.sm,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, marginHorizontal: spacing.lg, padding: spacing.sm,
+    borderRadius: radius.sm, borderWidth: 1, borderStyle: 'dashed', marginBottom: spacing.sm,
   },
   addFoodText: { fontSize: fontSize.sm, fontWeight: '600' },
 
   mealPlannerBtn: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    alignItems: 'center',
+    marginHorizontal: spacing.lg, marginTop: spacing.md,
+    padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center',
   },
   mealPlannerText: { fontSize: fontSize.lg, fontWeight: '700' },
 
   // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalCard: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    gap: spacing.md,
-    borderWidth: 1,
-    paddingBottom: spacing.xxxl,
+    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+    padding: spacing.lg, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
+    maxHeight: '90%', paddingBottom: spacing.xxxl,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  modalBackBtn: { padding: 4 },
+  modalTitle: { fontSize: fontSize.xl, fontWeight: '700', flex: 1 },
+
+  modalSearchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.sm,
   },
-  modalTitle: { fontSize: fontSize.xl, fontWeight: '700' },
-  modalField: { gap: 6 },
-  modalFieldLabel: { fontSize: fontSize.sm, fontWeight: '600' },
-  modalInput: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: spacing.md,
+  modalSearchInput: { flex: 1, fontSize: fontSize.base },
+  modalListLabel: {
+    fontSize: fontSize.xs, fontWeight: '600', marginBottom: spacing.xs,
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  modalInputText: { fontSize: fontSize.lg },
-  modalAddBtn: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    marginTop: spacing.sm,
+  modalFoodList: { maxHeight: 340 },
+  modalEmptyState: { alignItems: 'center', paddingVertical: spacing.xl },
+  modalEmptyText: { fontSize: fontSize.base, fontWeight: '600' },
+  modalEmptyHint: { fontSize: fontSize.sm, marginTop: spacing.xs },
+
+  foodResultRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.xs,
   },
+  foodResultLeft: { flex: 1 },
+  foodResultName: { fontSize: fontSize.base, fontWeight: '600' },
+  foodResultMacros: { fontSize: fontSize.xs, marginTop: 3 },
+  foodResultCalBadge: {
+    paddingHorizontal: spacing.sm, paddingVertical: 4,
+    borderRadius: radius.sm, alignItems: 'center', minWidth: 52,
+  },
+  foodResultCalNum: { fontSize: fontSize.lg, fontWeight: '800' },
+  foodResultCalUnit: { fontSize: 9, fontWeight: '600' },
+
+  servingNote: { fontSize: fontSize.xs, marginBottom: spacing.sm },
+  portionTitle: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.xs },
+  portionInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: spacing.md, borderRadius: radius.md, borderWidth: 2, marginBottom: spacing.sm,
+  },
+  portionInput: { flex: 1, fontSize: 28, fontWeight: '800' },
+  portionUnit: { fontSize: fontSize.lg, fontWeight: '600' },
+  portionPills: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md, flexWrap: 'wrap' },
+  portionPill: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.sm, borderWidth: 1 },
+  portionPillText: { fontSize: fontSize.sm, fontWeight: '600' },
+
+  nutritionGrid: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
+  nutritionCell: { flex: 1, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center' },
+  nutritionCellValue: { fontSize: fontSize.base, fontWeight: '800' },
+  nutritionCellUnit: { fontSize: fontSize.xs },
+  nutritionCellLabel: { fontSize: 9, marginTop: 2 },
+
+  modalAddBtn: { padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center' },
   modalAddBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
 });

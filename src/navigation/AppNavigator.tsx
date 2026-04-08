@@ -33,6 +33,10 @@ import GoalsScreen from '../screens/settings/GoalsScreen';
 // Quick Start Screen for Workout Screen
 import QuickStartScreen from '../screens/Activity/QuickStartScreen';
 
+// Subscription & Purchase screen
+import SubscriptionScreen from '../screens/earnings/SubscriptionScreen';
+import PurchaseCreditsScreen from '../screens/earnings/PurchaseCreditsScreen';
+
 // Auth + Onboarding screens
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import LoginScreen from '../screens/onboarding/LoginScreen';
@@ -144,6 +148,8 @@ export default function AppNavigator() {
           <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
           <RootStack.Screen name="Goals" component={GoalsScreen} />
           <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
+          <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
+<RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
         </>
         ) : (
           // ── MAIN APP ───────────────────────────────────────
@@ -159,6 +165,8 @@ export default function AppNavigator() {
           <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
           <RootStack.Screen name="Goals" component={GoalsScreen} />
           <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
+          <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
+<RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
         </>
         )}
       </RootStack.Navigator>

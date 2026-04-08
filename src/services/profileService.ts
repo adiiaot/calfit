@@ -17,11 +17,15 @@ export interface Profile {
   water_goal_ml: number;
   sleep_goal_hrs: number;
   step_goal: number;
-  streak_count: number;
   theme: string;
   units: string;
   dietary_preference: string[] | null;
   tracking_preferences: string[] | null;
+  referral_code: string | null;
+  streak_count: number;
+  last_active_date: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Fetch the current user's profile

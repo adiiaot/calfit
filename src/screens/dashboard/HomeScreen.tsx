@@ -380,6 +380,18 @@ export default function HomeScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
+useEffect(() => {
+  if (!user?.id) return;
+  const loadUnread = async () => {
+    const { getUnreadCount } = await import('../../services/notificationService');
+    const count = await getUnreadCount(user.id);
+    setUnreadCount(count);
+  };
+  loadUnread();
+}, [user?.id]);
+
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [waterMl, setWaterMl] = useState(0);
   const [steps, setSteps] = useState(0);
@@ -471,13 +483,15 @@ export default function HomeScreen() {
           </Text>
         </View>
         <View style={styles.topBarRight}>
-          <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate('Notifications')}
-            style={[styles.bellBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-          >
-            <Text style={styles.bellIcon}>🔔</Text>
-            <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
-          </TouchableOpacity>
+         <TouchableOpacity
+  onPress={() => navigation.getParent()?.navigate('Notifications')}
+  style={[styles.bellBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+>
+  <Text style={styles.bellIcon}>🔔</Text>
+  {unreadCount > 0 && (
+    <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
+  )}
+</TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.getParent()?.navigate('Settings')}
             style={[styles.avatarBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}

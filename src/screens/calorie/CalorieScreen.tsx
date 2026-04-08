@@ -552,32 +552,53 @@ export default function CalorieScreen() {
     }
   };
 
+
+  // Handle adding water or food and trigger notifications if goals are reached
   const handleAddWater = async (ml: number) => {
-    if (!user?.id) return;
-    const success = await logWater(user.id, ml);
-    if (success) setWaterMl((prev) => prev + ml);
-  };
+  if (!user?.id) return;
+  const success = await logWater(user.id, ml);
+  if (success) {
+    const newTotal = waterMl + ml;
+    setWaterMl(newTotal);
+
+    // Notify when water goal is reached
+    if (newTotal >= waterGoalMl && waterMl < waterGoalMl) {
+      const { notifyWaterGoalReached } = await import('../../services/notificationService');
+      await notifyWaterGoalReached(user.id);
+    }
+  }
+};
 
   const handleAddFood = async (entry: {
-    food_name: string;
-    calories: number;
-    meal_type: MealType;
-    protein_g?: number;
-    carbs_g?: number;
-    fats_g?: number;
-  }) => {
-    if (!user?.id) return;
-    const success = await logFood(user.id, entry);
-    if (success) {
-      setFoodEntries((prev) => [...prev, {
-        id: Date.now().toString(),
-        food_name: entry.food_name,
-        calories: entry.calories,
-        meal_type: entry.meal_type,
-      }]);
-      setCaloriesConsumed((prev) => prev + entry.calories);
+  food_name: string;
+  calories: number;
+  meal_type: MealType;
+  protein_g?: number;
+  carbs_g?: number;
+  fats_g?: number;
+}) => {
+  if (!user?.id) return;
+  const success = await logFood(user.id, entry);
+  if (success) {
+    setFoodEntries((prev) => [...prev, {
+      id: Date.now().toString(),
+      food_name: entry.food_name,
+      calories: entry.calories,
+      meal_type: entry.meal_type,
+    }]);
+    const newTotal = caloriesConsumed + entry.calories;
+    setCaloriesConsumed(newTotal);
+
+    // Send food logged notification
+    const { notifyFoodLogged, notifyCalorieGoalReached } = await import('../../services/notificationService');
+    await notifyFoodLogged(user.id, entry.food_name, entry.calories);
+
+    // Check if calorie goal reached
+    if (newTotal >= calorieGoal && caloriesConsumed < calorieGoal) {
+      await notifyCalorieGoalReached(user.id);
     }
-  };
+  }
+};
 
   const meals: { title: string; type: MealType }[] = [
     { title: 'Breakfast', type: 'breakfast' },

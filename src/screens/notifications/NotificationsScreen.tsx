@@ -5,44 +5,32 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  RefreshControl,
+  Alert,
 } from 'react-native';
-import { useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
+import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
-
-// ── NOTIFICATION TYPES ────────────────────────────────────────
-type NotificationType =
-  | 'achievement'
-  | 'social'
-  | 'streak'
-  | 'upgrade'
-  | 'coach'
-  | 'community'
-  | 'goal'
-  | 'referral'
-  | 'system';
-
-interface Notification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-  actionLabel?: string;
-}
+import {
+  AppNotification,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+} from '../../services/notificationService';
 
 // ── NOTIFICATION ICON ─────────────────────────────────────────
 function NotifIcon({
   type,
   theme,
 }: {
-  type: NotificationType;
+  type: AppNotification['type'];
   theme: typeof colors.dark;
 }) {
-  const config: Record<NotificationType, { icon: string; color: string }> = {
+  const config: Record<AppNotification['type'], { icon: string; color: string }> = {
     achievement: { icon: 'trophy',              color: theme.gold },
     social:      { icon: 'heart',               color: theme.red },
     streak:      { icon: 'flame',               color: theme.orange },
@@ -51,10 +39,11 @@ function NotifIcon({
     community:   { icon: 'people',              color: theme.accentSecond },
     goal:        { icon: 'checkmark-circle',    color: theme.accent },
     referral:    { icon: 'wallet',              color: theme.accent },
-    system:      { icon: 'notifications',       color: theme.textSecondary },
+    system:      { icon: 'settings',            color: theme.textSecondary },
+    welcome:     { icon: 'sparkles',            color: theme.accent },
   };
 
-  const { icon, color } = config[type];
+  const { icon, color } = config[type] ?? { icon: 'notifications', color: theme.accent };
 
   return (
     <View style={[styles.notifIcon, { backgroundColor: color + '22' }]}>
@@ -63,19 +52,44 @@ function NotifIcon({
   );
 }
 
+// ── TIME AGO ──────────────────────────────────────────────────
+function timeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
+  if (diff < 172800) return 'Yesterday';
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
 // ── NOTIFICATION ITEM ─────────────────────────────────────────
 function NotifItem({
   notif,
   theme,
   onPress,
+  onDelete,
 }: {
-  notif: Notification;
+  notif: AppNotification;
   theme: typeof colors.dark;
   onPress: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   return (
     <TouchableOpacity
       onPress={() => onPress(notif.id)}
+      onLongPress={() =>
+        Alert.alert(
+          'Delete notification?',
+          '',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => onDelete(notif.id) },
+          ]
+        )
+      }
       style={[styles.notifRow, {
         backgroundColor: notif.read ? theme.card : theme.accentDim as string,
         borderColor: notif.read ? theme.border : theme.accent,
@@ -84,23 +98,23 @@ function NotifItem({
       <NotifIcon type={notif.type} theme={theme} />
       <View style={styles.notifContent}>
         <View style={styles.notifTitleRow}>
-          <Text style={[styles.notifTitle, { color: theme.textPrimary }]}>
+          <Text style={[styles.notifTitle, { color: theme.textPrimary }]} numberOfLines={1}>
             {notif.title}
           </Text>
           {!notif.read && (
             <View style={[styles.unreadDot, { backgroundColor: theme.accent }]} />
           )}
         </View>
-        <Text style={[styles.notifBody, { color: theme.textSecondary }]}>
+        <Text style={[styles.notifBody, { color: theme.textSecondary }]} numberOfLines={2}>
           {notif.body}
         </Text>
         <View style={styles.notifFooter}>
           <Text style={[styles.notifTime, { color: theme.textMuted }]}>
-            {notif.time}
+            {timeAgo(notif.created_at)}
           </Text>
-          {notif.actionLabel && (
+          {notif.action_label && (
             <Text style={[styles.notifAction, { color: theme.accent }]}>
-              {notif.actionLabel} →
+              {notif.action_label} →
             </Text>
           )}
         </View>
@@ -121,7 +135,7 @@ function FilterTabs({
   onSelect: (f: string) => void;
   unreadCount: number;
 }) {
-  const filters = ['All', 'Unread', 'Social', 'Achievements', 'System'];
+  const filters = ['All', 'Unread', 'Activity', 'Achievements', 'System'];
 
   return (
     <ScrollView
@@ -142,8 +156,7 @@ function FilterTabs({
             color: active === f ? theme.bg : theme.textSecondary,
             fontWeight: active === f ? '700' : '400',
           }]}>
-            {f}
-            {f === 'Unread' && unreadCount > 0 ? ` (${unreadCount})` : ''}
+            {f === 'Unread' && unreadCount > 0 ? `Unread (${unreadCount})` : f}
           </Text>
         </TouchableOpacity>
       ))}
@@ -151,140 +164,68 @@ function FilterTabs({
   );
 }
 
-// ── MAIN SCREEN ──────────────────────────────────────────────
+// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
+  const { user } = useAuthStore();
   const theme = colors[colorScheme];
-  const [activeFilter, setActiveFilter] = useState('All');
 
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'achievement',
-      title: '14-Day Streak! 🔥',
-      body: "You've hit a 14-day streak — Gold badge unlocked. Keep it going!",
-      time: '2 min ago',
-      read: false,
-      actionLabel: 'View Streaks',
-    },
-    {
-      id: '2',
-      type: 'coach',
-      title: 'Weekly Feedback from Coach',
-      body: 'You averaged 128g protein/day this week. Sleep dipped mid-week — I have a plan to fix that.',
-      time: '18 min ago',
-      read: false,
-      actionLabel: 'Open Coach',
-    },
-    {
-      id: '3',
-      type: 'social',
-      title: 'Alex liked your post',
-      body: 'Alex reacted 🔥 to your leg day workout post.',
-      time: '1 hr ago',
-      read: false,
-      actionLabel: 'View Post',
-    },
-    {
-      id: '4',
-      type: 'goal',
-      title: 'Daily Calorie Goal Hit! ✓',
-      body: "You hit your 2,000 kcal goal today. Protein was on point at 142g.",
-      time: '2 hrs ago',
-      read: false,
-    },
-    {
-      id: '5',
-      type: 'community',
-      title: 'Jordan joined your group',
-      body: 'Jordan M. just joined CalFit Champions. Welcome them to the group!',
-      time: '3 hrs ago',
-      read: true,
-      actionLabel: 'View Group',
-    },
-    {
-      id: '6',
-      type: 'social',
-      title: 'Mia commented on your post',
-      body: 'Mia K.: "This is so inspiring! What programme are you following?"',
-      time: '4 hrs ago',
-      read: true,
-      actionLabel: 'Reply',
-    },
-    {
-      id: '7',
-      type: 'streak',
-      title: "Don't lose your streak!",
-      body: "You haven't checked in today. Log anything to keep your 14-day streak alive.",
-      time: '5 hrs ago',
-      read: true,
-      actionLabel: 'Check In',
-    },
-    {
-      id: '8',
-      type: 'referral',
-      title: 'Referral Earnings Update',
-      body: 'Sam just upgraded to Pro. You earned $0.99 in referral commission.',
-      time: 'Yesterday',
-      read: true,
-      actionLabel: 'View Earnings',
-    },
-    {
-      id: '9',
-      type: 'upgrade',
-      title: 'Upgrade to Premium 🌟',
-      body: 'Unlock unlimited Coach prompts, live streaming, and the full earnings wallet.',
-      time: 'Yesterday',
-      read: true,
-      actionLabel: 'Upgrade Now',
-    },
-    {
-      id: '10',
-      type: 'achievement',
-      title: 'New Badge Unlocked — FirstMile 👟',
-      body: "You've tracked 1,000 steps for the first time. Your step journey begins!",
-      time: '2 days ago',
-      read: true,
-    },
-    {
-      id: '11',
-      type: 'goal',
-      title: 'Water Goal Achieved 💧',
-      body: "You hit your 2.5L water goal today. Hydration is key to recovery.",
-      time: '2 days ago',
-      read: true,
-    },
-    {
-      id: '12',
-      type: 'system',
-      title: 'CalFit Update Available',
-      body: 'Version 1.1.0 is available. New features: improved food scanner accuracy and meal plan sharing.',
-      time: '3 days ago',
-      read: true,
-    },
-  ]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const filteredNotifs = notifications.filter((n) => {
-    if (activeFilter === 'All') return true;
-    if (activeFilter === 'Unread') return !n.read;
-    if (activeFilter === 'Social') return n.type === 'social' || n.type === 'community';
-    if (activeFilter === 'Achievements') return n.type === 'achievement' || n.type === 'goal' || n.type === 'streak';
-    if (activeFilter === 'System') return n.type === 'system' || n.type === 'upgrade';
-    return true;
-  });
+  // Load on mount and every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) loadNotifications();
+    }, [user?.id])
+  );
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const loadNotifications = async () => {
+    if (!user?.id) return;
+    const data = await getNotifications(user.id);
+    setNotifications(data);
   };
 
-  const markRead = (id: string) => {
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadNotifications();
+    setIsRefreshing(false);
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await markNotificationRead(id);
     setNotifications((prev) =>
       prev.map((n) => n.id === id ? { ...n, read: true } : n)
     );
   };
+
+  const handleMarkAllRead = async () => {
+    if (!user?.id) return;
+    await markAllNotificationsRead(user.id);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteNotification(id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  // Filter logic
+  const filtered = notifications.filter((n) => {
+    if (activeFilter === 'All') return true;
+    if (activeFilter === 'Unread') return !n.read;
+    if (activeFilter === 'Activity') return ['goal', 'streak', 'coach'].includes(n.type);
+    if (activeFilter === 'Achievements') return ['achievement', 'referral', 'upgrade'].includes(n.type);
+    if (activeFilter === 'System') return ['system', 'welcome'].includes(n.type);
+    return true;
+  });
+
+  const unread = filtered.filter((n) => !n.read);
+  const read = filtered.filter((n) => n.read);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
@@ -298,14 +239,14 @@ export default function NotificationsScreen() {
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
           <Text style={[styles.backText, { color: theme.textPrimary }]}>Home</Text>
         </TouchableOpacity>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
-          Notifications
-        </Text>
-        <TouchableOpacity onPress={markAllRead}>
-          <Text style={[styles.markAllText, { color: theme.accent }]}>
-            Mark all read
-          </Text>
-        </TouchableOpacity>
+        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Notifications</Text>
+        {unreadCount > 0 ? (
+          <TouchableOpacity onPress={handleMarkAllRead}>
+            <Text style={[styles.markAllText, { color: theme.accent }]}>Mark all read</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 70 }} />
+        )}
       </View>
 
       {/* Filter tabs */}
@@ -316,53 +257,78 @@ export default function NotificationsScreen() {
         unreadCount={unreadCount}
       />
 
-      {/* Notification list */}
-      {filteredNotifs.length === 0 ? (
+      {/* Empty state */}
+      {filtered.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="notifications-off-outline" size={48} color={theme.textMuted} />
+          <Ionicons name="notifications-off-outline" size={52} color={theme.textMuted} />
           <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-            All caught up!
+            {activeFilter === 'Unread' ? 'All caught up!' : 'No notifications yet'}
           </Text>
           <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-            No notifications in this category
+            {activeFilter === 'Unread'
+              ? 'You have no unread notifications right now.'
+              : 'Complete activities in the app and your notifications will appear here.'}
           </Text>
         </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.accent}
+              colors={[theme.accent]}
+            />
+          }
         >
           {/* Unread section */}
-          {filteredNotifs.some((n) => !n.read) && (
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-              New
-            </Text>
+          {unread.length > 0 && (
+            <>
+              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>New</Text>
+              {unread.map((notif) => (
+                <NotifItem
+                  key={notif.id}
+                  notif={notif}
+                  theme={theme}
+                  onPress={handleMarkRead}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </>
           )}
-          {filteredNotifs.filter((n) => !n.read).map((notif) => (
-            <NotifItem key={notif.id} notif={notif} theme={theme} onPress={markRead} />
-          ))}
 
           {/* Read section */}
-          {filteredNotifs.some((n) => n.read) && (
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-              Earlier
-            </Text>
+          {read.length > 0 && (
+            <>
+              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Earlier</Text>
+              {read.map((notif) => (
+                <NotifItem
+                  key={notif.id}
+                  notif={notif}
+                  theme={theme}
+                  onPress={handleMarkRead}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </>
           )}
-          {filteredNotifs.filter((n) => n.read).map((notif) => (
-            <NotifItem key={notif.id} notif={notif} theme={theme} onPress={markRead} />
-          ))}
+
+          <Text style={[styles.hint, { color: theme.textMuted }]}>
+            Long press any notification to delete it
+          </Text>
         </ScrollView>
       )}
     </SafeAreaView>
   );
 }
 
-// ── STYLES ───────────────────────────────────────────────────
+// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100, paddingTop: spacing.sm },
+  scrollContent: { paddingBottom: 100, paddingTop: spacing.xs },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -376,7 +342,6 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
   markAllText: { fontSize: fontSize.sm, fontWeight: '600' },
 
-  // Filters
   filterRow: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -392,7 +357,6 @@ const styles = StyleSheet.create({
   },
   filterTabText: { fontSize: fontSize.sm },
 
-  // Section label
   sectionLabel: {
     fontSize: fontSize.xs,
     fontWeight: '700',
@@ -403,7 +367,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
 
-  // Notification row
   notifRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -440,10 +403,20 @@ const styles = StyleSheet.create({
   notifTime: { fontSize: fontSize.xs },
   notifAction: { fontSize: fontSize.xs, fontWeight: '700' },
 
-  // Empty state
   emptyState: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xxl,
   },
-  emptyTitle: { fontSize: fontSize.xl, fontWeight: '700' },
-  emptySub: { fontSize: fontSize.base },
+  emptyTitle: { fontSize: fontSize.xl, fontWeight: '700', textAlign: 'center' },
+  emptySub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 20 },
+
+  hint: {
+    fontSize: fontSize.xs,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+  },
 });

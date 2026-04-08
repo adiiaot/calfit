@@ -730,6 +730,8 @@ export default function WorkoutScreen() {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
 
+    
+
     const totalCal = workoutExercises.reduce((sum, ex) => sum + ex.calories_burned, 0);
     const sessionName = workoutExercises.length > 0
       ? `${workoutExercises[0].category} Workout`
@@ -759,6 +761,10 @@ export default function WorkoutScreen() {
 
     try {
       if (user?.id) {
+
+        // Send workout complete notification
+const { notifyWorkoutComplete } = await import('../../services/notificationService');
+await notifyWorkoutComplete(user.id, sessionName, totalCal, workoutSeconds);
         const { supabase } = await import('../../services/supabase');
         await supabase.from('workout_sessions').insert({
           user_id: user.id,

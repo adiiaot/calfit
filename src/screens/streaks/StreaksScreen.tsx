@@ -65,15 +65,15 @@ function PersonalStreakHero({ theme, streakCount }: {
       </View>
 
       <View style={styles.milestonePills}>
-        {['7d', '14d', '30d', '60d', '90d'].map((m, i) => (
-          <View key={m} style={[styles.milestonePill, {
-            backgroundColor: streakCount >= [7, 14, 30, 60, 90][i] ? theme.accent : theme.card,
-            borderColor: streakCount >= [7, 14, 30, 60, 90][i] ? theme.accent : theme.border,
+        {[7, 14, 30, 60, 90].map((milestone, i) => (
+          <View key={milestone} style={[styles.milestonePill, {
+            backgroundColor: streakCount >= milestone ? theme.accent : theme.card,
+            borderColor: streakCount >= milestone ? theme.accent : theme.border,
           }]}>
             <Text style={[styles.milestonePillText, {
-              color: streakCount >= [7, 14, 30, 60, 90][i] ? theme.bg : theme.textMuted,
+              color: streakCount >= milestone ? theme.bg : theme.textMuted,
             }]}>
-              {m}
+              {milestone}d
             </Text>
           </View>
         ))}
@@ -99,11 +99,42 @@ function StreakFreezeBanner({ theme }: { theme: typeof colors.dark }) {
 
 // ── PARTNER STREAK ────────────────────────────────────────────
 function PartnerStreak({ theme }: { theme: typeof colors.dark }) {
+  const navigation = useNavigation<any>();
+
+  // No friends yet — show invite CTA
+  const hasFriends = false;
+
+  if (!hasFriends) {
+    return (
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
+          Partner Streak
+        </Text>
+        <View style={styles.emptySection}>
+          <Ionicons name="people-outline" size={36} color={theme.textMuted} />
+          <Text style={[styles.emptySectionTitle, { color: theme.textPrimary }]}>
+            No accountability partner yet
+          </Text>
+          <Text style={[styles.emptySectionSub, { color: theme.textMuted }]}>
+            Invite a friend to CalFit and share a streak together. You keep each other accountable.
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigation.getParent()?.navigate('Credits', { tab: 'Referrals' })}
+            style={[styles.emptySectionBtn, { backgroundColor: theme.accent }]}
+          >
+            <Ionicons name="person-add-outline" size={16} color={theme.bg} />
+            <Text style={[styles.emptySectionBtnText, { color: theme.bg }]}>
+              Invite a Friend
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-        Partner Streak
-      </Text>
+      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Partner Streak</Text>
       <View style={styles.partnerRow}>
         <View style={[styles.partnerAvatar, {
           backgroundColor: theme.purple + '22',
@@ -112,15 +143,11 @@ function PartnerStreak({ theme }: { theme: typeof colors.dark }) {
           <Text style={[styles.partnerAvatarText, { color: theme.purple }]}>A</Text>
         </View>
         <View style={styles.partnerInfo}>
-          <Text style={[styles.partnerName, { color: theme.textPrimary }]}>
-            Favour + Alex
-          </Text>
+          <Text style={[styles.partnerName, { color: theme.textPrimary }]}>Favour + Alex</Text>
           <Text style={[styles.partnerGoal, { color: theme.textSecondary }]}>
             Shared goal: Log meals daily
           </Text>
-          <Text style={[styles.partnerStreak, { color: theme.accent }]}>
-            🔥 9 day streak
-          </Text>
+          <Text style={[styles.partnerStreak, { color: theme.accent }]}>🔥 9 day streak</Text>
         </View>
         <TouchableOpacity style={[styles.nudgeBtn, {
           backgroundColor: theme.accentDim as string,
@@ -140,6 +167,37 @@ function PartnerStreak({ theme }: { theme: typeof colors.dark }) {
 
 // ── GROUP STREAK ──────────────────────────────────────────────
 function GroupStreak({ theme }: { theme: typeof colors.dark }) {
+  const navigation = useNavigation<any>();
+
+  // No groups yet — show join/create CTA
+  const hasGroups = false;
+
+  if (!hasGroups) {
+    return (
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Group Streak</Text>
+        <View style={styles.emptySection}>
+          <Ionicons name="fitness-outline" size={36} color={theme.textMuted} />
+          <Text style={[styles.emptySectionTitle, { color: theme.textPrimary }]}>
+            Not in any group yet
+          </Text>
+          <Text style={[styles.emptySectionSub, { color: theme.textMuted }]}>
+            Join or create a group to build a shared streak with other CalFit members.
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigation.getParent()?.navigate('Community')}
+            style={[styles.emptySectionBtn, { backgroundColor: theme.accent }]}
+          >
+            <Ionicons name="compass-outline" size={16} color={theme.bg} />
+            <Text style={[styles.emptySectionBtnText, { color: theme.bg }]}>
+              Browse Communities
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   const members = [
     { initial: 'F', done: true },
     { initial: 'A', done: true },
@@ -150,12 +208,8 @@ function GroupStreak({ theme }: { theme: typeof colors.dark }) {
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-        Group Streak
-      </Text>
-      <Text style={[styles.groupName, { color: theme.textPrimary }]}>
-        CalFit Champions
-      </Text>
+      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Group Streak</Text>
+      <Text style={[styles.groupName, { color: theme.textPrimary }]}>CalFit Champions</Text>
       <Text style={[styles.groupSub, { color: theme.textSecondary }]}>
         5 members · Log meals daily · 🔥 22 days
       </Text>
@@ -193,27 +247,61 @@ function MilestoneBadges({ theme, streakCount }: {
     { label: '6 Months', emoji: '🌟', milestone: 180 },
   ];
 
+  const handleClaimBadge = (badge: typeof badges[0], earned: boolean) => {
+    if (!earned) {
+      const remaining = badge.milestone - streakCount;
+      Alert.alert(
+        `${badge.emoji} ${badge.label}`,
+        `You need ${remaining} more day${remaining === 1 ? '' : 's'} to unlock this badge. Keep checking in!`,
+        [{ text: 'Keep Going!' }]
+      );
+      return;
+    }
+    Alert.alert(
+      `${badge.emoji} Badge Unlocked!`,
+      `Congratulations! You have earned the ${badge.label} streak badge. Amazing consistency!`,
+      [{ text: 'Claim it! 🎉' }]
+    );
+  };
+
   return (
     <View style={styles.badgesSection}>
       <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
         Milestone Badges
       </Text>
+      <Text style={[styles.badgesHint, { color: theme.textMuted }]}>
+        Tap a badge to claim it once unlocked
+      </Text>
       <View style={styles.badgeGrid}>
         {badges.map((b) => {
           const earned = streakCount >= b.milestone;
           return (
-            <View key={b.label} style={[styles.badge, {
-              backgroundColor: theme.card,
-              borderColor: earned ? theme.accent : theme.border,
-              opacity: earned ? 1 : 0.5,
-            }]}>
+            <TouchableOpacity
+              key={b.label}
+              onPress={() => handleClaimBadge(b, earned)}
+              style={[styles.badge, {
+                backgroundColor: theme.card,
+                borderColor: earned ? theme.accent : theme.border,
+                opacity: earned ? 1 : 0.45,
+              }]}
+            >
               <Text style={styles.badgeEmoji}>{b.emoji}</Text>
               <Text style={[styles.badgeLabel, {
                 color: earned ? theme.accent : theme.textMuted,
               }]}>
                 {b.label}
               </Text>
-            </View>
+              {earned && (
+                <View style={[styles.badgeEarned, { backgroundColor: theme.accent }]}>
+                  <Text style={[styles.badgeEarnedText, { color: theme.bg }]}>✓ Earned</Text>
+                </View>
+              )}
+              {!earned && (
+                <Text style={[styles.badgeRemaining, { color: theme.textMuted }]}>
+                  {b.milestone - streakCount}d left
+                </Text>
+              )}
+            </TouchableOpacity>
           );
         })}
       </View>
@@ -229,17 +317,13 @@ export default function StreaksScreen() {
   const theme = colors[colorScheme];
 
   const streakCount = profile?.streak_count ?? 0;
+  const today = new Date().toISOString().split('T')[0];
+  const alreadyCheckedIn = profile?.last_active_date === today;
 
   const handleCheckIn = async () => {
-  if (!user?.id) return;
+    if (!user?.id) return;
 
-  try {
-    const { supabase } = await import('../../services/supabase');
-    const today = new Date().toISOString().split('T')[0];
-
-    // Check if user already checked in today
-    const lastActiveDate = profile?.last_active_date;
-    if (lastActiveDate === today) {
+    if (alreadyCheckedIn) {
       Alert.alert(
         'Already Checked In ✓',
         'You have already checked in today. Come back tomorrow to keep your streak going!',
@@ -248,41 +332,39 @@ export default function StreaksScreen() {
       return;
     }
 
-    const newCount = streakCount + 1;
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const newCount = streakCount + 1;
 
-    // Update streak count and last active date
-    await supabase
-      .from('profiles')
-      .update({
+      await supabase
+        .from('profiles')
+        .update({
+          streak_count: newCount,
+          last_active_date: today,
+        })
+        .eq('id', user.id);
+
+      updateProfile({
         streak_count: newCount,
         last_active_date: today,
-      })
-      .eq('id', user.id);
+      });
 
-    // Update local store immediately
-    updateProfile({
-      streak_count: newCount,
-      last_active_date: today,
-    });
+      const { notifyStreakCheckIn } = await import('../../services/notificationService');
+      await notifyStreakCheckIn(user.id, newCount);
 
-    // Send streak notification
-    const { notifyStreakCheckIn } = await import('../../services/notificationService');
-    await notifyStreakCheckIn(user.id, newCount);
-
-    Alert.alert(
-      'Checked In! 🔥',
-      `Day ${newCount} streak recorded. Come back tomorrow to keep it going!`,
-      [{ text: "Let's Go!" }]
-    );
-  } catch (error) {
-    console.error('Check in failed:', error);
-    Alert.alert('Error', 'Could not record your check-in. Please try again.');
-  }
-};
+      Alert.alert(
+        'Checked In! 🔥',
+        `Day ${newCount} streak recorded. Come back tomorrow to keep it going!`,
+        [{ text: "Let's Go!" }]
+      );
+    } catch (error) {
+      console.error('Check in failed:', error);
+      Alert.alert('Error', 'Could not record your check-in. Please try again.');
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -306,29 +388,29 @@ export default function StreaksScreen() {
         <GroupStreak theme={theme} />
         <MilestoneBadges theme={theme} streakCount={streakCount} />
 
-        {(() => {
-          const today = new Date().toISOString().split('T')[0];
-          const alreadyCheckedIn = profile?.last_active_date === today;
-          return (
-            <TouchableOpacity
-              onPress={handleCheckIn}
-              style={[styles.checkInBtn, {
-                backgroundColor: alreadyCheckedIn ? theme.border : theme.accent,
-              }]}
-            >
-              <Ionicons
-                name={alreadyCheckedIn ? 'checkmark-circle' : 'add-circle'}
-                size={20}
-                color={alreadyCheckedIn ? theme.textMuted : theme.bg}
-              />
-              <Text style={[styles.checkInBtnText, {
-                color: alreadyCheckedIn ? theme.textMuted : theme.bg,
-              }]}>
-                {alreadyCheckedIn ? 'Checked In Today ✓' : 'Check In Today'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })()}
+        <TouchableOpacity
+          onPress={handleCheckIn}
+          style={[styles.checkInBtn, {
+            backgroundColor: alreadyCheckedIn ? theme.border : theme.accent,
+          }]}
+        >
+          <Ionicons
+            name={alreadyCheckedIn ? 'checkmark-circle' : 'add-circle'}
+            size={20}
+            color={alreadyCheckedIn ? theme.textMuted : theme.bg}
+          />
+          <Text style={[styles.checkInBtnText, {
+            color: alreadyCheckedIn ? theme.textMuted : theme.bg,
+          }]}>
+            {alreadyCheckedIn ? 'Checked In Today ✓' : 'Check In Today'}
+          </Text>
+        </TouchableOpacity>
+
+        {alreadyCheckedIn && (
+          <Text style={[styles.nextCheckIn, { color: theme.textMuted }]}>
+            Next check-in available tomorrow 🕛
+          </Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -350,7 +432,6 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backText: { fontSize: fontSize.lg, fontWeight: '400' },
   pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
-  pageSub: { fontSize: fontSize.md, marginTop: 2 },
 
   heroCard: {
     marginHorizontal: spacing.lg,
@@ -427,6 +508,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
+  // Empty section
+  emptySection: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  emptySectionTitle: { fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' },
+  emptySectionSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18 },
+  emptySectionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    marginTop: spacing.xs,
+  },
+  emptySectionBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+
+  // Partner
   partnerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   partnerAvatar: {
     width: 48, height: 48, borderRadius: 24,
@@ -453,6 +550,7 @@ const styles = StyleSheet.create({
   },
   graceText: { fontSize: fontSize.xs },
 
+  // Group
   groupName: { fontSize: fontSize.lg, fontWeight: '700', marginBottom: 4 },
   groupSub: { fontSize: fontSize.sm, marginBottom: spacing.md },
   memberDots: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
@@ -463,12 +561,18 @@ const styles = StyleSheet.create({
   memberDotText: { fontSize: fontSize.sm, fontWeight: '700' },
   groupProgress: { fontSize: fontSize.xs },
 
+  // Badges
   badgesSection: { marginBottom: spacing.md },
   sectionLabel: {
     fontSize: fontSize.xs,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  badgesHint: {
+    fontSize: fontSize.xs,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
@@ -484,10 +588,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     alignItems: 'center',
+    gap: 4,
   },
-  badgeEmoji: { fontSize: 28, marginBottom: spacing.xs },
+  badgeEmoji: { fontSize: 28 },
   badgeLabel: { fontSize: fontSize.xs, fontWeight: '600', textAlign: 'center' },
+  badgeEarned: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    marginTop: 2,
+  },
+  badgeEarnedText: { fontSize: 8, fontWeight: '700' },
+  badgeRemaining: { fontSize: 9, marginTop: 2 },
 
+  // Check in
   checkInBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -499,4 +613,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
   },
   checkInBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
+  nextCheckIn: {
+    textAlign: 'center',
+    fontSize: fontSize.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
 });

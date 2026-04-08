@@ -196,37 +196,36 @@ export default function NotificationsScreen() {
     setIsRefreshing(false);
   };
 
- const handleMarkRead = async (id: string) => {
-  // Mark as read in DB
+const handleMarkRead = async (id: string) => {
   await markNotificationRead(id);
-
-  // Update local state
   setNotifications((prev) =>
     prev.map((n) => n.id === id ? { ...n, read: true } : n)
   );
 
-  // Navigate based on action label
   const notif = notifications.find((n) => n.id === id);
   if (!notif?.action_label) return;
 
-  const actionMap: Record<string, () => void> = {
-    'View Streaks':  () => navigation.getParent()?.navigate('Streaks'),
-    'Check In':      () => navigation.getParent()?.navigate('Streaks'),
-    'View Progress': () => navigation.getParent()?.navigate('Progress'),
-    'View Calories': () => navigation.navigate('Calorie'),
-    'View History':  () => navigation.navigate('Activity'),
-    'View Plan':     () => navigation.navigate('Meals'),
-    'Open Coach':    () => navigation.navigate('Coach'),
-    'View Group':    () => navigation.getParent()?.navigate('Community'),
-    'View Earnings': () => navigation.navigate('Credits'),
-    'View Plans':    () => navigation.getParent()?.navigate('Subscription'),
-    'Complete Profile': () => navigation.getParent()?.navigate('EditProfile'),
-    'Reply':         () => navigation.navigate('Social'),
-    'View Post':     () => navigation.navigate('Social'),
-  };
+  // Small delay so mark-read saves before navigating
+  setTimeout(() => {
+    const actionMap: Record<string, () => void> = {
+      'View Streaks':     () => navigation.navigate('Streaks' as never),
+      'Check In':         () => navigation.navigate('Streaks' as never),
+      'View Progress':    () => navigation.navigate('Progress' as never),
+      'View Calories':    () => navigation.navigate('Calorie' as never),
+      'View History':     () => navigation.navigate('Activity' as never),
+      'View Plan':        () => navigation.navigate('Meals' as never),
+      'Open Coach':       () => navigation.navigate('Coach' as never),
+      'View Group':       () => navigation.navigate('Community' as never),
+      'View Earnings':    () => navigation.navigate('Credits' as never),
+      'View Plans':       () => navigation.navigate('Subscription' as never),
+      'Complete Profile': () => navigation.navigate('Settings' as never),
+      'Reply':            () => navigation.navigate('Social' as never),
+      'View Post':        () => navigation.navigate('Social' as never),
+    };
 
-  const navigate = actionMap[notif.action_label];
-  if (navigate) navigate();
+    const navigate = actionMap[notif.action_label!];
+    if (navigate) navigate();
+  }, 100);
 };
 
   const handleMarkAllRead = async () => {
@@ -400,7 +399,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
 
-  
+
   notifRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

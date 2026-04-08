@@ -5,10 +5,10 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
-  FlatList,
   Alert,
 } from 'react-native';
 import { useEffect, useState, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
@@ -42,22 +42,14 @@ interface WorkoutSession {
 }
 
 // ── DIFFICULTY BADGE ──────────────────────────────────────────
-function DifficultyBadge({
-  level,
-  theme,
-}: {
-  level: string;
-  theme: typeof colors.dark;
-}) {
+function DifficultyBadge({ level, theme }: { level: string; theme: typeof colors.dark }) {
   const colorMap: Record<string, string> = {
     beginner: theme.accent,
     intermediate: theme.orange,
     advanced: theme.red,
   };
   return (
-    <View style={[styles.diffBadge, {
-      backgroundColor: (colorMap[level] ?? theme.accent) + '22',
-    }]}>
+    <View style={[styles.diffBadge, { backgroundColor: (colorMap[level] ?? theme.accent) + '22' }]}>
       <Text style={[styles.diffBadgeText, { color: colorMap[level] ?? theme.accent }]}>
         {level}
       </Text>
@@ -67,17 +59,14 @@ function DifficultyBadge({
 
 // ── EXERCISE CARD (catalogue) ─────────────────────────────────
 function ExerciseCard({
-  exercise,
-  theme,
-  isSelected,
-  onToggle,
+  exercise, theme, isSelected, onToggle,
 }: {
   exercise: Exercise;
   theme: typeof colors.dark;
   isSelected: boolean;
   onToggle: () => void;
 }) {
-  const equipmentIcon: Record<string, string> = {
+  const equipmentIcon: Record<string, any> = {
     none: 'body-outline',
     dumbbells: 'barbell-outline',
     'pull up bar': 'git-commit-outline',
@@ -101,10 +90,10 @@ function ExerciseCard({
           backgroundColor: isSelected ? theme.accent + '22' : theme.border + '44',
         }]}>
           <Ionicons
-            name={(equipmentIcon[exercise.equipment] ?? 'body-outline') as any}
-            size={20}
-            color={isSelected ? theme.accent : theme.textMuted}
-          />
+  name={(equipmentIcon[exercise.equipment] ?? 'body-outline') as any}
+  size={20}
+  color={isSelected ? theme.accent : theme.textMuted}
+/>
         </View>
         <View style={styles.exerciseCardInfo}>
           <Text style={[styles.exerciseCardName, {
@@ -126,9 +115,7 @@ function ExerciseCard({
           backgroundColor: isSelected ? theme.accent : 'transparent',
           borderColor: isSelected ? theme.accent : theme.border,
         }]}>
-          {isSelected && (
-            <Ionicons name="checkmark" size={14} color={theme.bg} />
-          )}
+          {isSelected && <Ionicons name="checkmark" size={14} color={theme.bg} />}
         </View>
       </View>
     </TouchableOpacity>
@@ -137,11 +124,7 @@ function ExerciseCard({
 
 // ── ACTIVE EXERCISE ROW ───────────────────────────────────────
 function ActiveExerciseRow({
-  exercise,
-  theme,
-  isActive,
-  onStart,
-  onComplete,
+  exercise, theme, isActive, onStart, onComplete,
 }: {
   exercise: ActiveExercise;
   theme: typeof colors.dark;
@@ -155,16 +138,8 @@ function ActiveExerciseRow({
 
   return (
     <View style={[styles.activeRow, {
-      backgroundColor: exercise.done
-        ? theme.accent + '15'
-        : isActive
-        ? theme.card
-        : theme.card,
-      borderColor: exercise.done
-        ? theme.accent
-        : isActive
-        ? theme.orange
-        : theme.border,
+      backgroundColor: exercise.done ? theme.accent + '15' : theme.card,
+      borderColor: exercise.done ? theme.accent : isActive ? theme.orange : theme.border,
       borderWidth: isActive ? 2 : 1,
     }]}>
       <View style={styles.activeRowLeft}>
@@ -206,11 +181,7 @@ function ActiveExerciseRow({
 }
 
 // ── WORKOUT TIMER ─────────────────────────────────────────────
-function WorkoutTimer({
-  theme,
-  seconds,
-  calories,
-}: {
+function WorkoutTimer({ theme, seconds, calories }: {
   theme: typeof colors.dark;
   seconds: number;
   calories: number;
@@ -223,10 +194,7 @@ function WorkoutTimer({
     : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
   return (
-    <View style={[styles.timerCard, {
-      backgroundColor: theme.card,
-      borderColor: theme.border,
-    }]}>
+    <View style={[styles.timerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
       <View style={styles.timerLeft}>
         <Text style={[styles.timerLabel, { color: theme.textMuted }]}>WORKOUT TIME</Text>
         <Text style={[styles.timerValue, { color: theme.textPrimary }]}>{timeStr}</Text>
@@ -242,21 +210,11 @@ function WorkoutTimer({
 
 // ── TODAY TAB ─────────────────────────────────────────────────
 function TodayTab({
-  theme,
-  exercises,
-  allExercises,
-  activeIndex,
-  workoutSeconds,
-  totalCalories,
-  workoutStarted,
-  onStart,
-  onComplete,
-  onCompleteWorkout,
-  onOpenCatalogue,
+  theme, exercises, activeIndex, workoutSeconds, totalCalories,
+  workoutStarted, onStart, onComplete, onCompleteWorkout, onOpenCatalogue, onQuickStart,
 }: {
   theme: typeof colors.dark;
   exercises: ActiveExercise[];
-  allExercises: Exercise[];
   activeIndex: number;
   workoutSeconds: number;
   totalCalories: number;
@@ -265,21 +223,25 @@ function TodayTab({
   onComplete: (index: number) => void;
   onCompleteWorkout: () => void;
   onOpenCatalogue: () => void;
+  onQuickStart: (name: string) => void;
 }) {
+  const quickWorkouts = [
+    { name: 'Morning Cardio Blast', meta: 'Jumping Jacks, High Knees +3', duration: '20 min', cal: '200 kcal' },
+    { name: 'Full Body Strength', meta: 'Push Ups, Squats +3', duration: '30 min', cal: '250 kcal' },
+    { name: 'Core Crusher', meta: 'Crunches, Leg Raises +3', duration: '15 min', cal: '120 kcal' },
+    { name: 'Leg Day', meta: 'Squats, Lunges +3', duration: '25 min', cal: '220 kcal' },
+  ];
+
   if (exercises.length === 0) {
     return (
       <ScrollView contentContainerStyle={styles.tabContent}>
-        {/* Empty state */}
-        <View style={[styles.emptyWorkout, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
+        <View style={[styles.emptyWorkout, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Ionicons name="barbell-outline" size={48} color={theme.textMuted} />
           <Text style={[styles.emptyWorkoutTitle, { color: theme.textPrimary }]}>
             No exercises yet
           </Text>
           <Text style={[styles.emptyWorkoutSub, { color: theme.textMuted }]}>
-            Browse the exercise catalogue and add exercises to start your workout
+            Browse the exercise catalogue or pick a quick start workout below
           </Text>
           <TouchableOpacity
             onPress={onOpenCatalogue}
@@ -292,28 +254,22 @@ function TodayTab({
           </TouchableOpacity>
         </View>
 
-        {/* Quick start workouts */}
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           Quick Start
         </Text>
-        {[
-          { name: 'Morning Cardio Blast', exercises: ['Jumping Jacks', 'High Knees', 'Mountain Climbers', 'Burpees'], duration: '20 min', cal: '200 kcal' },
-          { name: 'Full Body Strength', exercises: ['Push Ups', 'Squats', 'Lunges', 'Plank'], duration: '30 min', cal: '250 kcal' },
-          { name: 'Core Crusher', exercises: ['Crunches', 'Leg Raises', 'Russian Twists', 'Plank'], duration: '15 min', cal: '120 kcal' },
-          { name: 'Leg Day', exercises: ['Squats', 'Lunges', 'Glute Bridges', 'Jump Squats'], duration: '25 min', cal: '220 kcal' },
-        ].map((q) => (
-          <TouchableOpacity key={q.name} style={[styles.quickStartCard, {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          }]}>
+
+        {quickWorkouts.map((q) => (
+          <TouchableOpacity
+            key={q.name}
+            onPress={() => onQuickStart(q.name)}
+            style={[styles.quickStartCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
             <View style={[styles.quickStartIcon, { backgroundColor: theme.accentDim as string }]}>
               <Ionicons name="flash" size={20} color={theme.accent} />
             </View>
             <View style={styles.quickStartInfo}>
               <Text style={[styles.quickStartName, { color: theme.textPrimary }]}>{q.name}</Text>
-              <Text style={[styles.quickStartMeta, { color: theme.textMuted }]}>
-                {q.exercises.slice(0, 2).join(', ')} +{q.exercises.length - 2} more
-              </Text>
+              <Text style={[styles.quickStartMeta, { color: theme.textMuted }]}>{q.meta}</Text>
               <Text style={[styles.quickStartStats, { color: theme.accent }]}>
                 ~{q.duration} · ~{q.cal}
               </Text>
@@ -328,22 +284,14 @@ function TodayTab({
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       {workoutStarted && (
-        <WorkoutTimer
-          theme={theme}
-          seconds={workoutSeconds}
-          calories={totalCalories}
-        />
+        <WorkoutTimer theme={theme} seconds={workoutSeconds} calories={totalCalories} />
       )}
-
       <View style={styles.todayHeader}>
-        <Text style={[styles.todayTitle, { color: theme.textPrimary }]}>
-          Today's Workout
-        </Text>
+        <Text style={[styles.todayTitle, { color: theme.textPrimary }]}>Today's Workout</Text>
         <TouchableOpacity onPress={onOpenCatalogue}>
           <Text style={[styles.addMoreText, { color: theme.accent }]}>+ Add More</Text>
         </TouchableOpacity>
       </View>
-
       {exercises.map((ex, i) => (
         <ActiveExerciseRow
           key={ex.id}
@@ -354,7 +302,6 @@ function TodayTab({
           onComplete={() => onComplete(i)}
         />
       ))}
-
       <TouchableOpacity
         onPress={onCompleteWorkout}
         style={[styles.completeWorkoutBtn, { backgroundColor: theme.accent }]}
@@ -370,11 +317,7 @@ function TodayTab({
 
 // ── CATALOGUE TAB ─────────────────────────────────────────────
 function CatalogueTab({
-  theme,
-  exercises,
-  selectedIds,
-  onToggle,
-  onAddToWorkout,
+  theme, exercises, selectedIds, onToggle, onAddToWorkout,
 }: {
   theme: typeof colors.dark;
   exercises: Exercise[];
@@ -391,7 +334,6 @@ function CatalogueTab({
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Category filter */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -416,7 +358,6 @@ function CatalogueTab({
         ))}
       </ScrollView>
 
-      {/* Selected count bar */}
       {selectedIds.size > 0 && (
         <TouchableOpacity
           onPress={onAddToWorkout}
@@ -443,7 +384,7 @@ function CatalogueTab({
   );
 }
 
-// ── CALORIES TAB ─────────────────────────────────────────────
+// ── CALORIES TAB ──────────────────────────────────────────────
 function CaloriesTab({ theme, totalCalories, weeklyData }: {
   theme: typeof colors.dark;
   totalCalories: number;
@@ -457,12 +398,8 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: {
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-          Calories Burned Today
-        </Text>
-        <Text style={[styles.bigStat, { color: theme.accent }]}>
-          {totalCalories} kcal
-        </Text>
+        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Calories Burned Today</Text>
+        <Text style={[styles.bigStat, { color: theme.accent }]}>{totalCalories} kcal</Text>
         <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
           <View style={[styles.progressBarFill, {
             backgroundColor: theme.accent,
@@ -474,9 +411,8 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: {
         </Text>
       </View>
 
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-        This Week
-      </Text>
+      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>This Week</Text>
+
       <View style={[styles.barChartCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.barChart}>
           {weeklyData.map((val, i) => (
@@ -513,13 +449,9 @@ function StepsTab({ theme }: { theme: typeof colors.dark }) {
         <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Steps Today</Text>
         <Text style={[styles.bigStat, { color: theme.accent }]}>0</Text>
         <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
-          <View style={[styles.progressBarFill, {
-            backgroundColor: theme.accent, width: '0%' as any,
-          }]} />
+          <View style={[styles.progressBarFill, { backgroundColor: theme.accent, width: '0%' as any }]} />
         </View>
-        <Text style={[styles.progressSub, { color: theme.textMuted }]}>
-          0 of 10,000 daily goal
-        </Text>
+        <Text style={[styles.progressSub, { color: theme.textMuted }]}>0 of 10,000 daily goal</Text>
         <View style={[styles.stepsSensorCard, {
           backgroundColor: theme.accentDim as string,
           borderColor: theme.accent,
@@ -535,20 +467,14 @@ function StepsTab({ theme }: { theme: typeof colors.dark }) {
 }
 
 // ── HISTORY TAB ───────────────────────────────────────────────
-function HistoryTab({
-  theme,
-  sessions,
-}: {
+function HistoryTab({ theme, sessions }: {
   theme: typeof colors.dark;
   sessions: WorkoutSession[];
 }) {
   if (sessions.length === 0) {
     return (
       <ScrollView contentContainerStyle={styles.tabContent}>
-        <View style={[styles.emptyWorkout, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
+        <View style={[styles.emptyWorkout, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Ionicons name="time-outline" size={44} color={theme.textMuted} />
           <Text style={[styles.emptyWorkoutTitle, { color: theme.textPrimary }]}>
             No workout history yet
@@ -565,26 +491,32 @@ function HistoryTab({
     <ScrollView contentContainerStyle={styles.tabContent}>
       {sessions.map((session) => {
         const date = new Date(session.completed_at);
-        const mins = Math.floor(session.duration_seconds / 60);
+        const hrs = Math.floor(session.duration_seconds / 3600);
+        const mins = Math.floor((session.duration_seconds % 3600) / 60);
+        const secs = session.duration_seconds % 60;
+        const timeDisplay = hrs > 0
+          ? `${hrs}h ${mins}m`
+          : mins > 0
+          ? `${mins} min ${secs}s`
+          : `${secs}s`;
+
         return (
           <View key={session.id} style={[styles.historyCard, {
             backgroundColor: theme.card,
             borderColor: theme.border,
           }]}>
             <View style={styles.historyHeader}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={[styles.historyName, { color: theme.textPrimary }]}>
                   {session.name}
                 </Text>
                 <Text style={[styles.historyDate, { color: theme.textMuted }]}>
                   {date.toLocaleDateString('en-GB', {
-                    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+                    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
                   })}
                 </Text>
               </View>
-              <View style={[styles.historyCalBadge, {
-                backgroundColor: theme.accentDim as string,
-              }]}>
+              <View style={[styles.historyCalBadge, { backgroundColor: theme.accentDim as string }]}>
                 <Text style={[styles.historyCalNum, { color: theme.accent }]}>
                   {session.calories_burned}
                 </Text>
@@ -594,24 +526,29 @@ function HistoryTab({
 
             <View style={styles.historyStats}>
               {[
-                { icon: 'time-outline', label: `${mins} min` },
+                { icon: 'time-outline', label: timeDisplay },
                 { icon: 'barbell-outline', label: `${session.exercises.length} exercises` },
               ].map((s) => (
                 <View key={s.label} style={styles.historyStat}>
                   <Ionicons name={s.icon as any} size={14} color={theme.textMuted} />
-                  <Text style={[styles.historyStatText, { color: theme.textMuted }]}>
-                    {s.label}
-                  </Text>
+                  <Text style={[styles.historyStatText, { color: theme.textMuted }]}>{s.label}</Text>
                 </View>
               ))}
             </View>
 
             <View style={styles.historyExercises}>
-              {session.exercises.map((ex, i) => (
-                <Text key={i} style={[styles.historyExName, { color: theme.textSecondary }]}>
-                  {ex.name} · {Math.floor(ex.seconds / 60)}:{(ex.seconds % 60).toString().padStart(2, '0')} · {ex.calories} kcal
-                </Text>
-              ))}
+              {session.exercises.map((ex, i) => {
+                const exMins = Math.floor(ex.seconds / 60);
+                const exSecs = ex.seconds % 60;
+                const exTime = exMins > 0
+                  ? `${exMins}m ${exSecs}s`
+                  : `${exSecs}s`;
+                return (
+                  <Text key={i} style={[styles.historyExName, { color: theme.textSecondary }]}>
+                    {ex.name} · {exTime} · {ex.calories} kcal
+                  </Text>
+                );
+              })}
             </View>
           </View>
         );
@@ -621,12 +558,7 @@ function HistoryTab({
 }
 
 // ── INNER TAB BAR ─────────────────────────────────────────────
-function InnerTabs({
-  tabs,
-  active,
-  onPress,
-  theme,
-}: {
+function InnerTabs({ tabs, active, onPress, theme }: {
   tabs: string[];
   active: string;
   onPress: (tab: string) => void;
@@ -638,10 +570,7 @@ function InnerTabs({
         <TouchableOpacity
           key={tab}
           onPress={() => onPress(tab)}
-          style={[
-            styles.innerTab,
-            active === tab && { borderBottomColor: theme.accent },
-          ]}
+          style={[styles.innerTab, active === tab && { borderBottomColor: theme.accent }]}
         >
           <Text style={[
             styles.innerTabText,
@@ -659,28 +588,23 @@ function InnerTabs({
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function WorkoutScreen() {
   const { colorScheme } = useThemeStore();
-  const { user, profile } = useAuthStore();
+  const { user } = useAuthStore();
+  const navigation = useNavigation<any>();
   const theme = colors[colorScheme];
 
   const [activeTab, setActiveTab] = useState('Today');
   const tabs = ['Today', 'Catalogue', 'Calories', 'Steps', 'History'];
 
-  // Exercise catalogue from Supabase
   const [catalogue, setCatalogue] = useState<Exercise[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  // Active workout
   const [workoutExercises, setWorkoutExercises] = useState<ActiveExercise[]>([]);
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(-1);
   const [workoutStarted, setWorkoutStarted] = useState(false);
   const [workoutSeconds, setWorkoutSeconds] = useState(0);
   const [totalCaloriesBurned, setTotalCaloriesBurned] = useState(0);
-
-  // Workout history
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [weeklyCalories, setWeeklyCalories] = useState([0, 0, 0, 0, 0, 0, 0]);
 
-  // Timers
   const workoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -725,7 +649,6 @@ export default function WorkoutScreen() {
           exercises: s.exercises ?? [],
         })));
 
-        // Build weekly calories array
         const weekly = [0, 0, 0, 0, 0, 0, 0];
         const now = new Date();
         data.forEach((s: any) => {
@@ -738,7 +661,6 @@ export default function WorkoutScreen() {
         });
         setWeeklyCalories(weekly);
 
-        // Today's calories
         const today = new Date().toDateString();
         const todayTotal = data
           .filter((s: any) => new Date(s.completed_at).toDateString() === today)
@@ -764,7 +686,6 @@ export default function WorkoutScreen() {
       .filter((e) => selectedIds.has(e.id))
       .filter((e) => !workoutExercises.some((we) => we.id === e.id))
       .map((e) => ({ ...e, seconds: 0, calories_burned: 0, done: false }));
-
     setWorkoutExercises((prev) => [...prev, ...toAdd]);
     setSelectedIds(new Set());
     setActiveTab('Today');
@@ -777,10 +698,8 @@ export default function WorkoutScreen() {
         setWorkoutSeconds((prev) => prev + 1);
       }, 1000);
     }
-
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     setActiveExerciseIndex(index);
-
     exerciseTimerRef.current = setInterval(() => {
       setWorkoutExercises((prev) =>
         prev.map((ex, i) => {
@@ -810,6 +729,16 @@ export default function WorkoutScreen() {
       ? `${workoutExercises[0].category} Workout`
       : 'Workout Session';
 
+    // Format time properly
+    const hrs = Math.floor(workoutSeconds / 3600);
+    const mins = Math.floor((workoutSeconds % 3600) / 60);
+    const secs = workoutSeconds % 60;
+    const timeStr = hrs > 0
+      ? `${hrs}h ${mins}m ${secs}s`
+      : mins > 0
+      ? `${mins} min ${secs}s`
+      : `${secs}s`;
+
     const sessionData = {
       name: sessionName,
       completed_at: new Date().toISOString(),
@@ -836,24 +765,27 @@ export default function WorkoutScreen() {
     }
 
     Alert.alert(
-      'Workout Complete! 🎉',
-      `Great work!\n\nTime: ${Math.floor(workoutSeconds / 60)} min\nCalories burned: ${totalCal} kcal\nExercises: ${workoutExercises.length}`,
-      [{ text: 'Awesome!', onPress: () => {
-        setSessions((prev) => [{ id: Date.now().toString(), ...sessionData }, ...prev]);
-        setTotalCaloriesBurned((prev) => prev + totalCal);
-        setWorkoutExercises([]);
-        setWorkoutSeconds(0);
-        setWorkoutStarted(false);
-        setActiveExerciseIndex(-1);
-        setActiveTab('History');
-      }}]
+      '🎉 Workout Complete!',
+      `Great work!\n\nWorkout: ${sessionName}\nTime: ${timeStr}\nCalories burned: ${totalCal} kcal\nExercises: ${workoutExercises.length}`,
+      [{
+        text: 'Awesome!',
+        onPress: () => {
+          setSessions((prev) => [{ id: Date.now().toString(), ...sessionData }, ...prev]);
+          setTotalCaloriesBurned((prev) => prev + totalCal);
+          setWorkoutExercises([]);
+          setWorkoutSeconds(0);
+          setWorkoutStarted(false);
+          setActiveExerciseIndex(-1);
+          setActiveTab('History');
+        },
+      }]
     );
   };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
       <View style={styles.header}>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Workout</Text>
+        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Activity</Text>
       </View>
 
       <InnerTabs tabs={tabs} active={activeTab} onPress={setActiveTab} theme={theme} />
@@ -862,7 +794,6 @@ export default function WorkoutScreen() {
         <TodayTab
           theme={theme}
           exercises={workoutExercises}
-          allExercises={catalogue}
           activeIndex={activeExerciseIndex}
           workoutSeconds={workoutSeconds}
           totalCalories={workoutExercises.reduce((sum, ex) => sum + ex.calories_burned, 0)}
@@ -871,6 +802,7 @@ export default function WorkoutScreen() {
           onComplete={handleCompleteExercise}
           onCompleteWorkout={handleCompleteWorkout}
           onOpenCatalogue={() => setActiveTab('Catalogue')}
+          onQuickStart={(name) => navigation.getParent()?.navigate('QuickStart', { name })}
         />
       )}
 
@@ -911,7 +843,6 @@ const styles = StyleSheet.create({
   },
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
 
-  // Inner tabs
   innerTabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -940,7 +871,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // Cards
   card: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -961,7 +891,6 @@ const styles = StyleSheet.create({
   progressBarFill: { height: '100%', borderRadius: 4 },
   progressSub: { fontSize: fontSize.xs },
 
-  // Bar chart
   barChartCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -976,7 +905,6 @@ const styles = StyleSheet.create({
   barLabel: { fontSize: 9 },
   weeklyAvg: { fontSize: fontSize.xs, textAlign: 'right', marginTop: spacing.sm },
 
-  // Empty workout
   emptyWorkout: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
@@ -999,7 +927,6 @@ const styles = StyleSheet.create({
   },
   browseCatalogueBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
 
-  // Quick start
   quickStartCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1019,7 +946,6 @@ const styles = StyleSheet.create({
   quickStartMeta: { fontSize: fontSize.xs, marginTop: 2 },
   quickStartStats: { fontSize: fontSize.xs, marginTop: 2, fontWeight: '600' },
 
-  // Timer
   timerCard: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
@@ -1035,7 +961,6 @@ const styles = StyleSheet.create({
   timerLabel: { fontSize: fontSize.xs, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4 },
   timerValue: { fontSize: 22, fontWeight: '800' },
 
-  // Today header
   todayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1047,7 +972,6 @@ const styles = StyleSheet.create({
   todayTitle: { fontSize: fontSize.lg, fontWeight: '700' },
   addMoreText: { fontSize: fontSize.sm, fontWeight: '600' },
 
-  // Active exercise rows
   activeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1090,7 +1014,6 @@ const styles = StyleSheet.create({
   },
   completeWorkoutBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
 
-  // Catalogue
   categoryRow: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -1114,7 +1037,6 @@ const styles = StyleSheet.create({
   },
   addSelectedText: { fontSize: fontSize.base, fontWeight: '700' },
 
-  // Exercise cards
   exerciseCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1143,7 +1065,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // Steps sensor card
   stepsSensorCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1155,7 +1076,6 @@ const styles = StyleSheet.create({
   },
   stepsSensorText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
 
-  // History
   historyCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,

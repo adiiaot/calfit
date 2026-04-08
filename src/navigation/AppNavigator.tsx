@@ -30,6 +30,9 @@ import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 // Goals Setting Screen
 import GoalsScreen from '../screens/settings/GoalsScreen';
 
+// Quick Start Screen for Workout Screen
+import QuickStartScreen from '../screens/Activity/QuickStartScreen';
+
 // Auth + Onboarding screens
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import LoginScreen from '../screens/onboarding/LoginScreen';
@@ -140,6 +143,7 @@ export default function AppNavigator() {
           <RootStack.Screen name="Notifications" component={NotificationsScreen} />
           <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
           <RootStack.Screen name="Goals" component={GoalsScreen} />
+          <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
         </>
         ) : (
           // ── MAIN APP ───────────────────────────────────────
@@ -154,6 +158,7 @@ export default function AppNavigator() {
           <RootStack.Screen name="Notifications" component={NotificationsScreen} />
           <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
           <RootStack.Screen name="Goals" component={GoalsScreen} />
+          <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
         </>
         )}
       </RootStack.Navigator>

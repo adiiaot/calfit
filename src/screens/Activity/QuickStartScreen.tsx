@@ -185,19 +185,19 @@ export default function QuickStartScreen() {
     try {
       if (user?.id) {
         const { supabase } = await import('../../services/supabase');
-        await supabase.from('workout_sessions').insert({
-          user_id: user.id,
-          name: workoutData.name,
-          status: 'completed',
-          duration_seconds: workoutSeconds,
-          calories_burned: totalCal,
-          completed_at: new Date().toISOString(),
-          exercises: exercises.map((ex) => ({
-            name: ex.name,
-            seconds: ex.seconds,
-            calories: ex.calories_burned,
-          })),
-        });
+       await supabase.from('workout_sessions').insert({
+  user_id: user.id,
+  name: workoutData.name,
+  status: 'completed',
+  duration_seconds: workoutSeconds,
+  calories_burned: totalCal,
+  completed_at: new Date().toISOString(),
+  exercises: exercises.map((ex) => ({
+    name: ex.name,
+    seconds: ex.seconds,
+    calories: ex.calories_burned,
+  })),
+});
       }
     } catch (error) {
       console.error('Failed to save session:', error);

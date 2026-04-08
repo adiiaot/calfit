@@ -7,8 +7,8 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { useEffect, useState, useRef } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
@@ -591,6 +591,12 @@ export default function WorkoutScreen() {
   const { user } = useAuthStore();
   const navigation = useNavigation<any>();
   const theme = colors[colorScheme];
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) loadHistory();
+    }, [user?.id])
+  );
 
   const [activeTab, setActiveTab] = useState('Today');
   const tabs = ['Today', 'Catalogue', 'Calories', 'Steps', 'History'];

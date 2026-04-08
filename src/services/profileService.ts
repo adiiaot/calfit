@@ -23,7 +23,7 @@ export interface Profile {
   tracking_preferences: string[] | null;
   referral_code: string | null;
   streak_count: number;
-  last_active_date: string;
+  last_active_date: string | null;
   created_at: string;
   updated_at: string;
 }

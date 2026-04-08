@@ -197,3 +197,36 @@ export const notifyUpgradePrompt = async (userId: string) => {
     'View Plans'
   );
 };
+
+// Call this on app open to remind user to check in
+export const checkAndSendStreakReminder = async (
+  userId: string,
+  lastActiveDate: string | null
+): Promise<void> => {
+  const today = new Date().toISOString().split('T')[0];
+
+  // Already checked in today — no reminder needed
+  if (lastActiveDate === today) return;
+
+  // Check if we already sent a reminder today
+  const { supabase } = await import('./supabase');
+  const { data } = await supabase
+    .from('notifications')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('type', 'streak')
+    .gte('created_at', `${today}T00:00:00`)
+    .limit(1);
+
+  // Already sent a reminder today
+  if (data && data.length > 0) return;
+
+  // Send the daily reminder
+  await sendNotification(
+    userId,
+    'streak',
+    "Don't lose your streak! ⚠️",
+    "You haven't checked in today. Tap to check in now and keep your streak alive.",
+    'Check In'
+  );
+};

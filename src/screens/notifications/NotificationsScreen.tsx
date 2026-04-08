@@ -196,12 +196,38 @@ export default function NotificationsScreen() {
     setIsRefreshing(false);
   };
 
-  const handleMarkRead = async (id: string) => {
-    await markNotificationRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => n.id === id ? { ...n, read: true } : n)
-    );
+ const handleMarkRead = async (id: string) => {
+  // Mark as read in DB
+  await markNotificationRead(id);
+
+  // Update local state
+  setNotifications((prev) =>
+    prev.map((n) => n.id === id ? { ...n, read: true } : n)
+  );
+
+  // Navigate based on action label
+  const notif = notifications.find((n) => n.id === id);
+  if (!notif?.action_label) return;
+
+  const actionMap: Record<string, () => void> = {
+    'View Streaks':  () => navigation.getParent()?.navigate('Streaks'),
+    'Check In':      () => navigation.getParent()?.navigate('Streaks'),
+    'View Progress': () => navigation.getParent()?.navigate('Progress'),
+    'View Calories': () => navigation.navigate('Calorie'),
+    'View History':  () => navigation.navigate('Activity'),
+    'View Plan':     () => navigation.navigate('Meals'),
+    'Open Coach':    () => navigation.navigate('Coach'),
+    'View Group':    () => navigation.getParent()?.navigate('Community'),
+    'View Earnings': () => navigation.navigate('Credits'),
+    'View Plans':    () => navigation.getParent()?.navigate('Subscription'),
+    'Complete Profile': () => navigation.getParent()?.navigate('EditProfile'),
+    'Reply':         () => navigation.navigate('Social'),
+    'View Post':     () => navigation.navigate('Social'),
   };
+
+  const navigate = actionMap[notif.action_label];
+  if (navigate) navigate();
+};
 
   const handleMarkAllRead = async () => {
     if (!user?.id) return;
@@ -367,6 +393,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
 
+
+  actionBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+
+  
   notifRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

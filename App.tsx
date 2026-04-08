@@ -29,18 +29,39 @@ export default function App() {
   });
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setSession(session);
+
+    // Send streak reminder if user hasn't checked in today
+    if (session?.user) {
+      setTimeout(async () => {
+        try {
+          const { supabase: sb } = await import('./src/services/supabase');
+          const { data: profileData } = await sb
+            .from('profiles')
+            .select('last_active_date')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileData) {
+            const { checkAndSendStreakReminder } = await import('./src/services/notificationService');
+            await checkAndSendStreakReminder(session.user.id, profileData.last_active_date);
+          }
+        } catch (e) {
+          // Silent fail — non critical
+        }
+      }, 3000); // Wait 3 seconds after app opens
+    }
+  });
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (_event, session) => {
       setSession(session);
-    });
+    }
+  );
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
+  return () => subscription.unsubscribe();
+}, []);
 
   if (!fontsLoaded) {
     return (

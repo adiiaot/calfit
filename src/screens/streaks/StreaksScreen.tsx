@@ -231,39 +231,54 @@ export default function StreaksScreen() {
   const streakCount = profile?.streak_count ?? 0;
 
   const handleCheckIn = async () => {
-    if (!user?.id) return;
+  if (!user?.id) return;
 
-    try {
-      const { supabase } = await import('../../services/supabase');
-      const newCount = streakCount + 1;
-      const today = new Date().toISOString().split('T')[0];
+  try {
+    const { supabase } = await import('../../services/supabase');
+    const today = new Date().toISOString().split('T')[0];
 
-      // Update streak count in Supabase
-      await supabase
-        .from('profiles')
-        .update({
-          streak_count: newCount,
-          last_active_date: today,
-        })
-        .eq('id', user.id);
-
-      // Update local store so it reflects immediately
-      updateProfile({ streak_count: newCount });
-
-      // Send streak notification
-      const { notifyStreakCheckIn } = await import('../../services/notificationService');
-      await notifyStreakCheckIn(user.id, newCount);
-
+    // Check if user already checked in today
+    const lastActiveDate = profile?.last_active_date;
+    if (lastActiveDate === today) {
       Alert.alert(
-        'Checked In! 🔥',
-        `Day ${newCount} streak recorded. Keep it going!`,
-        [{ text: 'Let\'s Go!' }]
+        'Already Checked In ✓',
+        'You have already checked in today. Come back tomorrow to keep your streak going!',
+        [{ text: 'OK' }]
       );
-    } catch (error) {
-      console.error('Check in failed:', error);
-      Alert.alert('Error', 'Could not record your check-in. Please try again.');
+      return;
     }
-  };
+
+    const newCount = streakCount + 1;
+
+    // Update streak count and last active date
+    await supabase
+      .from('profiles')
+      .update({
+        streak_count: newCount,
+        last_active_date: today,
+      })
+      .eq('id', user.id);
+
+    // Update local store immediately
+    updateProfile({
+      streak_count: newCount,
+      last_active_date: today,
+    });
+
+    // Send streak notification
+    const { notifyStreakCheckIn } = await import('../../services/notificationService');
+    await notifyStreakCheckIn(user.id, newCount);
+
+    Alert.alert(
+      'Checked In! 🔥',
+      `Day ${newCount} streak recorded. Come back tomorrow to keep it going!`,
+      [{ text: "Let's Go!" }]
+    );
+  } catch (error) {
+    console.error('Check in failed:', error);
+    Alert.alert('Error', 'Could not record your check-in. Please try again.');
+  }
+};
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
@@ -291,15 +306,29 @@ export default function StreaksScreen() {
         <GroupStreak theme={theme} />
         <MilestoneBadges theme={theme} streakCount={streakCount} />
 
-        <TouchableOpacity
-          onPress={handleCheckIn}
-          style={[styles.checkInBtn, { backgroundColor: theme.accent }]}
-        >
-          <Ionicons name="checkmark-circle" size={20} color={theme.bg} />
-          <Text style={[styles.checkInBtnText, { color: theme.bg }]}>
-            Check In Today
-          </Text>
-        </TouchableOpacity>
+        {(() => {
+          const today = new Date().toISOString().split('T')[0];
+          const alreadyCheckedIn = profile?.last_active_date === today;
+          return (
+            <TouchableOpacity
+              onPress={handleCheckIn}
+              style={[styles.checkInBtn, {
+                backgroundColor: alreadyCheckedIn ? theme.border : theme.accent,
+              }]}
+            >
+              <Ionicons
+                name={alreadyCheckedIn ? 'checkmark-circle' : 'add-circle'}
+                size={20}
+                color={alreadyCheckedIn ? theme.textMuted : theme.bg}
+              />
+              <Text style={[styles.checkInBtnText, {
+                color: alreadyCheckedIn ? theme.textMuted : theme.bg,
+              }]}>
+                {alreadyCheckedIn ? 'Checked In Today ✓' : 'Check In Today'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })()}
       </ScrollView>
     </SafeAreaView>
   );

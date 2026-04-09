@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import Avatar from '../../components/Avatar';
 
 // ── PROFILE CARD ─────────────────────────────────────────────
 function ProfileCard({
@@ -44,14 +45,7 @@ function ProfileCard({
         backgroundColor: theme.card,
         borderColor: theme.border,
       }]}>
-        <View style={[styles.profileAvatar, {
-          backgroundColor: theme.accentDim as string,
-          borderColor: theme.accent,
-        }]}>
-          <Text style={[styles.profileAvatarText, { color: theme.accent }]}>
-            {name[0]?.toUpperCase() ?? 'U'}
-          </Text>
-        </View>
+        <Avatar size={54} borderWidth={2} />
         <View style={styles.profileInfo}>
           <View style={styles.profileNameRow}>
             <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>

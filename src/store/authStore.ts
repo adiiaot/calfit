@@ -55,6 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (current) {
       set({ profile: { ...current, ...updates } });
     }
+    
   },
 
   signIn: async (email, password) => {

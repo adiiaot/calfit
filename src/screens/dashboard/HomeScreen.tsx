@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import Avatar from '../../components/Avatar';
 import {
   getTodayCalories,
   getTodayWater,
@@ -492,14 +493,9 @@ useEffect(() => {
     <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
   )}
 </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate('Settings')}
-            style={[styles.avatarBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-          >
-            <Text style={[styles.avatarText, { color: theme.accent }]}>
-              {firstName[0].toUpperCase()}
-            </Text>
-          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Settings')}>
+  <Avatar size={36} borderWidth={2} />
+</TouchableOpacity>
         </View>
       </View>
 

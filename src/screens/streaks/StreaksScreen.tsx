@@ -104,9 +104,14 @@ function PartnerStreak({ theme, navigation }: {
             Invite a friend to CalFit and share a streak together. You keep each other accountable.
           </Text>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Credits' as never)}
+            onPress={() => {
+  navigation.navigate('Main' as never, {
+    screen: 'Credits',
+  } as never);
+}}
             style={[styles.emptySectionBtn, { backgroundColor: theme.accent }]}
           >
+            
             <Ionicons name="person-add-outline" size={16} color={theme.bg} />
             <Text style={[styles.emptySectionBtnText, { color: theme.bg }]}>
               Invite a Friend

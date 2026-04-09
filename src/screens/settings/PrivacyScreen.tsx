@@ -82,11 +82,7 @@ Backups are purged on a 90-day rolling cycle.`,
     title: 'Contact Us',
     content: `For privacy questions or requests:
 
-Email: privacy@calfit.app
-Response time: within 72 hours
-
-CalFit is built by Trivian Technologies for BigCut LLC.
-Last updated: April 2026`,
+Email: privacy@calfit.app`,
   },
 ];
 

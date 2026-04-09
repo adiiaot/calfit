@@ -511,7 +511,7 @@ export default function SettingsScreen() {
         />
 
         <Text style={[styles.version, { color: theme.textMuted }]}>
-          CalFit v1.0.0 · Built by AOT for BigCut LLC
+          CalFit v1.0.0 · Built by BigCut LLC
         </Text>
       </ScrollView>
     </SafeAreaView>

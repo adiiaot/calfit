@@ -54,10 +54,11 @@ function ProfileCard({
         </View>
         <View style={styles.profileInfo}>
           <View style={styles.profileNameRow}>
-            <Text style={[styles.profileName, { color: theme.textPrimary }]}>
-              {name}
-            </Text>
-            <View style={[styles.tierBadge, { backgroundColor: tierColor + '22', borderColor: tierColor }]}>
+            <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
+            <View style={[styles.tierBadge, {
+              backgroundColor: tierColor + '22',
+              borderColor: tierColor,
+            }]}>
               <Text style={[styles.tierBadgeText, { color: tierColor }]}>{tierLabel}</Text>
             </View>
           </View>
@@ -83,12 +84,7 @@ function ProfileCard({
         <Text style={[styles.progressShortcutText, { color: theme.accent }]}>
           View My Progress
         </Text>
-        <Ionicons
-          name="chevron-forward"
-          size={16}
-          color={theme.accent}
-          style={{ marginLeft: 'auto' }}
-        />
+        <Ionicons name="chevron-forward" size={16} color={theme.accent} style={{ marginLeft: 'auto' }} />
       </TouchableOpacity>
     </>
   );
@@ -182,15 +178,14 @@ export default function SettingsScreen() {
 
   const [darkMode, setDarkMode] = useState(colorScheme === 'dark');
   const [micronutrients, setMicronutrients] = useState(false);
-  const [appleHealth, setAppleHealth] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [coachMessages, setCoachMessages] = useState(true);
 
-  // Reload profile every time Settings comes into focus
-  // so name/username changes from EditProfile reflect immediately
+  // Reload profile on focus so name changes reflect immediately
   useFocusEffect(
     useCallback(() => {
       if (!user?.id) return;
-      const reloadProfile = async () => {
+      const reload = async () => {
         try {
           const { supabase } = await import('../../services/supabase');
           const { data } = await supabase
@@ -199,18 +194,16 @@ export default function SettingsScreen() {
             .eq('id', user.id)
             .single();
           if (data) updateProfile(data);
-        } catch (e) {
-          // Silent fail
-        }
+        } catch (e) {}
       };
-      reloadProfile();
+      reload();
     }, [user?.id])
   );
 
-  // Derive real name and username from profile
   const name = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const username = profile?.calfit_id || profile?.full_name?.toLowerCase().replace(/\s+/g, '') || user?.email?.split('@')[0] || 'user';
-  const pointsBalance = 0; // Will come from calfit_points table in Phase 5
+  const username = profile?.calfit_id ||
+    profile?.full_name?.toLowerCase().replace(/\s+/g, '') ||
+    user?.email?.split('@')[0] || 'user';
 
   const handleDarkMode = (val: boolean) => {
     setDarkMode(val);
@@ -223,7 +216,7 @@ export default function SettingsScreen() {
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: signOut },
+        { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
       ]
     );
   };
@@ -231,19 +224,51 @@ export default function SettingsScreen() {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'This will permanently delete your account and all data. This cannot be undone.',
+      'This will permanently delete your account, all your data, workout history, meal logs, and earnings. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete Forever',
           style: 'destructive',
-          onPress: () => Alert.alert(
-            'Coming Soon',
-            'Account deletion will be available before the app goes live.'
-          ),
+          onPress: async () => {
+            try {
+              if (!user?.id) return;
+              const { supabase } = await import('../../services/supabase');
+
+              // Delete all user data from all tables
+              await Promise.all([
+                supabase.from('food_logs').delete().eq('user_id', user.id),
+                supabase.from('water_logs').delete().eq('user_id', user.id),
+                supabase.from('workout_sessions').delete().eq('user_id', user.id),
+                supabase.from('meal_plans').delete().eq('user_id', user.id),
+                supabase.from('notifications').delete().eq('user_id', user.id),
+                supabase.from('calfit_points').delete().eq('user_id', user.id),
+                supabase.from('earnings_wallet').delete().eq('user_id', user.id),
+                supabase.from('subscriptions').delete().eq('user_id', user.id),
+                supabase.from('profiles').delete().eq('id', user.id),
+              ]);
+
+              // Sign out — navigates to Welcome automatically via auth state change
+              await supabase.auth.signOut();
+              signOut();
+            } catch (error) {
+              Alert.alert('Error', 'Could not delete account. Please try again or contact support.');
+            }
+          },
         },
       ]
     );
+  };
+
+  const handleMicronutrients = (val: boolean) => {
+    setMicronutrients(val);
+    if (val) {
+      Alert.alert(
+        'Micronutrients Enabled',
+        'Vitamin and mineral tracking will be available in the next major update. Your food logs will automatically include micronutrient data when it launches.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   return (
@@ -298,6 +323,7 @@ export default function SettingsScreen() {
               value: 'English',
               icon: 'language-outline',
               iconColor: theme.orange,
+              onPress: () => navigation.navigate('Language' as never),
             },
           ]}
         />
@@ -308,25 +334,34 @@ export default function SettingsScreen() {
           items={[
             {
               label: 'Update Goals',
-              value: `${profile?.daily_calorie_goal ?? 2000} kcal · ${profile?.water_goal_ml ? (profile.water_goal_ml / 1000).toFixed(1) : 2.5}L water`,
+              value: `${profile?.daily_calorie_goal ?? 2000} kcal · ${
+                profile?.water_goal_ml
+                  ? (profile.water_goal_ml / 1000).toFixed(1)
+                  : '2.5'
+              }L water`,
               icon: 'flag-outline',
               iconColor: theme.accent,
               onPress: () => navigation.navigate('Goals' as never),
             },
             {
               label: 'Micronutrients',
-              value: 'Track vitamins & minerals',
+              value: micronutrients ? 'Enabled — coming next update' : 'Track vitamins & minerals',
               icon: 'leaf-outline',
               iconColor: theme.accent,
               toggle: true,
               toggleValue: micronutrients,
-              onToggle: setMicronutrients,
+              onToggle: handleMicronutrients,
             },
             {
               label: 'Equipment',
-              value: 'Gym, home, bodyweight',
+              value: 'Dumbbells, barbells — coming soon',
               icon: 'barbell-outline',
               iconColor: theme.orange,
+              onPress: () => Alert.alert(
+                'Equipment Weights',
+                'Add your gym equipment and weights to get more accurate calorie calculations during workouts. This feature is coming in the next update.',
+                [{ text: 'OK' }]
+              ),
             },
           ]}
         />
@@ -337,52 +372,88 @@ export default function SettingsScreen() {
           items={[
             {
               label: 'Push Notifications',
-              value: 'Manage alerts',
+              value: notificationsEnabled ? 'All alerts enabled' : 'All alerts disabled',
               icon: 'notifications-outline',
               iconColor: theme.gold,
               toggle: true,
               toggleValue: notificationsEnabled,
-              onToggle: setNotificationsEnabled,
+              onToggle: (val) => {
+                setNotificationsEnabled(val);
+                Alert.alert(
+                  val ? 'Notifications Enabled' : 'Notifications Disabled',
+                  val
+                    ? 'You will receive streak reminders, goal achievements, Coach messages and activity alerts.'
+                    : 'You will no longer receive push notifications from CalFit.',
+                  [{ text: 'OK' }]
+                );
+              },
             },
             {
               label: 'Streak Reminders',
-              value: 'Daily check-in reminder',
+              value: 'Tap to check in',
               icon: 'flame-outline',
               iconColor: theme.orange,
+              onPress: () => navigation.navigate('Streaks' as never),
             },
             {
               label: 'Coach Messages',
-              value: 'Enabled',
+              value: coachMessages ? 'Show in notifications' : 'Hidden from notifications',
               icon: 'chatbubble-outline',
               iconColor: theme.accentSecond,
+              toggle: true,
+              toggleValue: coachMessages,
+              onToggle: setCoachMessages,
             },
           ]}
         />
 
         <SettingsGroup
           theme={theme}
-          title="Connected Apps"
+          title="Connected Accounts"
           items={[
             {
-              label: 'Apple Health',
-              value: appleHealth ? 'Connected' : 'Not connected',
-              icon: 'heart-outline',
-              iconColor: theme.red,
-              toggle: true,
-              toggleValue: appleHealth,
-              onToggle: setAppleHealth,
+              label: 'Google',
+              value: 'Connect to sign in with Google',
+              icon: 'logo-google',
+              iconColor: '#EA4335',
+              onPress: () => Alert.alert(
+                'Connect Google',
+                'Google sign-in will be enabled once the OAuth provider is configured in the app settings.',
+                [{ text: 'OK' }]
+              ),
+            },
+            {
+              label: 'Apple',
+              value: 'Connect to sign in with Apple',
+              icon: 'logo-apple',
+              iconColor: theme.textPrimary,
+              onPress: () => Alert.alert(
+                'Connect Apple',
+                'Apple sign-in will be enabled once the Apple Developer account is configured.',
+                [{ text: 'OK' }]
+              ),
             },
             {
               label: 'Instagram',
-              value: 'Not linked',
+              value: 'Share workouts and recaps',
               icon: 'logo-instagram',
-              iconColor: theme.purple,
+              iconColor: '#E1306C',
+              onPress: () => Alert.alert(
+                'Connect Instagram',
+                'Instagram sharing will be enabled in a future update. You will be able to share your recaps and progress directly.',
+                [{ text: 'OK' }]
+              ),
             },
             {
-              label: 'Smartwatch',
+              label: 'Smartwatch / Apple Health',
               value: 'Coming in next update',
               icon: 'watch-outline',
               iconColor: theme.accentSecond,
+              onPress: () => Alert.alert(
+                'Wearable Integration',
+                'Smartwatch and Apple Health sync is coming in the next major update. Steps, heart rate and sleep data will sync automatically.',
+                [{ text: 'OK' }]
+              ),
             },
           ]}
         />
@@ -404,7 +475,7 @@ export default function SettingsScreen() {
             },
             {
               label: 'Credits & Earnings',
-              value: `${pointsBalance} CalFit Points`,
+              value: 'CalFit Points & referrals',
               icon: 'wallet-outline',
               iconColor: theme.accent,
               onPress: () => navigation.navigate('Credits' as never),
@@ -417,15 +488,18 @@ export default function SettingsScreen() {
           title="Account & Privacy"
           items={[
             {
-              label: 'Privacy Controls',
-              value: 'Data & visibility',
+              label: 'Privacy & Data Policy',
+              value: 'How we use your data',
               icon: 'shield-outline',
               iconColor: theme.accentSecond,
+              onPress: () => navigation.navigate('Privacy' as never),
             },
             {
               label: 'Download My Data',
+              value: 'Export as CSV',
               icon: 'download-outline',
               iconColor: theme.textSecondary,
+              onPress: () => navigation.navigate('DownloadData' as never),
             },
             {
               label: 'Sign Out',

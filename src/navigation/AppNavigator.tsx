@@ -24,6 +24,13 @@ import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 //Profile Edit screen
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 
+//Download My Data Screen
+import DownloadDataScreen from '../screens/settings/DownloadDataScreen';
+
+// Language & Data and Privacy Screen
+import LanguageScreen from '../screens/settings/LanguageScreen';
+import PrivacyScreen from '../screens/settings/PrivacyScreen';
+
 // Food Scanner screen
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 
@@ -150,6 +157,9 @@ export default function AppNavigator() {
           <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
           <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
 <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
+<RootStack.Screen name="Language" component={LanguageScreen} />
+<RootStack.Screen name="Privacy" component={PrivacyScreen} />
+<RootStack.Screen name="DownloadData" component={DownloadDataScreen} />
         </>
         ) : (
           // ── MAIN APP ───────────────────────────────────────
@@ -167,6 +177,9 @@ export default function AppNavigator() {
           <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
           <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
 <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
+<RootStack.Screen name="Language" component={LanguageScreen} />
+<RootStack.Screen name="Privacy" component={PrivacyScreen} />
+<RootStack.Screen name="DownloadData" component={DownloadDataScreen} />
         </>
         )}
       </RootStack.Navigator>

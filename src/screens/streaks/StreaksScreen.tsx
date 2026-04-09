@@ -65,7 +65,7 @@ function PersonalStreakHero({ theme, streakCount }: {
       </View>
 
       <View style={styles.milestonePills}>
-        {[7, 14, 30, 60, 90].map((milestone, i) => (
+        {[7, 14, 30, 60, 90].map((milestone) => (
           <View key={milestone} style={[styles.milestonePill, {
             backgroundColor: streakCount >= milestone ? theme.accent : theme.card,
             borderColor: streakCount >= milestone ? theme.accent : theme.border,
@@ -82,26 +82,11 @@ function PersonalStreakHero({ theme, streakCount }: {
   );
 }
 
-// ── STREAK FREEZE BANNER ──────────────────────────────────────
-function StreakFreezeBanner({ theme }: { theme: typeof colors.dark }) {
-  return (
-    <TouchableOpacity style={[styles.freezeBanner, {
-      backgroundColor: theme.accentSecond + '15',
-      borderColor: theme.accentSecond,
-    }]}>
-      <Ionicons name="snow-outline" size={18} color={theme.accentSecond} />
-      <Text style={[styles.freezeText, { color: theme.accentSecond }]}>
-        1 streak freeze available this week — tap to use
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 // ── PARTNER STREAK ────────────────────────────────────────────
-function PartnerStreak({ theme }: { theme: typeof colors.dark }) {
-  const navigation = useNavigation<any>();
-
-  // No friends yet — show invite CTA
+function PartnerStreak({ theme, navigation }: {
+  theme: typeof colors.dark;
+  navigation: any;
+}) {
   const hasFriends = false;
 
   if (!hasFriends) {
@@ -119,7 +104,7 @@ function PartnerStreak({ theme }: { theme: typeof colors.dark }) {
             Invite a friend to CalFit and share a streak together. You keep each other accountable.
           </Text>
           <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate('Credits', { tab: 'Referrals' })}
+            onPress={() => navigation.navigate('Credits' as never)}
             style={[styles.emptySectionBtn, { backgroundColor: theme.accent }]}
           >
             <Ionicons name="person-add-outline" size={16} color={theme.bg} />
@@ -166,10 +151,10 @@ function PartnerStreak({ theme }: { theme: typeof colors.dark }) {
 }
 
 // ── GROUP STREAK ──────────────────────────────────────────────
-function GroupStreak({ theme }: { theme: typeof colors.dark }) {
-  const navigation = useNavigation<any>();
-
-  // No groups yet — show join/create CTA
+function GroupStreak({ theme, navigation }: {
+  theme: typeof colors.dark;
+  navigation: any;
+}) {
   const hasGroups = false;
 
   if (!hasGroups) {
@@ -185,7 +170,7 @@ function GroupStreak({ theme }: { theme: typeof colors.dark }) {
             Join or create a group to build a shared streak with other CalFit members.
           </Text>
           <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate('Community')}
+            onPress={() => navigation.navigate('Community' as never)}
             style={[styles.emptySectionBtn, { backgroundColor: theme.accent }]}
           >
             <Ionicons name="compass-outline" size={16} color={theme.bg} />
@@ -291,12 +276,11 @@ function MilestoneBadges({ theme, streakCount }: {
               }]}>
                 {b.label}
               </Text>
-              {earned && (
+              {earned ? (
                 <View style={[styles.badgeEarned, { backgroundColor: theme.accent }]}>
                   <Text style={[styles.badgeEarnedText, { color: theme.bg }]}>✓ Earned</Text>
                 </View>
-              )}
-              {!earned && (
+              ) : (
                 <Text style={[styles.badgeRemaining, { color: theme.textMuted }]}>
                   {b.milestone - streakCount}d left
                 </Text>
@@ -383,9 +367,8 @@ export default function StreaksScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <PersonalStreakHero theme={theme} streakCount={streakCount} />
-        <StreakFreezeBanner theme={theme} />
-        <PartnerStreak theme={theme} />
-        <GroupStreak theme={theme} />
+        <PartnerStreak theme={theme} navigation={navigation} />
+        <GroupStreak theme={theme} navigation={navigation} />
         <MilestoneBadges theme={theme} streakCount={streakCount} />
 
         <TouchableOpacity
@@ -481,18 +464,6 @@ const styles = StyleSheet.create({
   },
   milestonePillText: { fontSize: fontSize.xs, fontWeight: '700' },
 
-  freezeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  freezeText: { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
-
   card: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -508,7 +479,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  // Empty section
   emptySection: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   emptySectionTitle: { fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' },
   emptySectionSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18 },
@@ -523,7 +493,6 @@ const styles = StyleSheet.create({
   },
   emptySectionBtnText: { fontSize: fontSize.base, fontWeight: '700' },
 
-  // Partner
   partnerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   partnerAvatar: {
     width: 48, height: 48, borderRadius: 24,
@@ -550,7 +519,6 @@ const styles = StyleSheet.create({
   },
   graceText: { fontSize: fontSize.xs },
 
-  // Group
   groupName: { fontSize: fontSize.lg, fontWeight: '700', marginBottom: 4 },
   groupSub: { fontSize: fontSize.sm, marginBottom: spacing.md },
   memberDots: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
@@ -561,7 +529,6 @@ const styles = StyleSheet.create({
   memberDotText: { fontSize: fontSize.sm, fontWeight: '700' },
   groupProgress: { fontSize: fontSize.xs },
 
-  // Badges
   badgesSection: { marginBottom: spacing.md },
   sectionLabel: {
     fontSize: fontSize.xs,
@@ -601,7 +568,6 @@ const styles = StyleSheet.create({
   badgeEarnedText: { fontSize: 8, fontWeight: '700' },
   badgeRemaining: { fontSize: 9, marginTop: 2 },
 
-  // Check in
   checkInBtn: {
     flexDirection: 'row',
     alignItems: 'center',

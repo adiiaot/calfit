@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Switch,
+  Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
@@ -17,15 +18,26 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 // ── PROFILE CARD ─────────────────────────────────────────────
 function ProfileCard({
   theme,
-  firstName,
+  name,
+  username,
+  tier,
   onProgressPress,
   onEditPress,
 }: {
   theme: typeof colors.dark;
-  firstName: string;
+  name: string;
+  username: string;
+  tier: string;
   onProgressPress: () => void;
   onEditPress: () => void;
 }) {
+  const tierColor =
+    tier === 'premium' ? theme.accent :
+    tier === 'pro' ? theme.gold : theme.textMuted;
+  const tierLabel =
+    tier === 'premium' ? 'Premium' :
+    tier === 'pro' ? 'Pro' : 'Free';
+
   return (
     <>
       <View style={[styles.profileCard, {
@@ -37,15 +49,20 @@ function ProfileCard({
           borderColor: theme.accent,
         }]}>
           <Text style={[styles.profileAvatarText, { color: theme.accent }]}>
-            {firstName[0].toUpperCase()}
+            {name[0]?.toUpperCase() ?? 'U'}
           </Text>
         </View>
         <View style={styles.profileInfo}>
-          <Text style={[styles.profileName, { color: theme.textPrimary }]}>
-            {firstName}
-          </Text>
+          <View style={styles.profileNameRow}>
+            <Text style={[styles.profileName, { color: theme.textPrimary }]}>
+              {name}
+            </Text>
+            <View style={[styles.tierBadge, { backgroundColor: tierColor + '22', borderColor: tierColor }]}>
+              <Text style={[styles.tierBadgeText, { color: tierColor }]}>{tierLabel}</Text>
+            </View>
+          </View>
           <Text style={[styles.profileHandle, { color: theme.textSecondary }]}>
-            @{firstName.toLowerCase()} · calfit.app/@{firstName.toLowerCase()}
+            @{username}
           </Text>
           <TouchableOpacity onPress={onEditPress}>
             <Text style={[styles.profileEdit, { color: theme.accent }]}>
@@ -55,7 +72,6 @@ function ProfileCard({
         </View>
       </View>
 
-      {/* My Progress shortcut */}
       <TouchableOpacity
         onPress={onProgressPress}
         style={[styles.progressShortcut, {
@@ -109,6 +125,7 @@ function SettingsGroup({
           <TouchableOpacity
             key={item.label}
             onPress={item.onPress}
+            activeOpacity={item.toggle ? 1 : 0.7}
             style={[
               styles.settingsRow,
               i < items.length - 1 && {
@@ -118,7 +135,7 @@ function SettingsGroup({
             ]}
           >
             <View style={[styles.settingsIconWrap, {
-              backgroundColor: (item.iconColor || theme.accent) + '22',
+              backgroundColor: (item.danger ? theme.red : (item.iconColor || theme.accent)) + '22',
             }]}>
               <Ionicons
                 name={item.icon as any}
@@ -160,23 +177,77 @@ function SettingsGroup({
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme, toggleTheme } = useThemeStore();
-  const { user, signOut } = useAuthStore();
+  const { user, profile, userTier, signOut, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
-  const firstName = user?.email?.split('@')[0] ?? 'Favour';
 
   const [darkMode, setDarkMode] = useState(colorScheme === 'dark');
   const [micronutrients, setMicronutrients] = useState(false);
-  const [appleHealth, setAppleHealth] = useState(true);
-  const [notifications, setNotifications] = useState(true);
+  const [appleHealth, setAppleHealth] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  // Reload profile every time Settings comes into focus
+  // so name/username changes from EditProfile reflect immediately
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return;
+      const reloadProfile = async () => {
+        try {
+          const { supabase } = await import('../../services/supabase');
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          if (data) updateProfile(data);
+        } catch (e) {
+          // Silent fail
+        }
+      };
+      reloadProfile();
+    }, [user?.id])
+  );
+
+  // Derive real name and username from profile
+  const name = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const username = profile?.calfit_id || profile?.full_name?.toLowerCase().replace(/\s+/g, '') || user?.email?.split('@')[0] || 'user';
+  const pointsBalance = 0; // Will come from calfit_points table in Phase 5
 
   const handleDarkMode = (val: boolean) => {
     setDarkMode(val);
     toggleTheme();
   };
 
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: signOut },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => Alert.alert(
+            'Coming Soon',
+            'Account deletion will be available before the app goes live.'
+          ),
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header with back button */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -184,13 +255,9 @@ export default function SettingsScreen() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>
-            Home
-          </Text>
+          <Text style={[styles.backText, { color: theme.textPrimary }]}>Home</Text>
         </TouchableOpacity>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
-          Settings
-        </Text>
+        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Settings</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -200,7 +267,9 @@ export default function SettingsScreen() {
       >
         <ProfileCard
           theme={theme}
-          firstName={firstName}
+          name={name}
+          username={username}
+          tier={userTier ?? 'free'}
           onProgressPress={() => navigation.navigate('Progress' as never)}
           onEditPress={() => navigation.navigate('EditProfile' as never)}
         />
@@ -219,9 +288,10 @@ export default function SettingsScreen() {
             },
             {
               label: 'Units',
-              value: 'Metric (kg, cm)',
+              value: profile?.units === 'imperial' ? 'Imperial (lbs, ft)' : 'Metric (kg, cm)',
               icon: 'scale-outline',
               iconColor: theme.accentSecond,
+              onPress: () => navigation.navigate('EditProfile' as never),
             },
             {
               label: 'Language',
@@ -237,12 +307,12 @@ export default function SettingsScreen() {
           title="Tracking & Goals"
           items={[
             {
-  label: 'Update Goals',
-  value: 'Calories, macros, water',
-  icon: 'flag-outline',
-  iconColor: theme.accent,
-  onPress: () => navigation.navigate('Goals' as never),
-},
+              label: 'Update Goals',
+              value: `${profile?.daily_calorie_goal ?? 2000} kcal · ${profile?.water_goal_ml ? (profile.water_goal_ml / 1000).toFixed(1) : 2.5}L water`,
+              icon: 'flag-outline',
+              iconColor: theme.accent,
+              onPress: () => navigation.navigate('Goals' as never),
+            },
             {
               label: 'Micronutrients',
               value: 'Track vitamins & minerals',
@@ -271,12 +341,12 @@ export default function SettingsScreen() {
               icon: 'notifications-outline',
               iconColor: theme.gold,
               toggle: true,
-              toggleValue: notifications,
-              onToggle: setNotifications,
+              toggleValue: notificationsEnabled,
+              onToggle: setNotificationsEnabled,
             },
             {
               label: 'Streak Reminders',
-              value: 'Daily at 8:00 PM',
+              value: 'Daily check-in reminder',
               icon: 'flame-outline',
               iconColor: theme.orange,
             },
@@ -295,7 +365,7 @@ export default function SettingsScreen() {
           items={[
             {
               label: 'Apple Health',
-              value: 'Connected',
+              value: appleHealth ? 'Connected' : 'Not connected',
               icon: 'heart-outline',
               iconColor: theme.red,
               toggle: true,
@@ -310,7 +380,7 @@ export default function SettingsScreen() {
             },
             {
               label: 'Smartwatch',
-              value: 'Coming soon',
+              value: 'Coming in next update',
               icon: 'watch-outline',
               iconColor: theme.accentSecond,
             },
@@ -323,15 +393,21 @@ export default function SettingsScreen() {
           items={[
             {
               label: 'Current Plan',
-              value: 'Free — Upgrade to Pro',
+              value: userTier === 'premium'
+                ? 'Premium — All features unlocked'
+                : userTier === 'pro'
+                ? 'Pro — Upgrade to Premium'
+                : 'Free — Upgrade to Pro',
               icon: 'star-outline',
               iconColor: theme.gold,
+              onPress: () => navigation.navigate('Subscription' as never),
             },
             {
               label: 'Credits & Earnings',
-              value: '1,240 CalFit Points',
+              value: `${pointsBalance} CalFit Points`,
               icon: 'wallet-outline',
               iconColor: theme.accent,
+              onPress: () => navigation.navigate('Credits' as never),
             },
           ]}
         />
@@ -355,13 +431,13 @@ export default function SettingsScreen() {
               label: 'Sign Out',
               icon: 'log-out-outline',
               iconColor: theme.red,
-              danger: false,
-              onPress: signOut,
+              onPress: handleSignOut,
             },
             {
               label: 'Delete Account',
               icon: 'trash-outline',
               danger: true,
+              onPress: handleDeleteAccount,
             },
           ]}
         />
@@ -379,7 +455,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -388,15 +463,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
   },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backText: { fontSize: fontSize.lg, fontWeight: '400' },
   pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
 
-  // Profile
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -414,11 +484,23 @@ const styles = StyleSheet.create({
   },
   profileAvatarText: { fontSize: fontSize.xxl, fontWeight: '700' },
   profileInfo: { flex: 1 },
+  profileNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: 2,
+  },
   profileName: { fontSize: fontSize.lg, fontWeight: '700' },
+  tierBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+  },
+  tierBadgeText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
   profileHandle: { fontSize: fontSize.sm, marginTop: 2 },
   profileEdit: { fontSize: fontSize.sm, fontWeight: '600', marginTop: 6 },
 
-  // Progress shortcut
   progressShortcut: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,7 +513,6 @@ const styles = StyleSheet.create({
   },
   progressShortcutText: { fontSize: fontSize.base, fontWeight: '600' },
 
-  // Groups
   group: { marginBottom: spacing.md },
   groupTitle: {
     fontSize: fontSize.xs,
@@ -455,14 +536,12 @@ const styles = StyleSheet.create({
   },
   settingsIconWrap: {
     width: 32, height: 32, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   settingsLabelWrap: { flex: 1 },
   settingsLabel: { fontSize: fontSize.base, fontWeight: '500' },
   settingsValue: { fontSize: fontSize.sm, marginTop: 1 },
 
-  // Version
   version: {
     textAlign: 'center',
     fontSize: fontSize.xs,

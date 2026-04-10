@@ -16,6 +16,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 
+// ── USERNAME VALIDATION ───────────────────────────────────────
+const validateUsername = (value: string): string | null => {
+  if (value.length < 3) return 'Username must be at least 3 characters';
+  if (value.length > 30) return 'Username must be 30 characters or less';
+  if (!/^[a-z0-9._]+$/.test(value)) return 'Only lowercase letters, numbers, dots and underscores';
+  if (value.startsWith('.') || value.startsWith('_')) return 'Cannot start with a dot or underscore';
+  if (value.endsWith('.') || value.endsWith('_')) return 'Cannot end with a dot or underscore';
+  if (/[._]{2,}/.test(value)) return 'No consecutive dots or underscores';
+  return null;
+};
+
 // ── PROGRESS BAR ─────────────────────────────────────────────
 function ProgressBar({
   step,
@@ -52,12 +63,12 @@ function Step1({
   onSelect: (g: string) => void;
 }) {
   const goals = [
-    { label: 'Lose Weight', icon: 'trending-down-outline' },
-    { label: 'Build Muscle', icon: 'barbell-outline' },
-    { label: 'Get Fit', icon: 'flash-outline' },
+    { label: 'Lose Weight',   icon: 'trending-down-outline' },
+    { label: 'Build Muscle',  icon: 'barbell-outline' },
+    { label: 'Get Fit',       icon: 'flash-outline' },
     { label: 'Maintain Weight', icon: 'remove-outline' },
-    { label: 'Gain Weight', icon: 'trending-up-outline' },
-    { label: 'Improve Diet', icon: 'leaf-outline' },
+    { label: 'Gain Weight',   icon: 'trending-up-outline' },
+    { label: 'Improve Diet',  icon: 'leaf-outline' },
   ];
 
   return (
@@ -98,24 +109,16 @@ function Step1({
 // ── STEP 2 — BODY STATS ──────────────────────────────────────
 function Step2({
   theme,
-  age,
-  setAge,
-  height,
-  setHeight,
-  weight,
-  setWeight,
-  targetWeight,
-  setTargetWeight,
+  age, setAge,
+  height, setHeight,
+  weight, setWeight,
+  targetWeight, setTargetWeight,
 }: {
   theme: typeof colors.dark;
-  age: string;
-  setAge: (v: string) => void;
-  height: string;
-  setHeight: (v: string) => void;
-  weight: string;
-  setWeight: (v: string) => void;
-  targetWeight: string;
-  setTargetWeight: (v: string) => void;
+  age: string;          setAge: (v: string) => void;
+  height: string;       setHeight: (v: string) => void;
+  weight: string;       setWeight: (v: string) => void;
+  targetWeight: string; setTargetWeight: (v: string) => void;
 }) {
   const fields = [
     {
@@ -206,10 +209,10 @@ function Step3({
   onSelect: (a: string) => void;
 }) {
   const levels = [
-    { label: 'Sedentary', sub: 'Little or no exercise', icon: 'bed-outline' },
-    { label: 'Lightly Active', sub: '1–3 days a week', icon: 'walk-outline' },
-    { label: 'Moderately Active', sub: '3–5 days a week', icon: 'bicycle-outline' },
-    { label: 'Very Active', sub: '6–7 days a week', icon: 'barbell-outline' },
+    { label: 'Sedentary',        sub: 'Little or no exercise',  icon: 'bed-outline' },
+    { label: 'Lightly Active',   sub: '1–3 days a week',         icon: 'walk-outline' },
+    { label: 'Moderately Active',sub: '3–5 days a week',         icon: 'bicycle-outline' },
+    { label: 'Very Active',      sub: '6–7 days a week',         icon: 'barbell-outline' },
   ];
 
   return (
@@ -248,9 +251,7 @@ function Step3({
                 {l.label}
               </Text>
               <Text style={[styles.levelSub, {
-                color: selected === l.label
-                  ? 'rgba(0,0,0,0.6)'
-                  : theme.textSecondary,
+                color: selected === l.label ? 'rgba(0,0,0,0.6)' : theme.textSecondary,
               }]}>
                 {l.sub}
               </Text>
@@ -276,12 +277,12 @@ function Step4({
   onToggle: (item: string) => void;
 }) {
   const options = [
-    { label: 'Calories', icon: 'flame-outline' },
-    { label: 'Water Intake', icon: 'water-outline' },
-    { label: 'Workouts', icon: 'barbell-outline' },
-    { label: 'Steps', icon: 'footsteps-outline' },
-    { label: 'Sleep', icon: 'moon-outline' },
-    { label: 'Macros', icon: 'nutrition-outline' },
+    { label: 'Calories',       icon: 'flame-outline' },
+    { label: 'Water Intake',   icon: 'water-outline' },
+    { label: 'Workouts',       icon: 'barbell-outline' },
+    { label: 'Steps',          icon: 'footsteps-outline' },
+    { label: 'Sleep',          icon: 'moon-outline' },
+    { label: 'Macros',         icon: 'nutrition-outline' },
     { label: 'Accountability', icon: 'people-outline' },
   ];
 
@@ -382,6 +383,14 @@ function Step6({
   calfitId: string;
   setCalfitId: (v: string) => void;
 }) {
+  const usernameError = calfitId.length > 0 ? validateUsername(calfitId) : null;
+
+  const handleChange = (val: string) => {
+    // Strip capitals and spaces immediately as user types
+    const cleaned = val.toLowerCase().replace(/\s/g, '');
+    setCalfitId(cleaned);
+  };
+
   return (
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: theme.textPrimary }]}>
@@ -395,29 +404,44 @@ function Step6({
       </Text>
       <View style={[styles.fieldInput, {
         backgroundColor: theme.card,
-        borderColor: theme.accent,
+        borderColor: usernameError ? theme.red : calfitId.length > 0 ? theme.accent : theme.border,
         borderWidth: 2,
       }]}>
         <Text style={[styles.atSign, { color: theme.accent }]}>@</Text>
         <TextInput
           value={calfitId}
-          onChangeText={setCalfitId}
+          onChangeText={handleChange}
           placeholder="your_username"
           placeholderTextColor={theme.textMuted}
           autoCapitalize="none"
+          autoCorrect={false}
           style={[styles.stepTextInput, { color: theme.textPrimary }]}
         />
+        {calfitId.length > 0 && (
+          <Ionicons
+            name={usernameError ? 'close-circle' : 'checkmark-circle'}
+            size={20}
+            color={usernameError ? theme.red : theme.accent}
+          />
+        )}
       </View>
-      {calfitId.length > 0 && (
+
+      {/* Inline validation message */}
+      {usernameError ? (
+        <Text style={[styles.usernameError, { color: theme.red }]}>
+          {usernameError}
+        </Text>
+      ) : calfitId.length >= 3 ? (
         <View style={styles.availableRow}>
           <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
           <Text style={[styles.availableText, { color: theme.accent }]}>
             calfit.app/@{calfitId} is available
           </Text>
         </View>
-      )}
+      ) : null}
+
       <Text style={[styles.idNote, { color: theme.textMuted }]}>
-        This is how friends will find you on CalFit.
+        Lowercase letters, numbers, dots and underscores only. No spaces or capitals.
       </Text>
     </View>
   );
@@ -426,16 +450,12 @@ function Step6({
 // ── STEP 7 — CREATE ACCOUNT ───────────────────────────────────
 function Step7({
   theme,
-  email,
-  setEmail,
-  password,
-  setPassword,
+  email, setEmail,
+  password, setPassword,
 }: {
   theme: typeof colors.dark;
-  email: string;
-  setEmail: (v: string) => void;
-  password: string;
-  setPassword: (v: string) => void;
+  email: string;    setEmail: (v: string) => void;
+  password: string; setPassword: (v: string) => void;
 }) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -448,10 +468,7 @@ function Step7({
         Your CalFit account is ready. Just set your email and password.
       </Text>
 
-      {/* Email */}
-      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-        Email
-      </Text>
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
       <View style={[styles.fieldInput, {
         backgroundColor: theme.card,
         borderColor: theme.border,
@@ -471,10 +488,7 @@ function Step7({
         />
       </View>
 
-      {/* Password */}
-      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-        Password
-      </Text>
+      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
       <View style={[styles.fieldInput, {
         backgroundColor: theme.card,
         borderColor: theme.border,
@@ -503,7 +517,6 @@ function Step7({
         </TouchableOpacity>
       </View>
 
-      {/* Privacy note */}
       <View style={[styles.privacyCard, {
         backgroundColor: theme.accentDim as string,
         borderColor: theme.accent,
@@ -555,17 +568,25 @@ export default function OnboardingScreen() {
   };
 
   const handleNext = async () => {
+    // Validate step 6 username before proceeding
+    if (step === 6 && calfitId.length > 0) {
+      const error = validateUsername(calfitId);
+      if (error) {
+        Alert.alert('Invalid Username', error);
+        return;
+      }
+    }
+
     if (step < totalSteps) {
       setStep(step + 1);
       return;
     }
 
-    // Step 7 — create account and save profile
+    // Step 7 — create account
     if (!email || !password) {
       Alert.alert('Almost there!', 'Please enter your email and password.');
       return;
     }
-
     if (password.length < 8) {
       Alert.alert('Weak password', 'Password must be at least 8 characters.');
       return;
@@ -575,11 +596,9 @@ export default function OnboardingScreen() {
       setIsLoading(true);
       const { supabase } = await import('../../services/supabase');
 
-      // Create the auth account
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
 
-      // Save profile details to the profiles table
       if (data.user) {
         await supabase.from('profiles').update({
           calfit_id: calfitId || null,
@@ -595,7 +614,6 @@ export default function OnboardingScreen() {
       }
 
       // Auth listener in App.tsx detects session and redirects automatically
-
     } catch (error: any) {
       Alert.alert('Sign Up Failed', error.message);
     } finally {
@@ -610,7 +628,6 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={handleBack}
@@ -622,48 +639,35 @@ export default function OnboardingScreen() {
         <View style={{ width: 26 }} />
       </View>
 
-      {/* Progress */}
       <ProgressBar step={step} total={totalSteps} theme={theme} />
 
-      {/* Step content */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {step === 1 && (
-          <Step1 theme={theme} selected={goal} onSelect={setGoal} />
-        )}
+        {step === 1 && <Step1 theme={theme} selected={goal} onSelect={setGoal} />}
         {step === 2 && (
           <Step2
             theme={theme}
-            age={age} setAge={setAge}
-            height={height} setHeight={setHeight}
-            weight={weight} setWeight={setWeight}
+            age={age}               setAge={setAge}
+            height={height}         setHeight={setHeight}
+            weight={weight}         setWeight={setWeight}
             targetWeight={targetWeight} setTargetWeight={setTargetWeight}
           />
         )}
-        {step === 3 && (
-          <Step3 theme={theme} selected={activity} onSelect={setActivity} />
-        )}
-        {step === 4 && (
-          <Step4 theme={theme} selected={tracking} onToggle={toggleTracking} />
-        )}
-        {step === 5 && (
-          <Step5 theme={theme} selected={diet} onToggle={toggleDiet} />
-        )}
-        {step === 6 && (
-          <Step6 theme={theme} calfitId={calfitId} setCalfitId={setCalfitId} />
-        )}
+        {step === 3 && <Step3 theme={theme} selected={activity} onSelect={setActivity} />}
+        {step === 4 && <Step4 theme={theme} selected={tracking} onToggle={toggleTracking} />}
+        {step === 5 && <Step5 theme={theme} selected={diet} onToggle={toggleDiet} />}
+        {step === 6 && <Step6 theme={theme} calfitId={calfitId} setCalfitId={setCalfitId} />}
         {step === 7 && (
           <Step7
             theme={theme}
-            email={email} setEmail={setEmail}
+            email={email}       setEmail={setEmail}
             password={password} setPassword={setPassword}
           />
         )}
       </ScrollView>
 
-      {/* Bottom button */}
       <View style={[styles.bottomBar, { backgroundColor: theme.bg }]}>
         <TouchableOpacity
           onPress={handleNext}
@@ -697,7 +701,6 @@ const styles = StyleSheet.create({
   },
   logo: { fontSize: fontSize.xl, fontWeight: '800' },
 
-  //Privacy card style on step 7
   privacyCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -707,11 +710,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: spacing.sm,
   },
-  privacyText: {
-    fontSize: fontSize.sm,
-    flex: 1,
-    lineHeight: 18,
-  },
+  privacyText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
 
   progressWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   progressBg: { height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 6 },
@@ -740,11 +739,13 @@ const styles = StyleSheet.create({
   },
   stepTextInput: { flex: 1, fontSize: fontSize.lg, paddingVertical: 2 },
   fieldSuffix: { fontSize: fontSize.base, fontWeight: '600' },
-  fieldPlaceholder: { fontSize: fontSize.lg },
   atSign: { fontSize: fontSize.xl, fontWeight: '700' },
+
+  // Username validation
+  usernameError: { fontSize: fontSize.xs, marginTop: 6, fontWeight: '600' },
   availableRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm },
   availableText: { fontSize: fontSize.sm, fontWeight: '600' },
-  idNote: { fontSize: fontSize.sm, marginTop: spacing.sm },
+  idNote: { fontSize: fontSize.sm, marginTop: spacing.sm, lineHeight: 18 },
 
   levelList: { gap: spacing.sm },
   levelCard: {
@@ -759,22 +760,6 @@ const styles = StyleSheet.create({
   levelInfo: { flex: 1 },
   levelLabel: { fontSize: fontSize.lg, fontWeight: '700' },
   levelSub: { fontSize: fontSize.sm, marginTop: 2 },
-
-  personalList: { gap: spacing.sm },
-  personalRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: spacing.md, padding: spacing.md,
-    borderRadius: radius.md, borderWidth: 1,
-  },
-  personalIcon: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  personalInfo: { flex: 1 },
-  personalLabel: { fontSize: fontSize.base, fontWeight: '600' },
-  personalValue: { fontSize: fontSize.sm, marginTop: 2 },
-  toggleOn: { width: 38, height: 22, borderRadius: 11, paddingLeft: 18, justifyContent: 'center' },
-  toggleKnob: { width: 16, height: 16, borderRadius: 8, backgroundColor: 'white' },
 
   bottomBar: {
     position: 'absolute',

@@ -135,6 +135,20 @@ function TabNavigator() {
 export default function AppNavigator() {
   const { isAuthenticated } = useAuthStore();
 
+  const { user } = useAuthStore();
+
+// When user is null → show Welcome/Login/Onboarding
+// When user exists → show Main app
+if (!user) {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Welcome" component={WelcomeScreen} />
+      <RootStack.Screen name="Login" component={LoginScreen} />
+      <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+    </RootStack.Navigator>
+  );
+}
+
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -186,6 +200,8 @@ export default function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+//
 
 const styles = StyleSheet.create({
   iconWrap: { alignItems: 'center', justifyContent: 'center' },

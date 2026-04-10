@@ -199,60 +199,99 @@ export default function SettingsScreen() {
     profile?.full_name?.toLowerCase().replace(/\s+/g, '') ||
     user?.email?.split('@')[0] || 'user';
 
+    // DARK & LIGHT MODE TOGGLE:
   const handleDarkMode = (val: boolean) => {
     setDarkMode(val);
     toggleTheme();
   };
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
-      ]
-    );
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This will permanently delete your account, all your data, workout history, meal logs, and earnings. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Forever',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (!user?.id) return;
-              const { supabase } = await import('../../services/supabase');
-
-              // Delete all user data from all tables
-              await Promise.all([
-                supabase.from('food_logs').delete().eq('user_id', user.id),
-                supabase.from('water_logs').delete().eq('user_id', user.id),
-                supabase.from('workout_sessions').delete().eq('user_id', user.id),
-                supabase.from('meal_plans').delete().eq('user_id', user.id),
-                supabase.from('notifications').delete().eq('user_id', user.id),
-                supabase.from('calfit_points').delete().eq('user_id', user.id),
-                supabase.from('earnings_wallet').delete().eq('user_id', user.id),
-                supabase.from('subscriptions').delete().eq('user_id', user.id),
-                supabase.from('profiles').delete().eq('id', user.id),
-              ]);
-
-              // Sign out — navigates to Welcome automatically via auth state change
-              await supabase.auth.signOut();
-              signOut();
-            } catch (error) {
-              Alert.alert('Error', 'Could not delete account. Please try again or contact support.');
-            }
-          },
+  // SIGN OUT FLOW:
+ const handleSignOut = () => {
+  Alert.alert(
+    'Sign Out',
+    'Are you sure you want to sign out?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const { supabase } = await import('../../services/supabase');
+            await supabase.auth.signOut();
+            signOut();
+          } catch (error) {
+            signOut();
+          }
         },
-      ]
-    );
-  };
+      },
+    ]
+  );
+};
+
+// ACCOUNT DELETION FLOW: 
+ const handleDeleteAccount = () => {
+  Alert.alert(
+    'Before You Delete',
+    'We recommend downloading your data first so you have a copy of your fitness history.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Download Data First',
+        onPress: () => navigation.navigate('DownloadData' as never),
+      },
+      {
+        text: 'Delete Anyway',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Delete Account',
+            'This will permanently delete your account and ALL your data. This cannot be undone.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete Forever',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    if (!user?.id) return;
+                    const { supabase } = await import('../../services/supabase');
+
+                    // Delete all user data
+                    await Promise.all([
+                      supabase.from('food_logs').delete().eq('user_id', user.id),
+                      supabase.from('water_logs').delete().eq('user_id', user.id),
+                      supabase.from('workout_sessions').delete().eq('user_id', user.id),
+                      supabase.from('meal_plans').delete().eq('user_id', user.id),
+                      supabase.from('notifications').delete().eq('user_id', user.id),
+                      supabase.from('calfit_points').delete().eq('user_id', user.id),
+                      supabase.from('earnings_wallet').delete().eq('user_id', user.id),
+                      supabase.from('subscriptions').delete().eq('user_id', user.id),
+                      supabase.storage.from('avatars').remove([`${user.id}/avatar.jpg`]),
+                      supabase.from('profiles').delete().eq('id', user.id),
+                    ]);
+
+                    // Sign out from Supabase Auth
+                    await supabase.auth.signOut();
+
+                    // Clear local store — auth state change
+                    // will navigate to onboarding automatically
+                    signOut();
+                  } catch (error) {
+                    Alert.alert(
+                      'Error',
+                      'Could not delete account. Please try again or contact support at privacy@calfit.app'
+                    );
+                  }
+                },
+              },
+            ]
+          );
+        },
+      },
+    ]
+  );
+};
 
   const handleMicronutrients = (val: boolean) => {
     setMicronutrients(val);

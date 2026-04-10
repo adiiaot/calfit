@@ -114,34 +114,9 @@ function TabNavigator() {
   );
 }
 
-// ── SHARED STACK SCREENS ──────────────────────────────────────
-// All screens available in both auth and main stacks
-function SharedScreens() {
-  return (
-    <>
-      <RootStack.Screen name="Settings"      component={SettingsScreen} />
-      <RootStack.Screen name="Progress"      component={ProgressScreen} />
-      <RootStack.Screen name="Streaks"       component={StreaksScreen} />
-      <RootStack.Screen name="Community"     component={CommunityScreen} />
-      <RootStack.Screen name="FoodScanner"   component={FoodScannerScreen} />
-      <RootStack.Screen name="Notifications" component={NotificationsScreen} />
-      <RootStack.Screen name="EditProfile"   component={EditProfileScreen} />
-      <RootStack.Screen name="Goals"         component={GoalsScreen} />
-      <RootStack.Screen name="QuickStart"    component={QuickStartScreen} />
-      <RootStack.Screen name="Subscription"  component={SubscriptionScreen} />
-      <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
-      <RootStack.Screen name="Language"      component={LanguageScreen} />
-      <RootStack.Screen name="Privacy"       component={PrivacyScreen} />
-      <RootStack.Screen name="DownloadData"  component={DownloadDataScreen} />
-    </>
-  );
-}
-
 // ── ROOT NAVIGATOR ────────────────────────────────────────────
 export default function AppNavigator() {
   const { user } = useAuthStore();
-  const { colorScheme } = useThemeStore();
-  const theme = colors[colorScheme];
 
   return (
     <NavigationContainer>
@@ -156,8 +131,21 @@ export default function AppNavigator() {
         ) : (
           // ── MAIN APP — user logged in ──────────────────────
           <>
-            <RootStack.Screen name="Main" component={TabNavigator} />
-            <SharedScreens />
+            <RootStack.Screen name="Main"           component={TabNavigator} />
+            <RootStack.Screen name="Settings"       component={SettingsScreen} />
+            <RootStack.Screen name="Progress"       component={ProgressScreen} />
+            <RootStack.Screen name="Streaks"        component={StreaksScreen} />
+            <RootStack.Screen name="Community"      component={CommunityScreen} />
+            <RootStack.Screen name="FoodScanner"    component={FoodScannerScreen} />
+            <RootStack.Screen name="Notifications"  component={NotificationsScreen} />
+            <RootStack.Screen name="EditProfile"    component={EditProfileScreen} />
+            <RootStack.Screen name="Goals"          component={GoalsScreen} />
+            <RootStack.Screen name="QuickStart"     component={QuickStartScreen} />
+            <RootStack.Screen name="Subscription"   component={SubscriptionScreen} />
+            <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
+            <RootStack.Screen name="Language"       component={LanguageScreen} />
+            <RootStack.Screen name="Privacy"        component={PrivacyScreen} />
+            <RootStack.Screen name="DownloadData"   component={DownloadDataScreen} />
           </>
         )}
       </RootStack.Navigator>

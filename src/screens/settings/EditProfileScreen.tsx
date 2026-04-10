@@ -21,8 +21,8 @@ import { pickImageFromGallery } from '../../services/imageService';
 // ── UNIT CONVERSION HELPERS ───────────────────────────────────
 const kgToLbs = (kg: number) => Math.round(kg * 2.20462 * 10) / 10;
 const lbsToKg = (lbs: number) => Math.round(lbs / 2.20462 * 10) / 10;
-const cmToInches = (cm: number) => Math.round(cm / 2.54 * 10) / 10;
-const inchesToCm = (inches: number) => Math.round(inches * 2.54 * 10) / 10;
+const cmToFt = (cm: number) => Math.round(cm / 30.48 * 100) / 100;
+const ftToCm = (ft: number) => Math.round(ft * 30.48 * 10) / 10;
 
 // ── USERNAME VALIDATION ───────────────────────────────────────
 const validateUsername = (value: string): string | null => {
@@ -74,7 +74,7 @@ export default function EditProfileScreen() {
   const [heightDisplay, setHeightDisplay] = useState(
     profile?.height_cm
       ? (units === 'imperial'
-        ? cmToInches(profile.height_cm).toString()
+        ? cmToFt(profile.height_cm).toString()
         : profile.height_cm.toString())
       : ''
   );
@@ -84,22 +84,20 @@ export default function EditProfileScreen() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // ── UNIT SWITCH ───────────────────────────────────────────
-  const handleUnitSwitch = (newUnit: 'metric' | 'imperial') => {
-    if (newUnit === units) return;
-    setUnits(newUnit);
+ const handleUnitSwitch = (newUnit: 'metric' | 'imperial') => {
+  if (newUnit === units) return;
+  setUnits(newUnit);
 
-    if (newUnit === 'imperial') {
-      // Convert stored kg/cm values to display as lbs/inches
-      if (weightKg) setWeightDisplay(kgToLbs(weightKg).toString());
-      if (targetWeightKg) setTargetWeightDisplay(kgToLbs(targetWeightKg).toString());
-      if (heightCm) setHeightDisplay(cmToInches(heightCm).toString());
-    } else {
-      // Convert back to metric
-      if (weightKg) setWeightDisplay(weightKg.toString());
-      if (targetWeightKg) setTargetWeightDisplay(targetWeightKg.toString());
-      if (heightCm) setHeightDisplay(heightCm.toString());
-    }
-  };
+  if (newUnit === 'imperial') {
+    if (weightKg) setWeightDisplay(kgToLbs(weightKg).toString());
+    if (targetWeightKg) setTargetWeightDisplay(kgToLbs(targetWeightKg).toString());
+    if (heightCm) setHeightDisplay(cmToFt(heightCm).toString());
+  } else {
+    if (weightKg) setWeightDisplay(weightKg.toString());
+    if (targetWeightKg) setTargetWeightDisplay(targetWeightKg.toString());
+    if (heightCm) setHeightDisplay(heightCm.toString());
+  }
+};
 
   // ── WEIGHT INPUT ──────────────────────────────────────────
   const handleWeightChange = (val: string) => {
@@ -119,12 +117,12 @@ export default function EditProfileScreen() {
   };
 
   const handleHeightChange = (val: string) => {
-    setHeightDisplay(val);
-    const num = parseFloat(val);
-    if (!isNaN(num)) {
-      setHeightCm(units === 'imperial' ? inchesToCm(num) : num);
-    }
-  };
+  setHeightDisplay(val);
+  const num = parseFloat(val);
+  if (!isNaN(num)) {
+    setHeightCm(units === 'imperial' ? ftToCm(num) : num);
+  }
+};
 
   // ── USERNAME INPUT ────────────────────────────────────────
   const handleUsernameChange = (val: string) => {
@@ -210,7 +208,7 @@ export default function EditProfileScreen() {
 
   const firstName = fullName || user?.email?.split('@')[0] || 'U';
   const weightSuffix = units === 'imperial' ? 'lbs' : 'kg';
-  const heightSuffix = units === 'imperial' ? 'in' : 'cm';
+  const heightSuffix = units === 'imperial' ? 'ft' : 'cm';
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
@@ -397,18 +395,18 @@ export default function EditProfileScreen() {
           <TextInput
             value={heightDisplay}
             onChangeText={handleHeightChange}
-            placeholder={units === 'imperial' ? '69' : '175'}
+            placeholder={units === 'imperial' ? '5.9' : '175'}
             placeholderTextColor={theme.textMuted}
             keyboardType="decimal-pad"
             style={[styles.input, { color: theme.textPrimary }]}
           />
           <Text style={[styles.atSign, { color: theme.textMuted }]}>{heightSuffix}</Text>
         </View>
-        <Text style={[styles.fieldHint, { color: theme.textMuted }]}>
-          {units === 'imperial'
-            ? 'Enter height in inches (e.g. 5\'9\" = 69 inches)'
-            : 'Enter height in centimetres'}
-        </Text>
+       <Text style={[styles.fieldHint, { color: theme.textMuted }]}>
+  {units === 'imperial'
+    ? 'Enter height in feet (e.g. 5\'9\" = 5.75 ft)'
+    : 'Enter height in centimetres'}
+</Text>
 
         {/* Save button */}
         <TouchableOpacity

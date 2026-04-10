@@ -275,6 +275,21 @@ export default function SettingsScreen() {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
 
+    const funcResponse = await fetch(
+  `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ user_id: user.id }),
+  }
+);
+
+const funcResult = await funcResponse.json();
+console.log('Delete user function result:', funcResult);
+
     await fetch(
       `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`,
       {

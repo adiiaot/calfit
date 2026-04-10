@@ -1,7 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StyleSheet } from 'react-native';
 import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../theme';
@@ -20,31 +19,15 @@ import ProgressScreen from '../screens/progress/ProgressScreen';
 import StreaksScreen from '../screens/streaks/StreaksScreen';
 import CommunityScreen from '../screens/community/CommunityScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
-
-//Profile Edit screen
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
-
-//Download My Data Screen
 import DownloadDataScreen from '../screens/settings/DownloadDataScreen';
-
-// Language & Data and Privacy Screen
 import LanguageScreen from '../screens/settings/LanguageScreen';
 import PrivacyScreen from '../screens/settings/PrivacyScreen';
-
-// Food Scanner screen
 import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
-
-// Goals Setting Screen
 import GoalsScreen from '../screens/settings/GoalsScreen';
-
-// Quick Start Screen for Workout Screen
 import QuickStartScreen from '../screens/Activity/QuickStartScreen';
-
-// Subscription & Purchase screen
 import SubscriptionScreen from '../screens/earnings/SubscriptionScreen';
 import PurchaseCreditsScreen from '../screens/earnings/PurchaseCreditsScreen';
-
-// Auth + Onboarding screens
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
@@ -52,7 +35,7 @@ import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
 
-// ── TAB ICON ─────────────────────────────────────────────────
+// ── TAB ICON ──────────────────────────────────────────────────
 function TabIcon({
   label,
   focused,
@@ -86,7 +69,7 @@ function TabIcon({
   );
 }
 
-// ── 7 TABS ────────────────────────────────────────────────────
+// ── TAB NAVIGATOR ─────────────────────────────────────────────
 function TabNavigator() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
@@ -131,79 +114,53 @@ function TabNavigator() {
   );
 }
 
-// ── ROOT NAVIGATOR ────────────────────────────────────────────
-export default function AppNavigator() {
-  const { isAuthenticated } = useAuthStore();
-
-  const { user } = useAuthStore();
-
-// When user is null → show Welcome/Login/Onboarding
-// When user exists → show Main app
-if (!user) {
+// ── SHARED STACK SCREENS ──────────────────────────────────────
+// All screens available in both auth and main stacks
+function SharedScreens() {
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      <RootStack.Screen name="Welcome" component={WelcomeScreen} />
-      <RootStack.Screen name="Login" component={LoginScreen} />
-      <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
-    </RootStack.Navigator>
+    <>
+      <RootStack.Screen name="Settings"      component={SettingsScreen} />
+      <RootStack.Screen name="Progress"      component={ProgressScreen} />
+      <RootStack.Screen name="Streaks"       component={StreaksScreen} />
+      <RootStack.Screen name="Community"     component={CommunityScreen} />
+      <RootStack.Screen name="FoodScanner"   component={FoodScannerScreen} />
+      <RootStack.Screen name="Notifications" component={NotificationsScreen} />
+      <RootStack.Screen name="EditProfile"   component={EditProfileScreen} />
+      <RootStack.Screen name="Goals"         component={GoalsScreen} />
+      <RootStack.Screen name="QuickStart"    component={QuickStartScreen} />
+      <RootStack.Screen name="Subscription"  component={SubscriptionScreen} />
+      <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
+      <RootStack.Screen name="Language"      component={LanguageScreen} />
+      <RootStack.Screen name="Privacy"       component={PrivacyScreen} />
+      <RootStack.Screen name="DownloadData"  component={DownloadDataScreen} />
+    </>
   );
 }
+
+// ── ROOT NAVIGATOR ────────────────────────────────────────────
+export default function AppNavigator() {
+  const { user } = useAuthStore();
+  const { colorScheme } = useThemeStore();
+  const theme = colors[colorScheme];
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          // ── AUTH FLOW ──────────────────────────────────────
-          // Shown when user is not logged in
-         <>
-          <RootStack.Screen name="Welcome"    component={WelcomeScreen} />
-          <RootStack.Screen name="Login"      component={LoginScreen} />
-          <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
-          <RootStack.Screen name="Main"       component={TabNavigator} />
-          <RootStack.Screen name="Settings"   component={SettingsScreen} />
-          <RootStack.Screen name="Progress"   component={ProgressScreen} />
-          <RootStack.Screen name="Streaks"    component={StreaksScreen} />
-          <RootStack.Screen name="Community"  component={CommunityScreen} />
-          <RootStack.Screen name="FoodScanner" component={FoodScannerScreen} />
-          <RootStack.Screen name="Notifications" component={NotificationsScreen} />
-          <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
-          <RootStack.Screen name="Goals" component={GoalsScreen} />
-          <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
-          <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
-<RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
-<RootStack.Screen name="Language" component={LanguageScreen} />
-<RootStack.Screen name="Privacy" component={PrivacyScreen} />
-<RootStack.Screen name="DownloadData" component={DownloadDataScreen} />
-        </>
-        ) : (
-          // ── MAIN APP ───────────────────────────────────────
-          // Shown when user is logged in
+        {!user ? (
+          // ── AUTH FLOW — user not logged in ─────────────────
           <>
-          <RootStack.Screen name="Main"      component={TabNavigator} />
-          <RootStack.Screen name="Settings"  component={SettingsScreen} />
-          <RootStack.Screen name="Progress"  component={ProgressScreen} />
-          <RootStack.Screen name="Streaks"   component={StreaksScreen} />
-          <RootStack.Screen name="Community" component={CommunityScreen} />
-          <RootStack.Screen name="FoodScanner" component={FoodScannerScreen} />
-          <RootStack.Screen name="Notifications" component={NotificationsScreen} />
-          <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
-          <RootStack.Screen name="Goals" component={GoalsScreen} />
-          <RootStack.Screen name="QuickStart" component={QuickStartScreen} />
-          <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
-<RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
-<RootStack.Screen name="Language" component={LanguageScreen} />
-<RootStack.Screen name="Privacy" component={PrivacyScreen} />
-<RootStack.Screen name="DownloadData" component={DownloadDataScreen} />
-        </>
+            <RootStack.Screen name="Welcome"    component={WelcomeScreen} />
+            <RootStack.Screen name="Login"      component={LoginScreen} />
+            <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+          </>
+        ) : (
+          // ── MAIN APP — user logged in ──────────────────────
+          <>
+            <RootStack.Screen name="Main" component={TabNavigator} />
+            <SharedScreens />
+          </>
         )}
       </RootStack.Navigator>
     </NavigationContainer>
   );
 }
-
-//
-
-const styles = StyleSheet.create({
-  iconWrap: { alignItems: 'center', justifyContent: 'center' },
-  icon: { fontSize: 20 },
-});

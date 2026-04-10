@@ -456,24 +456,34 @@ export default function SettingsScreen() {
           theme={theme}
           title="Subscription"
           items={[
-            {
-              label: 'Current Plan',
-              value: userTier === 'premium'
-                ? 'Premium — All features unlocked'
-                : userTier === 'pro'
-                ? 'Pro — Upgrade to Premium'
-                : 'Free — Upgrade to Pro',
-              icon: 'star-outline',
-              iconColor: theme.gold,
-              onPress: () => navigation.navigate('Subscription' as never),
-            },
-            {
-              label: 'Credits & Earnings',
-              value: 'CalFit Points & referrals',
-              icon: 'wallet-outline',
-              iconColor: theme.accent,
-              onPress: () => navigation.navigate('Credits' as never),
-            },
+          {
+  label: 'Current Plan',
+  value: userTier === 'premium'
+    ? 'Premium — All features unlocked'
+    : userTier === 'pro'
+    ? 'Pro — Upgrade to Premium'
+    : 'Free — Upgrade to Pro',
+  icon: 'star-outline',
+  iconColor: theme.gold,
+  onPress: () => {
+    navigation.goBack();
+    setTimeout(() => {
+      navigation.navigate('Main' as never, { screen: 'Credits' } as never);
+    }, 300);
+  },
+},
+           {
+  label: 'Credits & Earnings',
+  value: 'CalFit Points & referrals',
+  icon: 'wallet-outline',
+  iconColor: theme.accent,
+  onPress: () => {
+    navigation.goBack();
+    setTimeout(() => {
+      navigation.navigate('Main' as never, { screen: 'Credits' } as never);
+    }, 300);
+  },
+},
           ]}
         />
 

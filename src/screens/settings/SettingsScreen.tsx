@@ -253,37 +253,51 @@ export default function SettingsScreen() {
                 text: 'Delete Forever',
                 style: 'destructive',
                 onPress: async () => {
-                  try {
-                    if (!user?.id) return;
-                    const { supabase } = await import('../../services/supabase');
+  try {
+    if (!user?.id) return;
+    const { supabase } = await import('../../services/supabase');
 
-                    // Delete all user data
-                    await Promise.all([
-                      supabase.from('food_logs').delete().eq('user_id', user.id),
-                      supabase.from('water_logs').delete().eq('user_id', user.id),
-                      supabase.from('workout_sessions').delete().eq('user_id', user.id),
-                      supabase.from('meal_plans').delete().eq('user_id', user.id),
-                      supabase.from('notifications').delete().eq('user_id', user.id),
-                      supabase.from('calfit_points').delete().eq('user_id', user.id),
-                      supabase.from('earnings_wallet').delete().eq('user_id', user.id),
-                      supabase.from('subscriptions').delete().eq('user_id', user.id),
-                      supabase.storage.from('avatars').remove([`${user.id}/avatar.jpg`]),
-                      supabase.from('profiles').delete().eq('id', user.id),
-                    ]);
+    // Delete all user data from all tables
+    await Promise.all([
+      supabase.from('food_logs').delete().eq('user_id', user.id),
+      supabase.from('water_logs').delete().eq('user_id', user.id),
+      supabase.from('workout_sessions').delete().eq('user_id', user.id),
+      supabase.from('meal_plans').delete().eq('user_id', user.id),
+      supabase.from('notifications').delete().eq('user_id', user.id),
+      supabase.from('calfit_points').delete().eq('user_id', user.id),
+      supabase.from('earnings_wallet').delete().eq('user_id', user.id),
+      supabase.from('subscriptions').delete().eq('user_id', user.id),
+      supabase.storage.from('avatars').remove([`${user.id}/avatar.jpg`]),
+      supabase.from('profiles').delete().eq('id', user.id),
+    ]);
 
-                    // Sign out from Supabase Auth
-                    await supabase.auth.signOut();
+    // Call Edge Function to delete from auth.users
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
 
-                    // Clear local store — auth state change
-                    // will navigate to onboarding automatically
-                    signOut();
-                  } catch (error) {
-                    Alert.alert(
-                      'Error',
-                      'Could not delete account. Please try again or contact support at privacy@calfit.app'
-                    );
-                  }
-                },
+    await fetch(
+      `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: user.id }),
+      }
+    );
+
+    // Sign out locally — navigator auto redirects to Welcome
+    await supabase.auth.signOut();
+    signOut();
+
+  } catch (error) {
+    Alert.alert(
+      'Error',
+      'Could not delete account. Please try again or contact support at privacy@calfit.app' //EDIT THE EMAIL ADDRESS FOR SUPPORT MESSAGES TO BIGCUTLLC
+    );
+  }
+},
               },
             ]
           );

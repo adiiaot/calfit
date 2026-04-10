@@ -1,10 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
-
-const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+import { supabase } from './supabase';
+import { decode } from 'base64-arraybuffer';
 
 export const pickImageFromGallery = async (): Promise<string | null> => {
-  // Request permission
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== 'granted') {
     return null;
@@ -14,44 +12,57 @@ export const pickImageFromGallery = async (): Promise<string | null> => {
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: true,
     aspect: [1, 1],
-    quality: 0.8,
+    quality: 0.7,
+    base64: true,
   });
 
   if (result.canceled) return null;
   return result.assets[0].uri;
 };
 
-export const uploadImageToCloudinary = async (
+export const uploadAvatarToSupabase = async (
   imageUri: string,
   userId: string
 ): Promise<string | null> => {
   try {
-    const formData = new FormData();
-    formData.append('file', {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: `avatar_${userId}.jpg`,
-    } as any);
-    formData.append('upload_preset', UPLOAD_PRESET ?? 'calfit_avatars');
-    formData.append('public_id', `calfit_avatars/${userId}`);
-    formData.append('overwrite', 'true');
+    // Read file as base64
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
+    const reader = new FileReader();
+    const base64 = await new Promise<string>((resolve, reject) => {
+      reader.onloadend = () => {
+        const base64String = (reader.result as string).split(',')[1];
+        resolve(base64String);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
 
-    const data = await response.json();
+    const filePath = `${userId}/avatar.jpg`;
 
-    if (data.secure_url) {
-      return data.secure_url;
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, decode(base64), {
+        contentType: 'image/jpeg',
+        upsert: true, // overwrite if exists
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError.message);
+      return null;
     }
-    return null;
+
+    // Get public URL
+    const { data } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    // Add cache bust so updated image shows immediately
+    return `${data.publicUrl}?t=${Date.now()}`;
   } catch (error) {
-    console.error('Cloudinary upload failed:', error);
+    console.error('Avatar upload failed:', error);
     return null;
   }
 };

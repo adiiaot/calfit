@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
-import { pickImageFromGallery, uploadImageToCloudinary } from '../../services/imageService';
+import { pickImageFromGallery } from '../../services/imageService';
 
 export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
@@ -43,43 +43,44 @@ export default function EditProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-  const handleChangePhoto = async () => {
-    const uri = await pickImageFromGallery();
-    if (!uri) return;
+ const handleChangePhoto = async () => {
+  const uri = await pickImageFromGallery();
+  if (!uri) return;
 
-    // Show the image immediately as a preview
-    setAvatarUri(uri);
+  // Show preview immediately
+  setAvatarUri(uri);
+  setIsUploadingPhoto(true);
 
-    // Upload to Cloudinary in the background
-    setIsUploadingPhoto(true);
-    try {
-      const cloudUrl = await uploadImageToCloudinary(uri, user?.id ?? 'unknown');
-      if (cloudUrl) {
-        setAvatarUri(cloudUrl);
+  try {
+    const { uploadAvatarToSupabase } = await import('../../services/imageService');
+    const publicUrl = await uploadAvatarToSupabase(uri, user?.id ?? '');
 
-        // Save to Supabase immediately so it persists
-        const { supabase } = await import('../../services/supabase');
-        await supabase
-          .from('profiles')
-          .update({ avatar_url: cloudUrl })
-          .eq('id', user?.id);
+    if (publicUrl) {
+      setAvatarUri(publicUrl);
 
-        updateProfile({ avatar_url: cloudUrl });
-      } else {
-        Alert.alert(
-          'Upload Failed',
-          'Could not upload your photo. Please check your internet connection and try again.'
-        );
-        // Revert to previous avatar
-        setAvatarUri(profile?.avatar_url ?? null);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Photo upload failed. Please try again.');
+      // Save URL to Supabase profiles table
+      const { supabase } = await import('../../services/supabase');
+      await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user?.id);
+
+      // Update local store so it reflects everywhere instantly
+      updateProfile({ avatar_url: publicUrl });
+    } else {
+      Alert.alert(
+        'Upload Failed',
+        'Could not upload your photo. Please check your connection and try again.'
+      );
       setAvatarUri(profile?.avatar_url ?? null);
-    } finally {
-      setIsUploadingPhoto(false);
     }
-  };
+  } catch (error) {
+    Alert.alert('Error', 'Photo upload failed. Please try again.');
+    setAvatarUri(profile?.avatar_url ?? null);
+  } finally {
+    setIsUploadingPhoto(false);
+  }
+};
 
   const handleSave = async () => {
     if (!user?.id) return;

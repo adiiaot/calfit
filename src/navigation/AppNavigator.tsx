@@ -32,6 +32,9 @@ import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 
+// Messages Screen
+import MessagesScreen from '../screens/social/MessagesScreen';
+
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
 
@@ -146,6 +149,7 @@ export default function AppNavigator() {
             <RootStack.Screen name="Language"       component={LanguageScreen} />
             <RootStack.Screen name="Privacy"        component={PrivacyScreen} />
             <RootStack.Screen name="DownloadData"   component={DownloadDataScreen} />
+            <RootStack.Screen name="Messages" component={MessagesScreen} />
           </>
         )}
       </RootStack.Navigator>

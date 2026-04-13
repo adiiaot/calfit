@@ -35,6 +35,20 @@ import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 // Messages Screen
 import MessagesScreen from '../screens/social/MessagesScreen';
 
+// Accountability module
+import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
+
+// Live module
+import LiveScreen from '../modules/live/screens/LiveScreen';
+
+import { Platform, StatusBar } from 'react-native';
+
+// Fix Android status bar overlap globally
+if (Platform.OS === 'android') {
+  StatusBar.setTranslucent(true);
+  StatusBar.setBackgroundColor('transparent');
+}
+
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
 
@@ -150,6 +164,8 @@ export default function AppNavigator() {
             <RootStack.Screen name="Privacy"        component={PrivacyScreen} />
             <RootStack.Screen name="DownloadData"   component={DownloadDataScreen} />
             <RootStack.Screen name="Messages" component={MessagesScreen} />
+            <RootStack.Screen name="Accountability" component={AccountabilityScreen} />
+            <RootStack.Screen name="Live" component={LiveScreen} />
           </>
         )}
       </RootStack.Navigator>

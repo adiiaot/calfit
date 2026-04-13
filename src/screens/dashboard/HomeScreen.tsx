@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
@@ -344,17 +345,20 @@ function FriendsTicker({ theme }: { theme: typeof colors.dark }) {
         <Text style={[styles.emptyFriendsSub, { color: theme.textMuted }]}>
           Invite friends to join CalFit and see their activity here in real time.
         </Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Credits')}
-          style={[styles.inviteBtn, {
-            backgroundColor: theme.accentDim as string,
-            borderColor: theme.accent,
-          }]}
-        >
-          <Text style={[styles.inviteBtnText, { color: theme.accent }]}>
-            📨 Copy Invite Link
-          </Text>
-        </TouchableOpacity>
+
+<TouchableOpacity
+  onPress={() => navigation.navigate('Credits')}
+  style={[styles.inviteBtn, {
+    backgroundColor: theme.accentDim as string,
+    borderColor: theme.accent,
+  }]}
+>
+  <Ionicons name="mail-outline" size={16} color={theme.accent} />
+  <Text style={[styles.inviteBtnText, { color: theme.accent }]}>
+    Copy Invite Link
+  </Text>
+</TouchableOpacity>
+
       </View>
     );
   }
@@ -750,11 +754,22 @@ const styles = StyleSheet.create({
   liveText: { fontSize: fontSize.xs, fontWeight: '700' },
   emptyFriendsText: { fontSize: fontSize.base, fontWeight: '600', marginBottom: 4 },
   emptyFriendsSub: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
-  inviteBtn: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  inviteBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+ inviteBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: spacing.xs,
+  marginHorizontal: spacing.lg,
+  marginTop: spacing.sm,
+  marginBottom: spacing.md,
+  paddingVertical: spacing.md,
+  paddingHorizontal: spacing.lg,
+  borderRadius: radius.lg,
+  borderWidth: 1,
+  alignSelf: 'stretch',
+},
+inviteBtnText: {
+  fontSize: fontSize.base,
+  fontWeight: '700',
+},
 });

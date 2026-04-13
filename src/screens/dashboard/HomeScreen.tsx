@@ -225,6 +225,7 @@ function StreakCard({ theme, streakCount }: {
 }
 
 // ── QUICK LOG ────────────────────────────────────────────────
+// ── QUICK LOG ────────────────────────────────────────────────
 function QuickLog({ theme, onWaterLog, onSleepLog, onStepsLog }: {
   theme: typeof colors.dark;
   onWaterLog: () => void;
@@ -234,31 +235,58 @@ function QuickLog({ theme, onWaterLog, onSleepLog, onStepsLog }: {
   const navigation = useNavigation<any>();
 
   return (
-    <View style={styles.quickLogRow}>
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Calorie')}
-        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-      >
-        <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Food</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={onWaterLog}
-        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-      >
-        <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Water</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={onSleepLog}
-        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-      >
-        <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Sleep</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Activity')}
-        style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-      >
-        <Text style={[styles.quickLogText, { color: theme.accent }]}>Workout</Text>
-      </TouchableOpacity>
+    <View>
+      {/* Quick log buttons */}
+      <View style={styles.quickLogRow}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Calorie')}
+          style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Food</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onWaterLog}
+          style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Water</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onSleepLog}
+          style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          <Text style={[styles.quickLogText, { color: theme.accent }]}>+ Sleep</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Activity')}
+          style={[styles.quickLogBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          <Text style={[styles.quickLogText, { color: theme.accent }]}>Workout</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Quick nav — Leaderboard, Partners, Live */}
+      {/* Quick nav — Leaderboard, Partners, Community */}
+<View style={styles.quickNav}>
+  {[
+    { label: 'Leaderboard', icon: 'trophy-outline',  route: 'Leaderboard' },
+    { label: 'Partners',    icon: 'people-outline',  route: 'Accountability' },
+    { label: 'Community',   icon: 'megaphone-outline', route: 'Community' },
+  ].map((item) => (
+    <TouchableOpacity
+      key={item.route}
+      onPress={() => navigation.navigate(item.route as never)}
+      style={[styles.quickNavBtn, {
+        backgroundColor: theme.card,
+        borderColor: theme.border,
+      }]}
+    >
+      <Ionicons name={item.icon as any} size={20} color={theme.accent} />
+      <Text style={[styles.quickNavLabel, { color: theme.textSecondary }]}>
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</View>
     </View>
   );
 }
@@ -772,5 +800,25 @@ const styles = StyleSheet.create({
 inviteBtnText: {
   fontSize: fontSize.base,
   fontWeight: '700',
+},
+
+quickNav: {
+  flexDirection: 'row',
+  gap: spacing.sm,
+  marginHorizontal: spacing.lg,
+  marginBottom: spacing.md,
+},
+quickNavBtn: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: spacing.xs,
+  paddingVertical: spacing.md,
+  borderRadius: radius.lg,
+  borderWidth: 1,
+},
+quickNavLabel: {
+  fontSize: fontSize.xs,
+  fontWeight: '600',
 },
 });

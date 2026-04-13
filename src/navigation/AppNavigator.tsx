@@ -38,7 +38,7 @@ import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 
 // ── SOCIAL MODULE ─────────────────────────────────────────────
-import SocialScreen from '../modules/social/screens/SocialScreen';
+import SocialScreen from '../screens/social/CalfitSocialScreen';
 import ProfileScreen from '../modules/social/screens/ProfileScreen';
 import LeaderboardScreen from '../modules/social/screens/LeaderboardScreen';
 

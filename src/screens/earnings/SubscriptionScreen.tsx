@@ -4,9 +4,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
@@ -187,8 +187,9 @@ export default function SubscriptionScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+               <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -223,7 +224,7 @@ export default function SubscriptionScreen() {
           Payments are processed securely via Stripe. Cancel anytime from your account settings. No hidden fees.
         </Text>
       </ScrollView>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

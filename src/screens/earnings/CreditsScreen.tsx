@@ -4,11 +4,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   ToastAndroid,
   Platform,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -431,8 +431,9 @@ export default function CreditsScreen() {
   const referralCode = profile?.referral_code ?? user?.id?.slice(0, 8) ?? 'calfit';
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+        <View style={styles.header}>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Credits & Earnings</Text>
         <Text style={[styles.pageSub, { color: theme.textSecondary }]}>
           Earn points, unlock features, refer friends
@@ -512,7 +513,8 @@ export default function CreditsScreen() {
           />
         )}
       </ScrollView>
-    </SafeAreaView>
+
+    </AndroidSafeView>
   );
 }
 

@@ -4,12 +4,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Alert,
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -211,8 +211,9 @@ export default function EditProfileScreen() {
   const heightSuffix = units === 'imperial' ? 'ft' : 'cm';
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+        {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -421,7 +422,7 @@ export default function EditProfileScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

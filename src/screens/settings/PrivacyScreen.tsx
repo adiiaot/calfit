@@ -4,8 +4,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
@@ -92,7 +92,8 @@ export default function PrivacyScreen() {
   const theme = colors[colorScheme];
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -136,7 +137,8 @@ export default function PrivacyScreen() {
           </View>
         ))}
       </ScrollView>
-    </SafeAreaView>
+
+    </AndroidSafeView>
   );
 }
 

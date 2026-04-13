@@ -4,10 +4,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Switch,
   Alert,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -334,8 +334,9 @@ console.log('Delete user function result:', funcResult);
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+<AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+            <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -592,7 +593,7 @@ console.log('Delete user function result:', funcResult);
           CalFit v1.0.0 · Built by BigCut LLC
         </Text>
       </ScrollView>
-    </SafeAreaView>
+</AndroidSafeView>
   );
 }
 

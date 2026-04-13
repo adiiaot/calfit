@@ -4,11 +4,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
   Share,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+
 import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -150,8 +151,8 @@ export default function DownloadDataScreen() {
   ];
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+              <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -205,7 +206,7 @@ export default function DownloadDataScreen() {
           Data exports include all records up to today. Your data remains in CalFit after export. To delete it, use Delete Account in Settings.
         </Text>
       </ScrollView>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

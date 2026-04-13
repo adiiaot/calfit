@@ -4,9 +4,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -795,8 +795,9 @@ await notifyWorkoutComplete(user.id, sessionName, totalCal, workoutSeconds);
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+       <View style={styles.header}>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Activity</Text>
       </View>
 
@@ -841,7 +842,7 @@ await notifyWorkoutComplete(user.id, sessionName, totalCal, workoutSeconds);
       {activeTab === 'History' && (
         <HistoryTab theme={theme} sessions={sessions} />
       )}
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

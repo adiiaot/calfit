@@ -1,23 +1,28 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { Platform, StatusBar } from 'react-native';
 import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 
-// Main screens
+// Fix Android status bar overlap globally
+if (Platform.OS === 'android') {
+  StatusBar.setTranslucent(true);
+  StatusBar.setBackgroundColor('transparent');
+}
+
+// ── CORE SCREENS ──────────────────────────────────────────────
 import HomeScreen from '../screens/dashboard/HomeScreen';
 import CalorieScreen from '../screens/calorie/CalorieScreen';
 import MealsScreen from '../screens/meals/MealsScreen';
 import WorkoutScreen from '../screens/Activity/ActivityScreen';
-import SocialScreen from '../screens/social/SocialScreen';
 import CoachScreen from '../screens/coach/CoachScreen';
 import CreditsScreen from '../screens/earnings/CreditsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProgressScreen from '../screens/progress/ProgressScreen';
 import StreaksScreen from '../screens/streaks/StreaksScreen';
-import CommunityScreen from '../screens/community/CommunityScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import DownloadDataScreen from '../screens/settings/DownloadDataScreen';
@@ -32,22 +37,23 @@ import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 
-// Messages Screen
-import MessagesScreen from '../screens/social/MessagesScreen';
+// ── SOCIAL MODULE ─────────────────────────────────────────────
+import SocialScreen from '../modules/social/screens/SocialScreen';
+import ProfileScreen from '../modules/social/screens/ProfileScreen';
+import LeaderboardScreen from '../modules/social/screens/LeaderboardScreen';
 
-// Accountability module
+// ── COMMUNITY MODULE ──────────────────────────────────────────
+import CommunityScreen from '../modules/community/screens/CommunityScreen';
+
+// ── CHAT MODULE ───────────────────────────────────────────────
+import MessagesScreen from '../modules/chat/screens/MessageScreen';
+import ChatScreen from '../modules/chat/screens/ChatScreen';
+
+// ── ACCOUNTABILITY MODULE ─────────────────────────────────────
 import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
 
-// Live module
+// ── LIVE MODULE ───────────────────────────────────────────────
 import LiveScreen from '../modules/live/screens/LiveScreen';
-
-import { Platform, StatusBar } from 'react-native';
-
-// Fix Android status bar overlap globally
-if (Platform.OS === 'android') {
-  StatusBar.setTranslucent(true);
-  StatusBar.setBackgroundColor('transparent');
-}
 
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
@@ -139,33 +145,47 @@ export default function AppNavigator() {
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
-          // ── AUTH FLOW — user not logged in ─────────────────
+          // ── AUTH FLOW ─────────────────────────────────────
           <>
             <RootStack.Screen name="Welcome"    component={WelcomeScreen} />
             <RootStack.Screen name="Login"      component={LoginScreen} />
             <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
           </>
         ) : (
-          // ── MAIN APP — user logged in ──────────────────────
+          // ── MAIN APP ──────────────────────────────────────
           <>
-            <RootStack.Screen name="Main"           component={TabNavigator} />
-            <RootStack.Screen name="Settings"       component={SettingsScreen} />
-            <RootStack.Screen name="Progress"       component={ProgressScreen} />
-            <RootStack.Screen name="Streaks"        component={StreaksScreen} />
-            <RootStack.Screen name="Community"      component={CommunityScreen} />
-            <RootStack.Screen name="FoodScanner"    component={FoodScannerScreen} />
-            <RootStack.Screen name="Notifications"  component={NotificationsScreen} />
-            <RootStack.Screen name="EditProfile"    component={EditProfileScreen} />
-            <RootStack.Screen name="Goals"          component={GoalsScreen} />
-            <RootStack.Screen name="QuickStart"     component={QuickStartScreen} />
-            <RootStack.Screen name="Subscription"   component={SubscriptionScreen} />
+            {/* Core */}
+            <RootStack.Screen name="Main"            component={TabNavigator} />
+            <RootStack.Screen name="Settings"        component={SettingsScreen} />
+            <RootStack.Screen name="Progress"        component={ProgressScreen} />
+            <RootStack.Screen name="Streaks"         component={StreaksScreen} />
+            <RootStack.Screen name="FoodScanner"     component={FoodScannerScreen} />
+            <RootStack.Screen name="Notifications"   component={NotificationsScreen} />
+            <RootStack.Screen name="EditProfile"     component={EditProfileScreen} />
+            <RootStack.Screen name="Goals"           component={GoalsScreen} />
+            <RootStack.Screen name="QuickStart"      component={QuickStartScreen} />
+            <RootStack.Screen name="Subscription"    component={SubscriptionScreen} />
             <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
-            <RootStack.Screen name="Language"       component={LanguageScreen} />
-            <RootStack.Screen name="Privacy"        component={PrivacyScreen} />
-            <RootStack.Screen name="DownloadData"   component={DownloadDataScreen} />
-            <RootStack.Screen name="Messages" component={MessagesScreen} />
-            <RootStack.Screen name="Accountability" component={AccountabilityScreen} />
-            <RootStack.Screen name="Live" component={LiveScreen} />
+            <RootStack.Screen name="Language"        component={LanguageScreen} />
+            <RootStack.Screen name="Privacy"         component={PrivacyScreen} />
+            <RootStack.Screen name="DownloadData"    component={DownloadDataScreen} />
+
+            {/* Social module */}
+            <RootStack.Screen name="Profile"         component={ProfileScreen} />
+            <RootStack.Screen name="Leaderboard"     component={LeaderboardScreen} />
+
+            {/* Community module */}
+            <RootStack.Screen name="Community"       component={CommunityScreen} />
+
+            {/* Chat module */}
+            <RootStack.Screen name="Messages"        component={MessagesScreen} />
+            <RootStack.Screen name="Chat"            component={ChatScreen} />
+
+            {/* Accountability module */}
+            <RootStack.Screen name="Accountability"  component={AccountabilityScreen} />
+
+            {/* Live module */}
+            <RootStack.Screen name="Live"            component={LiveScreen} />
           </>
         )}
       </RootStack.Navigator>

@@ -4,10 +4,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
   Alert,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -253,8 +253,9 @@ const handleMarkRead = async (id: string) => {
   const read = filtered.filter((n) => n.read);
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+          {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -345,7 +346,7 @@ const handleMarkRead = async (id: string) => {
           </Text>
         </ScrollView>
       )}
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

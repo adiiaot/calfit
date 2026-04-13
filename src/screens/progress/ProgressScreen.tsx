@@ -4,9 +4,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -411,7 +411,10 @@ export default function ProgressScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
+
+
+          <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -456,7 +459,7 @@ export default function ProgressScreen() {
 
         <BodyMeasurements theme={theme} />
       </ScrollView>
-    </SafeAreaView>
+          </AndroidSafeView>
   );
 }
 

@@ -3,11 +3,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,8 +38,10 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Back button */}
+
+
+          <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+                 {/* Back button */}
       <TouchableOpacity
         onPress={() => navigation.goBack()}
         style={styles.backBtn}
@@ -164,7 +166,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+          </AndroidSafeView>
   );
 }
 

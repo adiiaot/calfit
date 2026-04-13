@@ -3,13 +3,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Alert,
   ActivityIndicator,
   TextInput,
 } from 'react-native';
-
+import { AndroidSafeView } from '../../modules/shared//AndriodSafeView';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -627,8 +626,8 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+            <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+                  <View style={styles.header}>
         <TouchableOpacity
           onPress={handleBack}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -683,7 +682,7 @@ export default function OnboardingScreen() {
           )}
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+            </AndroidSafeView>
   );
 }
 

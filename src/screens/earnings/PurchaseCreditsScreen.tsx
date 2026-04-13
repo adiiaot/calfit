@@ -4,9 +4,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
@@ -70,8 +71,9 @@ export default function PurchaseCreditsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+        <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -145,7 +147,7 @@ export default function PurchaseCreditsScreen() {
           Points never expire. Purchases are non-refundable. Processed via App Store / Google Play.
         </Text>
       </ScrollView>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

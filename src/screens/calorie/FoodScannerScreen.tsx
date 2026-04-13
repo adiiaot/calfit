@@ -3,9 +3,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -199,8 +199,8 @@ export default function FoodScannerScreen() {
       </View>
 
       {/* Top controls */}
-      <SafeAreaView style={styles.topControls}>
-        <TouchableOpacity
+      <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+       <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.closeBtn}
         >
@@ -212,7 +212,7 @@ export default function FoodScannerScreen() {
         <TouchableOpacity style={styles.helpBtn}>
           <Ionicons name="help-circle-outline" size={24} color="white" />
         </TouchableOpacity>
-      </SafeAreaView>
+      </AndroidSafeView>
 
       {/* Camera viewfinder */}
       <View style={styles.viewfinder}>

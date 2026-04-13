@@ -4,12 +4,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Alert,
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -608,8 +608,10 @@ export default function CalorieScreen() {
   ];
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+
+     <View style={styles.header}>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
           Calorie Tracker
         </Text>
@@ -675,7 +677,7 @@ export default function CalorieScreen() {
         onClose={() => setShowAddFood(false)}
         onAdd={handleAddFood}
       />
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

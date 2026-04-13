@@ -5,8 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
@@ -353,8 +353,11 @@ export default function StreaksScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+
+
+      <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+           <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -400,7 +403,8 @@ export default function StreaksScreen() {
           </Text>
         )}
       </ScrollView>
-    </SafeAreaView>
+
+      </AndroidSafeView>
   );
 }
 

@@ -4,10 +4,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared//AndriodSafeView';
 import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
@@ -231,8 +231,9 @@ function DayPlanViewer({
   const dayPlan = plan.plan[activeDay];
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+        <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
           <Text style={[styles.backText, { color: theme.textPrimary }]}>Plans</Text>
@@ -312,7 +313,8 @@ function DayPlanViewer({
           </View>
         ))}
       </ScrollView>
-    </SafeAreaView>
+
+    </AndroidSafeView>
   );
 }
 
@@ -531,16 +533,18 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
 
   if (view === 'generating') {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-        <GeneratingScreen theme={theme} />
-      </SafeAreaView>
+
+      <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+             <GeneratingScreen theme={theme} />
+      </AndroidSafeView>
     );
   }
 
   if (view === 'questions') {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-        {/* Header */}
+
+      <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+              {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => {
@@ -604,15 +608,16 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
             questionNum={questionIndex + 1}
             total={questions.length}
           />
-        </ScrollView>
-      </SafeAreaView>
+        </ScrollView> 
+      </AndroidSafeView>
     );
   }
 
   // ── HOME VIEW ──────────────────────────────────────────────
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+          <View style={styles.header}>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
           Meal Planner
         </Text>
@@ -705,7 +710,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

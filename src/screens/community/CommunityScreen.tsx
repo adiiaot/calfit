@@ -4,12 +4,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Alert,
   RefreshControl,
   Modal,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState, useCallback } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -936,8 +936,9 @@ export default function CommunityScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+
+        {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -1103,7 +1104,7 @@ export default function CommunityScreen() {
         onCompleteWorkout={handleCompleteWorkout}
         onDeleteGroup={handleDeleteGroup}
       />
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

@@ -3,8 +3,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
@@ -24,8 +24,9 @@ export default function WelcomeScreen() {
   ];
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.container}>
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+          <View style={styles.container}>
 
         {/* Logo */}
         <View style={styles.logoWrap}>
@@ -87,7 +88,7 @@ export default function WelcomeScreen() {
           </Text>
         </View>
       </View>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

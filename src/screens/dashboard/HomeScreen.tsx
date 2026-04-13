@@ -4,10 +4,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
   Alert,
 } from 'react-native';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -474,8 +474,8 @@ useEffect(() => {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* TOP BAR */}
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    {/* TOP BAR */}
       <View style={[styles.topBar, { backgroundColor: theme.bg }]}>
         <View>
           <Text style={[styles.greeting, { color: theme.textPrimary }]}>
@@ -550,7 +550,8 @@ useEffect(() => {
         <MoodCard theme={theme} />
         <FriendsTicker theme={theme} />
       </ScrollView>
-    </SafeAreaView>
+
+    </AndroidSafeView>
   );
 }
 

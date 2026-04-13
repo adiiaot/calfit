@@ -9,6 +9,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { View, ActivityIndicator } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from './src/services/supabase';
 import { useAuthStore } from './src/store/authStore';
 import { useThemeStore } from './src/store/themeStore';
@@ -29,39 +30,43 @@ export default function App() {
   });
 
   useEffect(() => {
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    setSession(session);
-
-    // Send streak reminder if user hasn't checked in today
-    if (session?.user) {
-      setTimeout(async () => {
-        try {
-          const { supabase: sb } = await import('./src/services/supabase');
-          const { data: profileData } = await sb
-            .from('profiles')
-            .select('last_active_date')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileData) {
-            const { checkAndSendStreakReminder } = await import('./src/services/notificationService');
-            await checkAndSendStreakReminder(session.user.id, profileData.last_active_date);
-          }
-        } catch (e) {
-          // Silent fail — non critical
-        }
-      }, 3000); // Wait 3 seconds after app opens
-    }
-  });
-
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (_event, session) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-    }
-  );
 
-  return () => subscription.unsubscribe();
-}, []);
+      if (session?.user) {
+        setTimeout(async () => {
+          try {
+            const { supabase: sb } = await import('./src/services/supabase');
+            const { data: profileData } = await sb
+              .from('profiles')
+              .select('last_active_date')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profileData) {
+              const { checkAndSendStreakReminder } = await import(
+                './src/services/notificationService'
+              );
+              await checkAndSendStreakReminder(
+                session.user.id,
+                profileData.last_active_date
+              );
+            }
+          } catch (e) {
+            // Silent fail — non critical
+          }
+        }, 3000);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (!fontsLoaded) {
     return (
@@ -69,7 +74,7 @@ export default function App() {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: theme.bg
+        backgroundColor: theme.bg,
       }}>
         <ActivityIndicator color={theme.accent} size="large" />
       </View>
@@ -77,9 +82,9 @@ export default function App() {
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       <AppNavigator />
-    </>
+    </SafeAreaProvider>
   );
 }

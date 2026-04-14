@@ -264,7 +264,6 @@ function QuickLog({ theme, onWaterLog, onSleepLog, onStepsLog }: {
         </TouchableOpacity>
       </View>
 
-      {/* Quick nav — Leaderboard, Partners, Live */}
       {/* Quick nav — Leaderboard, Partners, Community */}
 <View style={styles.quickNav}>
   {[

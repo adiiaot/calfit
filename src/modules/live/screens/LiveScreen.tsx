@@ -1,8 +1,9 @@
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { useState } from 'react';
+import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
@@ -48,8 +49,9 @@ export default function LiveScreen() {
   const scheduled = MOCK_STREAMS.filter((s) => !s.isLive);
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+          <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+              <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -149,7 +151,7 @@ export default function LiveScreen() {
           )
         )}
       </ScrollView>
-    </SafeAreaView>
+          </AndroidSafeView>
   );
 }
 

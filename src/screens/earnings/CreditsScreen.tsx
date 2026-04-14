@@ -43,10 +43,14 @@ function WalletHero({
           </Text>
           <View style={styles.walletBalanceRow}>
             <Text style={[styles.pointsStar, { color: theme.gold }]}>✦</Text>
-            <Text style={[styles.walletBalance, { color: balance > 0 ? theme.gold : theme.textMuted }]}>
+            <Text style={[styles.walletBalance, {
+              color: balance > 0 ? theme.gold : theme.textMuted,
+            }]}>
               {balance.toLocaleString()}
             </Text>
-            <Text style={[styles.walletBalanceSub, { color: theme.textSecondary }]}> pts</Text>
+            <Text style={[styles.walletBalanceSub, { color: theme.textSecondary }]}>
+              {' '}pts
+            </Text>
           </View>
         </View>
         <TouchableOpacity
@@ -68,8 +72,12 @@ function WalletHero({
           { label: 'Lifetime Earned', value: lifetimeEarned.toLocaleString() },
         ].map((s) => (
           <View key={s.label} style={styles.walletStat}>
-            <Text style={[styles.walletStatValue, { color: theme.textPrimary }]}>{s.value}</Text>
-            <Text style={[styles.walletStatLabel, { color: theme.textMuted }]}>{s.label}</Text>
+            <Text style={[styles.walletStatValue, { color: theme.textPrimary }]}>
+              {s.value}
+            </Text>
+            <Text style={[styles.walletStatLabel, { color: theme.textMuted }]}>
+              {s.label}
+            </Text>
           </View>
         ))}
       </View>
@@ -88,13 +96,17 @@ function EmptyState({
   onWatchAd: () => void;
 }) {
   return (
-    <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+    <View style={[styles.emptyCard, {
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+    }]}>
       <Text style={styles.emptyEmoji}>✦</Text>
       <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
         No Points Yet
       </Text>
       <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-        Watch an ad to earn your first 10 points, or upgrade to Pro/Premium for exclusive access to all features.
+        Watch an ad to earn your first 10 points, or upgrade to Pro/Premium
+        for exclusive access to all features.
       </Text>
       <TouchableOpacity
         onPress={onWatchAd}
@@ -127,16 +139,18 @@ function HowToEarn({
   onWatchAd: () => void;
 }) {
   const ways = [
-    { icon: 'play-circle-outline', label: 'Watch an ad', points: '+10 pts', color: theme.accent },
-    { icon: 'calendar-outline', label: 'Daily login', points: '+5 pts', color: theme.accentSecond },
-    { icon: 'checkmark-circle-outline', label: 'Hit daily goal', points: '+5 pts', color: theme.purple },
-    { icon: 'person-add-outline', label: 'Invite a friend', points: '+50 pts', color: theme.gold },
-    { icon: 'trophy-outline', label: 'Milestone badge', points: '+20–100 pts', color: theme.orange },
+    { icon: 'play-circle-outline',      label: 'Watch an ad',      points: '+10 pts',     color: theme.accent },
+    { icon: 'calendar-outline',         label: 'Daily login',      points: '+5 pts',      color: theme.accentSecond },
+    { icon: 'checkmark-circle-outline', label: 'Hit daily goal',   points: '+5 pts',      color: theme.purple },
+    { icon: 'person-add-outline',       label: 'Invite a friend',  points: '+50 pts',     color: theme.gold },
+    { icon: 'trophy-outline',           label: 'Milestone badge',  points: '+20–100 pts', color: theme.orange },
   ];
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>How to Earn Points</Text>
+      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
+        How to Earn Points
+      </Text>
       {ways.map((w) => (
         <View key={w.label} style={styles.earnRow}>
           <View style={[styles.earnIconWrap, { backgroundColor: w.color + '22' }]}>
@@ -160,15 +174,21 @@ function HowToEarn({
 }
 
 // ── SPEND STORE ───────────────────────────────────────────────
-function SpendStore({ theme, balance }: { theme: typeof colors.dark; balance: number }) {
+function SpendStore({
+  theme,
+  balance,
+}: {
+  theme: typeof colors.dark;
+  balance: number;
+}) {
   const navigation = useNavigation<any>();
 
   const items = [
-    { icon: 'videocam-outline', title: 'Watch a Live Stream', desc: 'Access 1 live session', cost: 30, color: theme.accent },
-    { icon: 'chatbubble-ellipses-outline', title: 'Extra Coach Prompts', desc: '5 bonus prompts today', cost: 20, color: theme.accentSecond },
-    { icon: 'flame-outline', title: 'Streak Freeze', desc: 'Protect streak for 1 day', cost: 40, color: theme.orange },
-    { icon: 'star-outline', title: 'Premium Feature — 24hrs', desc: 'Unlock any premium feature', cost: 80, color: theme.purple },
-    { icon: 'people-outline', title: 'Join Premium Group', desc: 'Access a premium group', cost: 50, color: theme.gold },
+    { icon: 'videocam-outline',            title: 'Watch a Live Stream',      desc: 'Access 1 live session',         cost: 30, color: theme.accent },
+    { icon: 'chatbubble-ellipses-outline', title: 'Extra Coach Prompts',       desc: '5 bonus prompts today',         cost: 20, color: theme.accentSecond },
+    { icon: 'flame-outline',               title: 'Streak Freeze',             desc: 'Protect streak for 1 day',      cost: 40, color: theme.orange },
+    { icon: 'star-outline',                title: 'Premium Feature — 24hrs',   desc: 'Unlock any premium feature',    cost: 80, color: theme.purple },
+    { icon: 'people-outline',              title: 'Join Premium Group',         desc: 'Access a premium group',        cost: 50, color: theme.gold },
   ];
 
   const handleSpend = (item: typeof items[0]) => {
@@ -192,7 +212,9 @@ function SpendStore({ theme, balance }: { theme: typeof colors.dark; balance: nu
 
   return (
     <>
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Spend Points</Text>
+      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+        Spend Points
+      </Text>
       {items.map((item) => (
         <View key={item.title} style={[styles.storeItem, {
           backgroundColor: theme.card,
@@ -218,7 +240,6 @@ function SpendStore({ theme, balance }: { theme: typeof colors.dark; balance: nu
         </View>
       ))}
 
-      {/* Buy more credits */}
       <TouchableOpacity
         onPress={() => navigation.navigate('PurchaseCredits' as never)}
         style={[styles.buyMoreBtn, {
@@ -252,12 +273,9 @@ function ReferralSection({
   const handleCopy = async () => {
     await Clipboard.setStringAsync(inviteLink);
     setCopied(true);
-
-    // Show platform-appropriate toast
     if (Platform.OS === 'android') {
       ToastAndroid.show('Referral link copied! 🎉', ToastAndroid.SHORT);
     }
-
     setTimeout(() => setCopied(false), 3000);
   };
 
@@ -271,15 +289,22 @@ function ReferralSection({
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>Referral Earnings</Text>
+      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
+        Referral Earnings
+      </Text>
       <Text style={[styles.referralSub, { color: theme.textSecondary }]}>
         Earn 15% of every referred user's subscription for 5 years automatically.
       </Text>
 
-      {/* Invite link */}
       <Text style={[styles.linkLabel, { color: theme.textMuted }]}>Your invite link</Text>
-      <View style={[styles.inviteLink, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-        <Text style={[styles.inviteLinkText, { color: theme.textPrimary }]} numberOfLines={1}>
+      <View style={[styles.inviteLink, {
+        backgroundColor: theme.bg,
+        borderColor: theme.border,
+      }]}>
+        <Text
+          style={[styles.inviteLinkText, { color: theme.textPrimary }]}
+          numberOfLines={1}
+        >
           {inviteLink}
         </Text>
         <TouchableOpacity onPress={handleCopy} style={styles.copyBtn}>
@@ -291,7 +316,6 @@ function ReferralSection({
         </TouchableOpacity>
       </View>
 
-      {/* Copy confirmation banner */}
       {copied && (
         <View style={[styles.copiedBanner, {
           backgroundColor: theme.accent + '22',
@@ -309,15 +333,16 @@ function ReferralSection({
         style={[styles.shareBtn, { borderColor: theme.accent }]}
       >
         <Ionicons name="share-social-outline" size={18} color={theme.accent} />
-        <Text style={[styles.shareBtnText, { color: theme.accent }]}>Share Invite Link</Text>
+        <Text style={[styles.shareBtnText, { color: theme.accent }]}>
+          Share Invite Link
+        </Text>
       </TouchableOpacity>
 
-      {/* Referral stats */}
       <View style={styles.refStats}>
         {[
-          { label: 'Total Invited', value: referralStats.total.toString(), color: theme.textPrimary },
-          { label: 'On Paid Plan', value: referralStats.paid.toString(), color: theme.accent },
-          { label: 'On Free Plan', value: referralStats.free.toString(), color: theme.accentSecond },
+          { label: 'Total Invited', value: referralStats.total.toString(),  color: theme.textPrimary },
+          { label: 'On Paid Plan',  value: referralStats.paid.toString(),   color: theme.accent },
+          { label: 'On Free Plan',  value: referralStats.free.toString(),   color: theme.accentSecond },
         ].map((s) => (
           <View key={s.label} style={[styles.refStat, {
             backgroundColor: theme.bg,
@@ -329,8 +354,10 @@ function ReferralSection({
         ))}
       </View>
 
-      {/* Withdrawal balance */}
-      <View style={[styles.withdrawCard, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+      <View style={[styles.withdrawCard, {
+        backgroundColor: theme.bg,
+        borderColor: theme.border,
+      }]}>
         <View>
           <Text style={[styles.withdrawLabel, { color: theme.textSecondary }]}>
             Withdrawal Balance
@@ -353,7 +380,10 @@ function ReferralSection({
               Alert.alert('Minimum not reached', 'You need at least $10 to withdraw.');
               return;
             }
-            Alert.alert('Withdrawal', 'Withdrawal via PayPal, Stripe or Bank Transfer will be enabled once payment accounts are connected.');
+            Alert.alert(
+              'Withdrawal',
+              'Withdrawal via PayPal, Stripe or Bank Transfer will be enabled once payment accounts are connected.'
+            );
           }}
         >
           <Text style={[styles.withdrawBtnText, {
@@ -379,7 +409,6 @@ export default function CreditsScreen() {
   const [lifetimeEarned, setLifetimeEarned] = useState(0);
   const [walletBalance, setWalletBalance] = useState(0);
   const [referralStats, setReferralStats] = useState({ total: 0, paid: 0, free: 0 });
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user?.id) loadData();
@@ -411,8 +440,6 @@ export default function CreditsScreen() {
       }
     } catch (error) {
       console.error('Failed to load credits data:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -424,29 +451,32 @@ export default function CreditsScreen() {
     );
   };
 
-  const handleUpgrade = () => {
-    navigation.navigate('Subscription' as never);
-  };
-
+  const handleUpgrade = () => navigation.navigate('Subscription' as never);
   const referralCode = profile?.referral_code ?? user?.id?.slice(0, 8) ?? 'calfit';
 
   return (
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-        <View style={styles.header}>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Credits & Earnings</Text>
+      <View style={styles.header}>
+        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
+          Credits & Earnings
+        </Text>
         <Text style={[styles.pageSub, { color: theme.textSecondary }]}>
           Earn points, unlock features, refer friends
         </Text>
       </View>
 
       {/* Tab toggle */}
-      <View style={[styles.tabToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.tabToggle, {
+        backgroundColor: theme.card,
+        borderColor: theme.border,
+      }]}>
         {(['Points', 'Referrals'] as const).map((tab) => (
           <TouchableOpacity
             key={tab}
             onPress={() => setActiveTab(tab)}
-            style={[styles.tabToggleBtn, activeTab === tab && { backgroundColor: theme.accent }]}
+            style={[styles.tabToggleBtn, activeTab === tab && {
+              backgroundColor: theme.accent,
+            }]}
           >
             <Text style={[
               styles.tabToggleText,
@@ -459,8 +489,10 @@ export default function CreditsScreen() {
         ))}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Wallet hero — always shown */}
         <WalletHero
           theme={theme}
@@ -472,25 +504,7 @@ export default function CreditsScreen() {
 
         {activeTab === 'Points' ? (
           <>
-            {/* Upgrade banner for free users */}
-            {userTier === 'free' && (
-              <TouchableOpacity
-                onPress={handleUpgrade}
-                style={[styles.upgradeBanner, { backgroundColor: theme.gold + '15', borderColor: theme.gold }]}
-              >
-                <View>
-                  <Text style={[styles.upgradeBannerTitle, { color: theme.gold }]}>
-                    Upgrade to Pro or Premium
-                  </Text>
-                  <Text style={[styles.upgradeBannerSub, { color: theme.textSecondary }]}>
-                    Unlock unlimited Coach, food scanner, live streaming and more
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.gold} />
-              </TouchableOpacity>
-            )}
-
-            {/* Empty state or earn section */}
+            {/* Empty state or earn section — NO upgrade banner */}
             {balance === 0 ? (
               <EmptyState
                 theme={theme}
@@ -501,7 +515,7 @@ export default function CreditsScreen() {
               <HowToEarn theme={theme} onWatchAd={handleWatchAd} />
             )}
 
-            {/* Spend store — always visible */}
+            {/* Spend store */}
             <SpendStore theme={theme} balance={balance} />
           </>
         ) : (
@@ -513,7 +527,6 @@ export default function CreditsScreen() {
           />
         )}
       </ScrollView>
-
     </AndroidSafeView>
   );
 }
@@ -529,7 +542,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
-  pageSub: { fontSize: fontSize.md, marginTop: 2 },
+  pageSub: { fontSize: fontSize.base, marginTop: 2 },
 
   tabToggle: {
     flexDirection: 'row',
@@ -593,20 +606,6 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 44, color: '#FFD133' },
   emptyTitle: { fontSize: fontSize.xl, fontWeight: '700' },
   emptySub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 20 },
-
-  // Upgrade banner
-  upgradeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  upgradeBannerTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: 2 },
-  upgradeBannerSub: { fontSize: fontSize.sm },
 
   // Buttons
   watchAdBtn: {
@@ -673,7 +672,8 @@ const styles = StyleSheet.create({
   },
   storeIconWrap: {
     width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   storeInfo: { flex: 1 },
   storeTitle: { fontSize: fontSize.base, fontWeight: '600' },
@@ -685,7 +685,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   spendBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
-
   buyMoreBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -712,7 +711,6 @@ const styles = StyleSheet.create({
   },
   inviteLinkText: { fontSize: fontSize.base, fontWeight: '600', flex: 1 },
   copyBtn: { padding: 4 },
-
   copiedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -722,7 +720,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   copiedBannerText: { fontSize: fontSize.sm, fontWeight: '600' },
-
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -733,7 +730,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   shareBtnText: { fontSize: fontSize.base, fontWeight: '600' },
-
   refStats: { flexDirection: 'row', gap: spacing.sm },
   refStat: {
     flex: 1,
@@ -744,7 +740,6 @@ const styles = StyleSheet.create({
   },
   refStatValue: { fontSize: fontSize.xxl, fontWeight: '800' },
   refStatLabel: { fontSize: fontSize.xs, marginTop: 2, textAlign: 'center' },
-
   withdrawCard: {
     flexDirection: 'row',
     alignItems: 'center',

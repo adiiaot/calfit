@@ -1,8 +1,9 @@
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { useState, useCallback } from 'react';
+import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
@@ -113,8 +114,11 @@ export default function LeaderboardScreen() {
   const entries = activeTab === 'Global' ? globalEntries : friendsEntries;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+
+
+      <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+                <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -194,7 +198,7 @@ export default function LeaderboardScreen() {
           ))}
         </ScrollView>
       )}
-    </SafeAreaView>
+      </AndroidSafeView>
   );
 }
 

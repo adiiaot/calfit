@@ -1,8 +1,9 @@
 import {
-  View, StyleSheet, SafeAreaView, Text,
+  View, StyleSheet, Text,
   TouchableOpacity, ScrollView, KeyboardAvoidingView,
   Platform, ActivityIndicator,
 } from 'react-native';
+import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { useState, useRef } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,8 +55,8 @@ export default function ChatScreen() {
     });
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -136,7 +137,7 @@ export default function ChatScreen() {
           theme={theme}
         />
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

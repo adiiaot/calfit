@@ -1,8 +1,9 @@
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   ScrollView, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useState } from 'react';
+import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
@@ -86,8 +87,8 @@ export default function SocialScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+        {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Social</Text>
         <View style={styles.headerRight}>
@@ -263,7 +264,7 @@ export default function SocialScreen() {
           clearModerationError();
         }}
       />
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

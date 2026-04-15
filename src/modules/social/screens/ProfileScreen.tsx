@@ -1,9 +1,10 @@
 import {
-  View, StyleSheet, SafeAreaView,
+  View, StyleSheet,
   ScrollView, TouchableOpacity, Text,
   FlatList, Image, ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { useState, useCallback } from 'react';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -100,17 +101,18 @@ export default function ProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-        <View style={styles.loading}>
+
+      <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+                <View style={styles.loading}>
           <ActivityIndicator color={theme.accent} />
         </View>
-      </SafeAreaView>
+      </AndroidSafeView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+              <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -178,7 +180,7 @@ export default function ProfileScreen() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

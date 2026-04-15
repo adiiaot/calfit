@@ -7,7 +7,6 @@ import {
   Alert,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';

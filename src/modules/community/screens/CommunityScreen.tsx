@@ -1,8 +1,9 @@
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   ScrollView, TouchableOpacity, Alert, RefreshControl,
 } from 'react-native';
 import { useState } from 'react';
+import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
@@ -79,8 +80,9 @@ export default function CommunityScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Header */}
+
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+        {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -245,7 +247,7 @@ export default function CommunityScreen() {
           if (selectedGroup) remove(selectedGroup.id);
         }}
       />
-    </SafeAreaView>
+    </AndroidSafeView>
   );
 }
 

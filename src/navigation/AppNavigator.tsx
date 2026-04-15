@@ -40,10 +40,12 @@ import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 // ── SOCIAL MODULE ─────────────────────────────────────────────
 import SocialScreen from '../screens/social/CalfitSocialScreen';
 import ProfileScreen from '../modules/social/screens/ProfileScreen';
-import LeaderboardScreen from '../modules/social/screens/LeaderboardScreen';
 
 // ── COMMUNITY MODULE ──────────────────────────────────────────
 import CommunityScreen from '../modules/community/screens/CommunityScreen';
+
+// LEADERBOARD MODULE
+import LeaderboardScreen from '../modules/leaderboard/screens/LeaderboardScreen';
 
 // ── CHAT MODULE ───────────────────────────────────────────────
 import MessagesScreen from '../modules/chat/screens/MessageScreen';

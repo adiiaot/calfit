@@ -1,7 +1,8 @@
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet, 
   ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
+import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
@@ -33,8 +34,9 @@ export default function MessagesScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <View style={styles.header}>
+
+        <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+              <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -97,7 +99,7 @@ export default function MessagesScreen() {
           ))}
         </ScrollView>
       )}
-    </SafeAreaView>
+        </AndroidSafeView>
   );
 }
 

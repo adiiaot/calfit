@@ -7,12 +7,14 @@ import {
   Alert,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import * as Speech from 'expo-speech';
+import { useSteps } from '../../hooks/useSteps';
 
 // ── TYPES ─────────────────────────────────────────────────────
 interface Exercise {
@@ -41,15 +43,32 @@ interface WorkoutSession {
   exercises: { name: string; seconds: number; calories: number }[];
 }
 
+// ── VOICE COACH ───────────────────────────────────────────────
+const speak = (text: string) => {
+  Speech.stop();
+  Speech.speak(text, {
+    language: 'en-US',
+    pitch: 1.05,
+    rate: 0.92,
+  });
+};
+
 // ── DIFFICULTY BADGE ──────────────────────────────────────────
-function DifficultyBadge({ level, theme }: { level: string; theme: typeof colors.dark }) {
+function DifficultyBadge({
+  level, theme,
+}: {
+  level: string;
+  theme: typeof colors.dark;
+}) {
   const colorMap: Record<string, string> = {
     beginner: theme.accent,
     intermediate: theme.orange,
     advanced: theme.red,
   };
   return (
-    <View style={[styles.diffBadge, { backgroundColor: (colorMap[level] ?? theme.accent) + '22' }]}>
+    <View style={[styles.diffBadge, {
+      backgroundColor: (colorMap[level] ?? theme.accent) + '22',
+    }]}>
       <Text style={[styles.diffBadgeText, { color: colorMap[level] ?? theme.accent }]}>
         {level}
       </Text>
@@ -90,10 +109,10 @@ function ExerciseCard({
           backgroundColor: isSelected ? theme.accent + '22' : theme.border + '44',
         }]}>
           <Ionicons
-  name={(equipmentIcon[exercise.equipment] ?? 'body-outline') as any}
-  size={20}
-  color={isSelected ? theme.accent : theme.textMuted}
-/>
+            name={(equipmentIcon[exercise.equipment] ?? 'body-outline') as any}
+            size={20}
+            color={isSelected ? theme.accent : theme.textMuted}
+          />
         </View>
         <View style={styles.exerciseCardInfo}>
           <Text style={[styles.exerciseCardName, {
@@ -181,7 +200,9 @@ function ActiveExerciseRow({
 }
 
 // ── WORKOUT TIMER ─────────────────────────────────────────────
-function WorkoutTimer({ theme, seconds, calories }: {
+function WorkoutTimer({
+  theme, seconds, calories,
+}: {
   theme: typeof colors.dark;
   seconds: number;
   calories: number;
@@ -211,7 +232,8 @@ function WorkoutTimer({ theme, seconds, calories }: {
 // ── TODAY TAB ─────────────────────────────────────────────────
 function TodayTab({
   theme, exercises, activeIndex, workoutSeconds, totalCalories,
-  workoutStarted, onStart, onComplete, onCompleteWorkout, onOpenCatalogue, onQuickStart,
+  workoutStarted, onStart, onComplete, onCompleteWorkout,
+  onOpenCatalogue, onQuickStart,
 }: {
   theme: typeof colors.dark;
   exercises: ActiveExercise[];
@@ -226,16 +248,19 @@ function TodayTab({
   onQuickStart: (name: string) => void;
 }) {
   const quickWorkouts = [
-    { name: 'Morning Cardio Blast', meta: 'Jumping Jacks, High Knees +3', duration: '20 min', cal: '200 kcal' },
-    { name: 'Full Body Strength', meta: 'Push Ups, Squats +3', duration: '30 min', cal: '250 kcal' },
-    { name: 'Core Crusher', meta: 'Crunches, Leg Raises +3', duration: '15 min', cal: '120 kcal' },
-    { name: 'Leg Day', meta: 'Squats, Lunges +3', duration: '25 min', cal: '220 kcal' },
+    { name: 'Morning Cardio Blast',  meta: 'Jumping Jacks, High Knees +3', duration: '20 min', cal: '200 kcal' },
+    { name: 'Full Body Strength',    meta: 'Push Ups, Squats +3',           duration: '30 min', cal: '250 kcal' },
+    { name: 'Core Crusher',          meta: 'Crunches, Leg Raises +3',        duration: '15 min', cal: '120 kcal' },
+    { name: 'Leg Day',               meta: 'Squats, Lunges +3',              duration: '25 min', cal: '220 kcal' },
   ];
 
   if (exercises.length === 0) {
     return (
       <ScrollView contentContainerStyle={styles.tabContent}>
-        <View style={[styles.emptyWorkout, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.emptyWorkout, {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }]}>
           <Ionicons name="barbell-outline" size={48} color={theme.textMuted} />
           <Text style={[styles.emptyWorkoutTitle, { color: theme.textPrimary }]}>
             No exercises yet
@@ -262,13 +287,20 @@ function TodayTab({
           <TouchableOpacity
             key={q.name}
             onPress={() => onQuickStart(q.name)}
-            style={[styles.quickStartCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+            style={[styles.quickStartCard, {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            }]}
           >
-            <View style={[styles.quickStartIcon, { backgroundColor: theme.accentDim as string }]}>
+            <View style={[styles.quickStartIcon, {
+              backgroundColor: theme.accentDim as string,
+            }]}>
               <Ionicons name="flash" size={20} color={theme.accent} />
             </View>
             <View style={styles.quickStartInfo}>
-              <Text style={[styles.quickStartName, { color: theme.textPrimary }]}>{q.name}</Text>
+              <Text style={[styles.quickStartName, { color: theme.textPrimary }]}>
+                {q.name}
+              </Text>
               <Text style={[styles.quickStartMeta, { color: theme.textMuted }]}>{q.meta}</Text>
               <Text style={[styles.quickStartStats, { color: theme.accent }]}>
                 ~{q.duration} · ~{q.cal}
@@ -284,10 +316,16 @@ function TodayTab({
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       {workoutStarted && (
-        <WorkoutTimer theme={theme} seconds={workoutSeconds} calories={totalCalories} />
+        <WorkoutTimer
+          theme={theme}
+          seconds={workoutSeconds}
+          calories={totalCalories}
+        />
       )}
       <View style={styles.todayHeader}>
-        <Text style={[styles.todayTitle, { color: theme.textPrimary }]}>Today's Workout</Text>
+        <Text style={[styles.todayTitle, { color: theme.textPrimary }]}>
+          Today's Workout
+        </Text>
         <TouchableOpacity onPress={onOpenCatalogue}>
           <Text style={[styles.addMoreText, { color: theme.accent }]}>+ Add More</Text>
         </TouchableOpacity>
@@ -385,7 +423,9 @@ function CatalogueTab({
 }
 
 // ── CALORIES TAB ──────────────────────────────────────────────
-function CaloriesTab({ theme, totalCalories, weeklyData }: {
+function CaloriesTab({
+  theme, totalCalories, weeklyData,
+}: {
   theme: typeof colors.dark;
   totalCalories: number;
   weeklyData: number[];
@@ -398,7 +438,9 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: {
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Calories Burned Today</Text>
+        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
+          Calories Burned Today
+        </Text>
         <Text style={[styles.bigStat, { color: theme.accent }]}>{totalCalories} kcal</Text>
         <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
           <View style={[styles.progressBarFill, {
@@ -413,7 +455,10 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: {
 
       <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>This Week</Text>
 
-      <View style={[styles.barChartCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.barChartCard, {
+        backgroundColor: theme.card,
+        borderColor: theme.border,
+      }]}>
         <View style={styles.barChart}>
           {weeklyData.map((val, i) => (
             <View key={i} style={styles.barWrap}>
@@ -441,40 +486,146 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: {
   );
 }
 
-// ── STEPS TAB ─────────────────────────────────────────────────
-function StepsTab({ theme }: { theme: typeof colors.dark }) {
+// ── STEPS TAB — now with live sensor data ─────────────────────
+function StepsTab({
+  theme,
+  userId,
+  goalSteps,
+}: {
+  theme: typeof colors.dark;
+  userId: string;
+  goalSteps: number;
+}) {
+  const {
+    steps,
+    calories,
+    progress,
+    percentage,
+    isAvailable,
+    hasPermission,
+    isLoading,
+  } = useSteps(goalSteps);
+
+  const stepsFormatted = steps >= 1000
+    ? `${(steps / 1000).toFixed(1)}K`
+    : steps.toString();
+
+  const goalFormatted = goalSteps >= 1000
+    ? `${goalSteps / 1000}K`
+    : goalSteps.toString();
+
+  // Save steps to Supabase when tab is visible
+  useEffect(() => {
+    if (!userId || steps === 0) return;
+    const save = async () => {
+      const { saveStepsToSupabase } = await import('../../services/stepService');
+      await saveStepsToSupabase(userId, steps, goalSteps);
+    };
+    save();
+  }, [steps]);
+
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Steps Today</Text>
-        <Text style={[styles.bigStat, { color: theme.accent }]}>0</Text>
+
+        <Text style={[styles.bigStat, { color: theme.accent }]}>
+          {isLoading ? '...' : stepsFormatted}
+        </Text>
+
         <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
-          <View style={[styles.progressBarFill, { backgroundColor: theme.accent, width: '0%' as any }]} />
+          <View style={[styles.progressBarFill, {
+            backgroundColor: theme.accent,
+            width: `${Math.min(percentage, 100)}%` as any,
+          }]} />
         </View>
-        <Text style={[styles.progressSub, { color: theme.textMuted }]}>0 of 10,000 daily goal</Text>
-        <View style={[styles.stepsSensorCard, {
+
+        <Text style={[styles.progressSub, { color: theme.textMuted }]}>
+          {steps.toLocaleString()} of {goalSteps.toLocaleString()} daily goal · {percentage}%
+        </Text>
+
+        {/* Calories from steps */}
+        <View style={[styles.stepsCalRow, {
           backgroundColor: theme.accentDim as string,
           borderColor: theme.accent,
         }]}>
-          <Ionicons name="footsteps-outline" size={20} color={theme.accent} />
-          <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>
-            Automatic step tracking via phone sensors will be activated in the next update. Steps will count in the background automatically.
+          <Ionicons name="flame-outline" size={16} color={theme.accent} />
+          <Text style={[styles.stepsCalText, { color: theme.accent }]}>
+            {calories} kcal burned from steps today
           </Text>
         </View>
+
+        {/* Sensor status */}
+        {!isAvailable ? (
+          <View style={[styles.stepsSensorCard, {
+            backgroundColor: theme.orange + '18',
+            borderColor: theme.orange,
+          }]}>
+            <Ionicons name="warning-outline" size={20} color={theme.orange} />
+            <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>
+              Step counting is not available on this device. Some older Android phones and emulators do not have a pedometer sensor.
+            </Text>
+          </View>
+        ) : !hasPermission ? (
+          <View style={[styles.stepsSensorCard, {
+            backgroundColor: theme.orange + '18',
+            borderColor: theme.orange,
+          }]}>
+            <Ionicons name="lock-closed-outline" size={20} color={theme.orange} />
+            <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>
+              Motion permission is required to count steps. Please allow it in your device Settings under CalFit → Motion & Fitness.
+            </Text>
+          </View>
+        ) : (
+          <View style={[styles.stepsSensorCard, {
+            backgroundColor: theme.accentDim as string,
+            borderColor: theme.accent,
+          }]}>
+            <Ionicons name="footsteps-outline" size={20} color={theme.accent} />
+            <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>
+              Steps are tracked automatically in the background using your phone's motion sensor. Keep the app running for accurate counts.
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Weekly steps summary */}
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Today's Summary</Text>
+        {[
+          { label: 'Steps taken',    value: `${steps.toLocaleString()}`,  color: theme.accent },
+          { label: 'Goal',           value: `${goalSteps.toLocaleString()}`, color: theme.textMuted },
+          { label: 'Calories burned',value: `${calories} kcal`,           color: theme.orange },
+          { label: 'Progress',       value: `${percentage}%`,              color: theme.accentSecond },
+        ].map((s) => (
+          <View key={s.label} style={styles.stepsSummaryRow}>
+            <Text style={[styles.stepsSummaryLabel, { color: theme.textSecondary }]}>
+              {s.label}
+            </Text>
+            <Text style={[styles.stepsSummaryValue, { color: s.color }]}>
+              {s.value}
+            </Text>
+          </View>
+        ))}
       </View>
     </ScrollView>
   );
 }
 
 // ── HISTORY TAB ───────────────────────────────────────────────
-function HistoryTab({ theme, sessions }: {
+function HistoryTab({
+  theme, sessions,
+}: {
   theme: typeof colors.dark;
   sessions: WorkoutSession[];
 }) {
   if (sessions.length === 0) {
     return (
       <ScrollView contentContainerStyle={styles.tabContent}>
-        <View style={[styles.emptyWorkout, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.emptyWorkout, {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }]}>
           <Ionicons name="time-outline" size={44} color={theme.textMuted} />
           <Text style={[styles.emptyWorkoutTitle, { color: theme.textPrimary }]}>
             No workout history yet
@@ -512,30 +663,33 @@ function HistoryTab({ theme, sessions }: {
                 </Text>
                 <Text style={[styles.historyDate, { color: theme.textMuted }]}>
                   {date.toLocaleDateString('en-GB', {
-                    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+                    weekday: 'short', day: 'numeric',
+                    month: 'short', year: 'numeric',
                   })}
                 </Text>
               </View>
-              <View style={[styles.historyCalBadge, { backgroundColor: theme.accentDim as string }]}>
+              <View style={[styles.historyCalBadge, {
+                backgroundColor: theme.accentDim as string,
+              }]}>
                 <Text style={[styles.historyCalNum, { color: theme.accent }]}>
                   {session.calories_burned}
                 </Text>
                 <Text style={[styles.historyCalUnit, { color: theme.accent }]}>kcal</Text>
               </View>
             </View>
-
             <View style={styles.historyStats}>
               {[
-                { icon: 'time-outline', label: timeDisplay },
+                { icon: 'time-outline',    label: timeDisplay },
                 { icon: 'barbell-outline', label: `${session.exercises.length} exercises` },
               ].map((s) => (
                 <View key={s.label} style={styles.historyStat}>
                   <Ionicons name={s.icon as any} size={14} color={theme.textMuted} />
-                  <Text style={[styles.historyStatText, { color: theme.textMuted }]}>{s.label}</Text>
+                  <Text style={[styles.historyStatText, { color: theme.textMuted }]}>
+                    {s.label}
+                  </Text>
                 </View>
               ))}
             </View>
-
             <View style={styles.historyExercises}>
               {session.exercises.map((ex, i) => {
                 const exMins = Math.floor(ex.seconds / 60);
@@ -558,7 +712,9 @@ function HistoryTab({ theme, sessions }: {
 }
 
 // ── INNER TAB BAR ─────────────────────────────────────────────
-function InnerTabs({ tabs, active, onPress, theme }: {
+function InnerTabs({
+  tabs, active, onPress, theme,
+}: {
   tabs: string[];
   active: string;
   onPress: (tab: string) => void;
@@ -570,7 +726,9 @@ function InnerTabs({ tabs, active, onPress, theme }: {
         <TouchableOpacity
           key={tab}
           onPress={() => onPress(tab)}
-          style={[styles.innerTab, active === tab && { borderBottomColor: theme.accent }]}
+          style={[styles.innerTab, active === tab && {
+            borderBottomColor: theme.accent,
+          }]}
         >
           <Text style={[
             styles.innerTabText,
@@ -588,12 +746,14 @@ function InnerTabs({ tabs, active, onPress, theme }: {
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function WorkoutScreen() {
   const { colorScheme } = useThemeStore();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const navigation = useNavigation<any>();
   const theme = colors[colorScheme];
 
+  const goalSteps = (profile as any)?.step_goal ?? 10000;
+
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (user?.id) loadHistory();
     }, [user?.id])
   );
@@ -620,8 +780,9 @@ export default function WorkoutScreen() {
     return () => {
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
       if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
+      Speech.stop();
     };
-  }, [user?.id]);
+  }, []);
 
   const loadCatalogue = async () => {
     try {
@@ -697,15 +858,23 @@ export default function WorkoutScreen() {
     setActiveTab('Today');
   };
 
+  // ── VOICE — Start exercise ────────────────────────────────
   const handleStartExercise = (index: number) => {
+    const exercise = workoutExercises[index];
+
     if (!workoutStarted) {
       setWorkoutStarted(true);
+      speak(`Workout started! Let's go! First up — ${exercise.name}. Give it everything you've got!`);
       workoutTimerRef.current = setInterval(() => {
         setWorkoutSeconds((prev) => prev + 1);
       }, 1000);
+    } else {
+      speak(`Starting ${exercise.name}. You've got this!`);
     }
+
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     setActiveExerciseIndex(index);
+
     exerciseTimerRef.current = setInterval(() => {
       setWorkoutExercises((prev) =>
         prev.map((ex, i) => {
@@ -718,26 +887,37 @@ export default function WorkoutScreen() {
     }, 1000);
   };
 
+  // ── VOICE — Complete exercise ──────────────────────────────
   const handleCompleteExercise = (index: number) => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
+
+    const exercise = workoutExercises[index];
+    const nextIndex = index + 1;
+    const hasNext = nextIndex < workoutExercises.length;
+    const nextExercise = hasNext ? workoutExercises[nextIndex] : null;
+
+    if (hasNext && nextExercise) {
+      speak(`${exercise.name} done! Great work. Rest for 30 seconds, then we move to ${nextExercise.name}.`);
+    } else {
+      speak(`${exercise.name} complete! Excellent work. That's all your exercises — finish the workout when you're ready!`);
+    }
+
     setWorkoutExercises((prev) =>
       prev.map((ex, i) => i === index ? { ...ex, done: true } : ex)
     );
     setActiveExerciseIndex(-1);
   };
 
+  // ── VOICE — Complete workout ───────────────────────────────
   const handleCompleteWorkout = async () => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
-
-    
 
     const totalCal = workoutExercises.reduce((sum, ex) => sum + ex.calories_burned, 0);
     const sessionName = workoutExercises.length > 0
       ? `${workoutExercises[0].category} Workout`
       : 'Workout Session';
 
-    // Format time properly
     const hrs = Math.floor(workoutSeconds / 3600);
     const mins = Math.floor((workoutSeconds % 3600) / 60);
     const secs = workoutSeconds % 60;
@@ -746,6 +926,12 @@ export default function WorkoutScreen() {
       : mins > 0
       ? `${mins} min ${secs}s`
       : `${secs}s`;
+
+    // Voice celebration
+    speak(
+      `Workout complete! You are absolutely incredible! ${workoutExercises.length} exercises done, ` +
+      `${totalCal} calories burned in ${timeStr}. That's what consistency looks like. Be proud of yourself!`
+    );
 
     const sessionData = {
       name: sessionName,
@@ -761,16 +947,19 @@ export default function WorkoutScreen() {
 
     try {
       if (user?.id) {
+        const { notifyWorkoutComplete } = await import('../../services/notificationService');
+        await notifyWorkoutComplete(user.id, sessionName, totalCal, workoutSeconds);
 
-        // Send workout complete notification
-const { notifyWorkoutComplete } = await import('../../services/notificationService');
-await notifyWorkoutComplete(user.id, sessionName, totalCal, workoutSeconds);
+        // Update total_workouts count on profile for leaderboard
         const { supabase } = await import('../../services/supabase');
         await supabase.from('workout_sessions').insert({
           user_id: user.id,
           ...sessionData,
           status: 'completed',
         });
+
+        // Increment total workouts for leaderboard ranking
+        await supabase.rpc('increment_total_workouts', { uid: user.id });
       }
     } catch (error) {
       console.error('Failed to save session:', error);
@@ -795,13 +984,17 @@ await notifyWorkoutComplete(user.id, sessionName, totalCal, workoutSeconds);
   };
 
   return (
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-       <View style={styles.header}>
+      <View style={styles.header}>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Activity</Text>
       </View>
 
-      <InnerTabs tabs={tabs} active={activeTab} onPress={setActiveTab} theme={theme} />
+      <InnerTabs
+        tabs={tabs}
+        active={activeTab}
+        onPress={setActiveTab}
+        theme={theme}
+      />
 
       {activeTab === 'Today' && (
         <TodayTab
@@ -837,7 +1030,13 @@ await notifyWorkoutComplete(user.id, sessionName, totalCal, workoutSeconds);
         />
       )}
 
-      {activeTab === 'Steps' && <StepsTab theme={theme} />}
+      {activeTab === 'Steps' && (
+        <StepsTab
+          theme={theme}
+          userId={user?.id ?? ''}
+          goalSteps={goalSteps}
+        />
+      )}
 
       {activeTab === 'History' && (
         <HistoryTab theme={theme} sessions={sessions} />
@@ -904,6 +1103,36 @@ const styles = StyleSheet.create({
   progressBarFill: { height: '100%', borderRadius: 4 },
   progressSub: { fontSize: fontSize.xs },
 
+  // Steps tab
+  stepsCalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+  },
+  stepsCalText: { fontSize: fontSize.sm, fontWeight: '600' },
+  stepsSensorCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  stepsSensorText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
+  stepsSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  stepsSummaryLabel: { fontSize: fontSize.base },
+  stepsSummaryValue: { fontSize: fontSize.base, fontWeight: '700' },
+
   barChartCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -952,7 +1181,8 @@ const styles = StyleSheet.create({
   },
   quickStartIcon: {
     width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   quickStartInfo: { flex: 1 },
   quickStartName: { fontSize: fontSize.base, fontWeight: '700' },
@@ -1063,7 +1293,8 @@ const styles = StyleSheet.create({
   exerciseCardLeft: { flexDirection: 'row', flex: 1, gap: spacing.md, alignItems: 'flex-start' },
   exerciseIconWrap: {
     width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   exerciseCardInfo: { flex: 1 },
   exerciseCardName: { fontSize: fontSize.base, fontWeight: '700' },
@@ -1078,17 +1309,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  stepsSensorCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  stepsSensorText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
-
   historyCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
@@ -1097,7 +1317,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.sm,
   },
-  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   historyName: { fontSize: fontSize.lg, fontWeight: '700' },
   historyDate: { fontSize: fontSize.xs, marginTop: 2 },
   historyCalBadge: {

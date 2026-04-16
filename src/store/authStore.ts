@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { Profile } from '../services/profileService';
 
+type CoachPersonality = 'balanced' | 'motivator' | 'strict' | 'calm' | 'friendly';
+
 interface AuthState {
   user: User | null;
   session: Session | null;
@@ -9,12 +11,14 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   userTier: 'free' | 'pro' | 'premium';
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  coachPersonality: CoachPersonality;
   setSession: (session: Session | null) => void;
   loadProfile: (userId: string) => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => void;
+  setCoachPersonality: (personality: CoachPersonality) => void;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -24,6 +28,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   isAuthenticated: false,
   userTier: 'free',
+  coachPersonality: 'balanced',
+
+  setCoachPersonality: (personality) => set({ coachPersonality: personality }),
 
   setSession: async (session) => {
     set({
@@ -31,8 +38,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: session?.user ?? null,
       isAuthenticated: !!session,
     });
-
-    // Load profile when session is set
     if (session?.user) {
       get().loadProfile(session.user.id);
     }
@@ -55,17 +60,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (current) {
       set({ profile: { ...current, ...updates } });
     }
-    
   },
 
   signIn: async (email, password) => {
     set({ isLoading: true });
     try {
       const { supabase } = await import('../services/supabase');
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } finally {
       set({ isLoading: false });
@@ -83,12 +84,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
- signOut: async () => {
-  set({
-    user: null,
-    session: null,
-    profile: null,
-    userTier: 'free',
-  });
-},
+  signOut: async () => {
+    set({
+      user: null,
+      session: null,
+      profile: null,
+      userTier: 'free',
+      coachPersonality: 'balanced',
+    });
+  },
 }));

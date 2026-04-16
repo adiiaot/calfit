@@ -14,6 +14,10 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 
+
+import { PERSONALITIES } from './PersonalitySelector';
+
+
 // ── MESSAGE BUBBLE ───────────────────────────────────────────
 function MessageBubble({
   message,
@@ -115,6 +119,7 @@ export default function CoachScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const firstName = user?.email?.split('@')[0] ?? 'Favour';
+  
 
   const [messages, setMessages] = useState([
     {

@@ -1,6 +1,6 @@
 # CalFit — AI-Powered Fitness & Nutrition App
 
-> **Contract Project** · Developed by [AOT](https://github.com/adiiaot) for BigCut LLC · 12-Month Engagement
+> **Contract Project** · Developed by [AOT](https://github.com/adiiaot) for BigCut LLC 
 
 [![React Native](https://img.shields.io/badge/React_Native-0.74-61DAFB?style=flat&logo=react)](https://reactnative.dev)
 [![Expo](https://img.shields.io/badge/Expo-51-000020?style=flat&logo=expo)](https://expo.dev)
@@ -22,8 +22,6 @@ The app is built with a modular architecture — core components, including the 
 ## Live Prototype
 
 > Interactive design prototype — all 14 screens with dark/light mode toggle
-
-**[View Interactive Prototype →](https://claude.ai)**
 
 **[View Figma Design File →](https://www.figma.com/design/AXHKZdGTk9LThEY242VLgw/CalFit-%E2%80%93-App-UI-Design)**
 

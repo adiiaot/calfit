@@ -1,55 +1,93 @@
+// ── OPEN FOOD FACTS API ───────────────────────────────────────
 export interface FoodResult {
   id: string;
   name: string;
+  brand: string;
   calories: number;
-  protein_g: number;
-  carbs_g: number;
-  fats_g: number;
-  serving_size: string;
+  protein: number;
+  carbs: number;
+  fat: number;
+  servingSize: string;
+  image?: string;
 }
 
-// Nigerian and common foods database
-export const commonFoods: FoodResult[] = [
-  { id: 'ng1',  name: 'Jollof Rice',           calories: 180, protein_g: 4,  carbs_g: 36, fats_g: 3,  serving_size: '1 cup (200g)' },
-  { id: 'ng2',  name: 'Fried Rice',             calories: 220, protein_g: 5,  carbs_g: 38, fats_g: 7,  serving_size: '1 cup (200g)' },
-  { id: 'ng3',  name: 'Egusi Soup',             calories: 310, protein_g: 12, carbs_g: 8,  fats_g: 26, serving_size: '1 bowl (250g)' },
-  { id: 'ng4',  name: 'Pounded Yam',            calories: 290, protein_g: 3,  carbs_g: 68, fats_g: 1,  serving_size: '1 wrap (250g)' },
-  { id: 'ng5',  name: 'Suya',                   calories: 210, protein_g: 28, carbs_g: 4,  fats_g: 10, serving_size: '100g' },
-  { id: 'ng6',  name: 'Moi Moi',                calories: 150, protein_g: 10, carbs_g: 16, fats_g: 6,  serving_size: '1 piece (150g)' },
-  { id: 'ng7',  name: 'Akara',                  calories: 190, protein_g: 8,  carbs_g: 22, fats_g: 8,  serving_size: '3 pieces (100g)' },
-  { id: 'ng8',  name: 'Plantain Fried',         calories: 220, protein_g: 2,  carbs_g: 40, fats_g: 8,  serving_size: '100g' },
-  { id: 'ng9',  name: 'Eba / Garri',            calories: 330, protein_g: 2,  carbs_g: 80, fats_g: 1,  serving_size: '1 wrap (250g)' },
-  { id: 'ng10', name: 'Beans Cooked',           calories: 130, protein_g: 8,  carbs_g: 22, fats_g: 1,  serving_size: '1 cup (180g)' },
-  { id: 'ng11', name: 'Pepper Soup',            calories: 140, protein_g: 18, carbs_g: 4,  fats_g: 6,  serving_size: '1 bowl (300g)' },
-  { id: 'ng12', name: 'Indomie Noodles',        calories: 370, protein_g: 8,  carbs_g: 52, fats_g: 14, serving_size: '1 pack (70g)' },
-  { id: 'ng13', name: 'Rice and Stew',          calories: 400, protein_g: 12, carbs_g: 60, fats_g: 12, serving_size: '1 plate' },
-  { id: 'ng14', name: 'Bread Agege',            calories: 260, protein_g: 8,  carbs_g: 50, fats_g: 4,  serving_size: '2 slices (80g)' },
-  { id: 'ng15', name: 'Chicken Grilled',        calories: 165, protein_g: 31, carbs_g: 0,  fats_g: 4,  serving_size: '100g' },
-  { id: 'ng16', name: 'Boiled Egg',             calories: 77,  protein_g: 6,  carbs_g: 1,  fats_g: 5,  serving_size: '1 large egg' },
-  { id: 'ng17', name: 'Oatmeal',                calories: 150, protein_g: 5,  carbs_g: 27, fats_g: 3,  serving_size: '1 cup cooked' },
-  { id: 'ng18', name: 'Banana',                 calories: 89,  protein_g: 1,  carbs_g: 23, fats_g: 0,  serving_size: '1 medium' },
-  { id: 'ng19', name: 'Ofada Rice',             calories: 170, protein_g: 3,  carbs_g: 35, fats_g: 2,  serving_size: '1 cup (200g)' },
-  { id: 'ng20', name: 'Semovita',               calories: 350, protein_g: 3,  carbs_g: 80, fats_g: 1,  serving_size: '1 wrap (250g)' },
-  { id: 'ng21', name: 'Amala',                  calories: 270, protein_g: 2,  carbs_g: 64, fats_g: 0,  serving_size: '1 wrap (250g)' },
-  { id: 'ng22', name: 'Boli (Roasted Plantain)',calories: 120, protein_g: 1,  carbs_g: 30, fats_g: 0,  serving_size: '1 medium' },
-  { id: 'ng23', name: 'Ogbono Soup',            calories: 290, protein_g: 10, carbs_g: 6,  fats_g: 24, serving_size: '1 bowl (250g)' },
-  { id: 'ng24', name: 'Groundnut Soup',         calories: 350, protein_g: 14, carbs_g: 10, fats_g: 28, serving_size: '1 bowl (250g)' },
-  { id: 'ng25', name: 'White Rice Plain',       calories: 200, protein_g: 4,  carbs_g: 44, fats_g: 0,  serving_size: '1 cup (200g)' },
-  // International
-  { id: 'int1', name: 'Grilled Salmon',         calories: 208, protein_g: 28, carbs_g: 0,  fats_g: 10, serving_size: '100g' },
-  { id: 'int2', name: 'Caesar Salad',           calories: 380, protein_g: 18, carbs_g: 28, fats_g: 22, serving_size: '1 bowl' },
-  { id: 'int3', name: 'Pasta Bolognese',        calories: 430, protein_g: 22, carbs_g: 58, fats_g: 12, serving_size: '1 plate' },
-  { id: 'int4', name: 'Greek Yogurt',           calories: 100, protein_g: 17, carbs_g: 6,  fats_g: 0,  serving_size: '1 cup (200g)' },
-  { id: 'int5', name: 'Protein Shake',          calories: 150, protein_g: 25, carbs_g: 8,  fats_g: 2,  serving_size: '1 scoop (300ml)' },
-  { id: 'int6', name: 'Avocado Toast',          calories: 290, protein_g: 7,  carbs_g: 30, fats_g: 16, serving_size: '2 slices' },
-  { id: 'int7', name: 'Scrambled Eggs',         calories: 200, protein_g: 14, carbs_g: 2,  fats_g: 15, serving_size: '2 eggs' },
+export const searchFoods = async (query: string): Promise<FoodResult[]> => {
+  if (!query.trim() || query.length < 2) return [];
+
+  try {
+    // Search Open Food Facts first
+    const response = await fetch(
+      `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,brands,nutriments,serving_size,image_small_url`
+    );
+
+    if (!response.ok) throw new Error('API error');
+
+    const data = await response.json();
+    const products = data.products ?? [];
+
+    const results: FoodResult[] = products
+      .filter((p: any) =>
+        p.product_name &&
+        p.nutriments?.['energy-kcal_100g']
+      )
+      .map((p: any, i: number) => ({
+        id: p.code ?? `off_${i}`,
+        name: p.product_name ?? 'Unknown',
+        brand: p.brands ?? '',
+        calories: Math.round(p.nutriments?.['energy-kcal_100g'] ?? 0),
+        protein: Math.round((p.nutriments?.proteins_100g ?? 0) * 10) / 10,
+        carbs: Math.round((p.nutriments?.carbohydrates_100g ?? 0) * 10) / 10,
+        fat: Math.round((p.nutriments?.fat_100g ?? 0) * 10) / 10,
+        servingSize: p.serving_size ?? '100g',
+        image: p.image_small_url,
+      }));
+
+    // If API returns nothing, fall back to local Nigerian food DB
+    if (results.length === 0) {
+      return searchLocalFoods(query);
+    }
+
+    return results;
+  } catch {
+    // Fallback to local DB on error
+    return searchLocalFoods(query);
+  }
+};
+
+// ── LOCAL NIGERIAN FOOD DATABASE ──────────────────────────────
+const NIGERIAN_FOODS: FoodResult[] = [
+  { id: 'ng_1',  name: 'Jollof Rice',       brand: 'Nigerian',  calories: 180, protein: 4,  carbs: 35, fat: 4,  servingSize: '1 cup (200g)' },
+  { id: 'ng_2',  name: 'Egusi Soup',         brand: 'Nigerian',  calories: 320, protein: 14, carbs: 8,  fat: 26, servingSize: '1 bowl (250g)' },
+  { id: 'ng_3',  name: 'Pounded Yam',        brand: 'Nigerian',  calories: 200, protein: 2,  carbs: 47, fat: 0,  servingSize: '1 wrap (200g)' },
+  { id: 'ng_4',  name: 'Eba (Garri)',         brand: 'Nigerian',  calories: 170, protein: 1,  carbs: 40, fat: 0,  servingSize: '1 wrap (180g)' },
+  { id: 'ng_5',  name: 'Okra Soup',           brand: 'Nigerian',  calories: 150, protein: 8,  carbs: 12, fat: 9,  servingSize: '1 bowl (250g)' },
+  { id: 'ng_6',  name: 'Suya',               brand: 'Nigerian',  calories: 280, protein: 28, carbs: 4,  fat: 16, servingSize: '1 skewer (100g)' },
+  { id: 'ng_7',  name: 'Moi Moi',            brand: 'Nigerian',  calories: 140, protein: 9,  carbs: 16, fat: 5,  servingSize: '1 piece (150g)' },
+  { id: 'ng_8',  name: 'Akara',              brand: 'Nigerian',  calories: 120, protein: 6,  carbs: 14, fat: 5,  servingSize: '3 pieces (100g)' },
+  { id: 'ng_9',  name: 'Ofada Rice',         brand: 'Nigerian',  calories: 165, protein: 3,  carbs: 35, fat: 1,  servingSize: '1 cup (200g)' },
+  { id: 'ng_10', name: 'Banga Soup',          brand: 'Nigerian',  calories: 280, protein: 10, carbs: 8,  fat: 24, servingSize: '1 bowl (250g)' },
+  { id: 'ng_11', name: 'Oha Soup',            brand: 'Nigerian',  calories: 200, protein: 12, carbs: 6,  fat: 15, servingSize: '1 bowl (250g)' },
+  { id: 'ng_12', name: 'Ogbono Soup',         brand: 'Nigerian',  calories: 290, protein: 11, carbs: 7,  fat: 25, servingSize: '1 bowl (250g)' },
+  { id: 'ng_13', name: 'Nkwobi',             brand: 'Nigerian',  calories: 380, protein: 22, carbs: 5,  fat: 30, servingSize: '1 plate (200g)' },
+  { id: 'ng_14', name: 'Plantain (fried)',    brand: 'Nigerian',  calories: 220, protein: 1,  carbs: 38, fat: 8,  servingSize: '1 medium (100g)' },
+  { id: 'ng_15', name: 'Plantain (boiled)',   brand: 'Nigerian',  calories: 130, protein: 1,  carbs: 31, fat: 0,  servingSize: '1 medium (100g)' },
+  { id: 'ng_16', name: 'Chin Chin',           brand: 'Nigerian',  calories: 450, protein: 7,  carbs: 60, fat: 20, servingSize: '1 cup (80g)' },
+  { id: 'ng_17', name: 'Puff Puff',           brand: 'Nigerian',  calories: 280, protein: 4,  carbs: 38, fat: 12, servingSize: '3 pieces (100g)' },
+  { id: 'ng_18', name: 'Groundnut Soup',      brand: 'Nigerian',  calories: 350, protein: 16, carbs: 10, fat: 28, servingSize: '1 bowl (250g)' },
+  { id: 'ng_19', name: 'Efo Riro',            brand: 'Nigerian',  calories: 180, protein: 12, carbs: 8,  fat: 12, servingSize: '1 bowl (250g)' },
+  { id: 'ng_20', name: 'Tuwo Shinkafa',       brand: 'Nigerian',  calories: 190, protein: 3,  carbs: 42, fat: 1,  servingSize: '1 wrap (200g)' },
+  { id: 'ng_21', name: 'Kilishi',             brand: 'Nigerian',  calories: 300, protein: 35, carbs: 8,  fat: 14, servingSize: '100g' },
+  { id: 'ng_22', name: 'Zobo Drink',          brand: 'Nigerian',  calories: 50,  protein: 0,  carbs: 12, fat: 0,  servingSize: '1 glass (250ml)' },
+  { id: 'ng_23', name: 'Kunu Drink',          brand: 'Nigerian',  calories: 80,  protein: 1,  carbs: 18, fat: 1,  servingSize: '1 glass (250ml)' },
+  { id: 'ng_24', name: 'Pepper Soup',         brand: 'Nigerian',  calories: 160, protein: 18, carbs: 4,  fat: 8,  servingSize: '1 bowl (300g)' },
+  { id: 'ng_25', name: 'Bole and Fish',       brand: 'Nigerian',  calories: 420, protein: 28, carbs: 45, fat: 14, servingSize: '1 plate (300g)' },
 ];
 
-// Search local food database
-export const searchFood = (query: string): FoodResult[] => {
-  if (!query || query.length < 1) return commonFoods.slice(0, 10);
-  const q = query.toLowerCase().trim();
-  return commonFoods.filter((f) =>
-    f.name.toLowerCase().includes(q)
+export const searchLocalFoods = (query: string): FoodResult[] => {
+  const q = query.toLowerCase();
+  return NIGERIAN_FOODS.filter(
+    (f) =>
+      f.name.toLowerCase().includes(q) ||
+      f.brand.toLowerCase().includes(q)
   );
 };

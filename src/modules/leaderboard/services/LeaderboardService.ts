@@ -26,7 +26,7 @@ export const getGlobalLeaderboard = async (
     overall:   'streak_count',
     streaks:   'streak_count',
     workouts:  'total_workouts',
-    referrals: 'streak_count', // referrals joined separately
+    referrals: 'streak_count',
   }[category];
 
   const { data, error } = await supabase
@@ -39,7 +39,7 @@ export const getGlobalLeaderboard = async (
 
   const entries = data as any[];
 
-  // For referrals category fetch counts
+  // Fetch referral counts when that category is selected
   let referralMap: Record<string, number> = {};
   if (category === 'referrals') {
     const { data: refs } = await supabase
@@ -57,30 +57,30 @@ export const getGlobalLeaderboard = async (
   const mapped = entries.map((u) => {
     const refCount = referralMap[u.id] ?? 0;
     const totalScore =
-      (u.streak_count ?? 0) * 10 +
-      (u.total_workouts ?? 0) * 5 +
+      (u.streak_count   ?? 0) * 10 +
+      (u.total_workouts ?? 0) * 5  +
       refCount * 20;
 
     return {
       rank: 0,
-      user_id: u.id,
-      full_name: u.full_name ?? 'CalFit User',
-      calfit_id: u.calfit_id ?? u.id.slice(0, 8),
-      avatar_url: u.avatar_url ?? null,
-      goal: u.goal ?? 'Get Fit',
-      streak_count: u.streak_count ?? 0,
+      user_id:        u.id,
+      full_name:      u.full_name   ?? 'CalFit User',
+      calfit_id:      u.calfit_id   ?? u.id.slice(0, 8),
+      avatar_url:     u.avatar_url  ?? null,
+      goal:           u.goal        ?? 'Get Fit',
+      streak_count:   u.streak_count   ?? 0,
       total_workouts: u.total_workouts ?? 0,
       referral_count: refCount,
-      total_score: totalScore,
-      isCurrentUser: u.id === currentUserId,
+      total_score:    totalScore,
+      isCurrentUser:  u.id === currentUserId,
     };
   });
 
   // Sort by selected category
   if (category === 'referrals') {
-    mapped.sort((a, b) => b.referral_count - a.referral_count);
+    mapped.sort((a, b) => b.referral_count  - a.referral_count);
   } else if (category === 'workouts') {
-    mapped.sort((a, b) => b.total_workouts - a.total_workouts);
+    mapped.sort((a, b) => b.total_workouts  - a.total_workouts);
   } else {
     mapped.sort((a, b) => b.total_score - a.total_score);
   }
@@ -111,16 +111,16 @@ export const getFriendsLeaderboard = async (
 
   const entries = (data as any[]).map((u) => ({
     rank: 0,
-    user_id: u.id,
-    full_name: u.full_name ?? 'CalFit User',
-    calfit_id: u.calfit_id ?? u.id.slice(0, 8),
-    avatar_url: u.avatar_url ?? null,
-    goal: u.goal ?? 'Get Fit',
-    streak_count: u.streak_count ?? 0,
+    user_id:        u.id,
+    full_name:      u.full_name      ?? 'CalFit User',
+    calfit_id:      u.calfit_id      ?? u.id.slice(0, 8),
+    avatar_url:     u.avatar_url     ?? null,
+    goal:           u.goal           ?? 'Get Fit',
+    streak_count:   u.streak_count   ?? 0,
     total_workouts: u.total_workouts ?? 0,
     referral_count: 0,
     total_score:
-      (u.streak_count ?? 0) * 10 +
+      (u.streak_count   ?? 0) * 10 +
       (u.total_workouts ?? 0) * 5,
     isCurrentUser: u.id === currentUserId,
   }));
@@ -128,9 +128,9 @@ export const getFriendsLeaderboard = async (
   if (category === 'workouts') {
     entries.sort((a, b) => b.total_workouts - a.total_workouts);
   } else if (category === 'streaks') {
-    entries.sort((a, b) => b.streak_count - a.streak_count);
+    entries.sort((a, b) => b.streak_count   - a.streak_count);
   } else {
-    entries.sort((a, b) => b.total_score - a.total_score);
+    entries.sort((a, b) => b.total_score    - a.total_score);
   }
 
   return entries.map((e, i) => ({ ...e, rank: i + 1 }));

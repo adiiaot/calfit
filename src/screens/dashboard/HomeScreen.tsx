@@ -18,16 +18,15 @@ import Avatar from '../../components/Avatar';
 import {
   getTodayCalories,
   getTodayWater,
-  getTodaySteps,
   logWater,
 } from '../../services/profileService';
+import { useSteps } from '../../hooks/useSteps';
 
 // ── READINESS CARD ───────────────────────────────────────────
 function ReadinessCard({ theme, score }: {
   theme: typeof colors.dark;
   score: number;
 }) {
-  const pct = score / 100;
   const label =
     score >= 80 ? 'Great recovery' :
     score >= 60 ? 'Good recovery' : 'Rest recommended';
@@ -53,7 +52,7 @@ function ReadinessCard({ theme, score }: {
           <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
             <View style={[styles.progressBarFill, {
               backgroundColor: theme.accent,
-              width: `${pct * 100}%` as any,
+              width: `${(score / 100) * 100}%` as any,
             }]} />
           </View>
         </View>
@@ -89,18 +88,14 @@ function CalorieCard({ theme, consumed, goal }: {
         </View>
         <View style={styles.donutStats}>
           {[
-            { dot: theme.textMuted, label: 'Goal', value: `${goal} kcal` },
-            { dot: theme.orange, label: 'Consumed', value: `${consumed} kcal` },
-            { dot: theme.accent, label: 'Burned', value: `${burned} kcal` },
+            { dot: theme.textMuted, label: 'Goal',     value: `${goal} kcal` },
+            { dot: theme.orange,    label: 'Consumed',  value: `${consumed} kcal` },
+            { dot: theme.accent,    label: 'Burned',    value: `${burned} kcal` },
           ].map((s) => (
             <View key={s.label} style={styles.donutStatRow}>
               <View style={[styles.donutDot, { backgroundColor: s.dot }]} />
-              <Text style={[styles.donutLabel, { color: theme.textSecondary }]}>
-                {s.label}
-              </Text>
-              <Text style={[styles.donutVal, { color: theme.textPrimary }]}>
-                {s.value}
-              </Text>
+              <Text style={[styles.donutLabel, { color: theme.textSecondary }]}>{s.label}</Text>
+              <Text style={[styles.donutVal, { color: theme.textPrimary }]}>{s.value}</Text>
             </View>
           ))}
         </View>
@@ -110,19 +105,26 @@ function CalorieCard({ theme, consumed, goal }: {
 }
 
 // ── SMALL STAT CARDS ─────────────────────────────────────────
-function SmallStatCards({ theme, waterMl, waterGoalMl, steps, stepGoal, sleepHrs }: {
+function SmallStatCards({
+  theme,
+  waterMl,
+  waterGoalMl,
+  liveSteps,
+  stepGoal,
+  sleepHrs,
+}: {
   theme: typeof colors.dark;
   waterMl: number;
   waterGoalMl: number;
-  steps: number;
+  liveSteps: number;
   stepGoal: number;
   sleepHrs: number;
 }) {
   const waterL = (waterMl / 1000).toFixed(1);
   const waterGoalL = (waterGoalMl / 1000).toFixed(1);
-  const stepsFormatted = steps >= 1000
-    ? `${(steps / 1000).toFixed(1)}K`
-    : steps.toString();
+  const stepsFormatted = liveSteps >= 1000
+    ? `${(liveSteps / 1000).toFixed(1)}K`
+    : liveSteps > 0 ? liveSteps.toString() : '—';
   const stepGoalFormatted = stepGoal >= 1000
     ? `${stepGoal / 1000}K`
     : stepGoal.toString();
@@ -136,8 +138,8 @@ function SmallStatCards({ theme, waterMl, waterGoalMl, steps, stepGoal, sleepHrs
     },
     {
       label: 'Steps',
-      value: stepsFormatted === '0' ? '—' : stepsFormatted,
-      sub: `of ${stepGoalFormatted}`,
+      value: stepsFormatted,
+      sub: liveSteps > 0 ? `of ${stepGoalFormatted}` : 'tracking...',
       color: theme.accent,
     },
     {
@@ -153,7 +155,7 @@ function SmallStatCards({ theme, waterMl, waterGoalMl, steps, stepGoal, sleepHrs
       {stats.map((s) => (
         <View key={s.label} style={[
           styles.smallCard,
-          { backgroundColor: theme.card, borderColor: theme.border }
+          { backgroundColor: theme.card, borderColor: theme.border },
         ]}>
           <Text style={[styles.smallCardLabel, { color: theme.textSecondary }]}>
             {s.label}
@@ -161,6 +163,20 @@ function SmallStatCards({ theme, waterMl, waterGoalMl, steps, stepGoal, sleepHrs
           <Text style={[styles.smallCardValue, { color: s.color }]}>
             {s.value}
           </Text>
+          <View style={[styles.smallCardBar, { backgroundColor: theme.border }]}>
+            {s.label === 'Steps' && liveSteps > 0 && (
+              <View style={[styles.smallCardBarFill, {
+                backgroundColor: s.color,
+                width: `${Math.min((liveSteps / stepGoal) * 100, 100)}%` as any,
+              }]} />
+            )}
+            {s.label === 'Water' && waterMl > 0 && (
+              <View style={[styles.smallCardBarFill, {
+                backgroundColor: s.color,
+                width: `${Math.min((waterMl / waterGoalMl) * 100, 100)}%` as any,
+              }]} />
+            )}
+          </View>
           <Text style={[styles.smallCardSub, { color: theme.textMuted }]}>
             {s.sub}
           </Text>
@@ -182,7 +198,7 @@ function StreakCard({ theme, streakCount }: {
 
   const badgeLabel =
     streakCount >= 30 ? 'Gold' :
-    streakCount >= 7 ? 'Silver' : 'Bronze';
+    streakCount >= 7  ? 'Silver' : 'Bronze';
 
   return (
     <TouchableOpacity
@@ -206,11 +222,11 @@ function StreakCard({ theme, streakCount }: {
             {
               backgroundColor: i <= adjustedToday ? theme.accent : theme.card,
               borderColor: i <= adjustedToday ? theme.accent : theme.border,
-            }
+            },
           ]}>
             <Text style={[
               styles.streakDotText,
-              { color: i <= adjustedToday ? theme.bg : theme.textMuted }
+              { color: i <= adjustedToday ? theme.bg : theme.textMuted },
             ]}>
               {day}
             </Text>
@@ -225,12 +241,10 @@ function StreakCard({ theme, streakCount }: {
 }
 
 // ── QUICK LOG ────────────────────────────────────────────────
-// ── QUICK LOG ────────────────────────────────────────────────
-function QuickLog({ theme, onWaterLog, onSleepLog, onStepsLog }: {
+function QuickLog({ theme, onWaterLog, onSleepLog }: {
   theme: typeof colors.dark;
   onWaterLog: () => void;
   onSleepLog: () => void;
-  onStepsLog: () => void;
 }) {
   const navigation = useNavigation<any>();
 
@@ -265,27 +279,27 @@ function QuickLog({ theme, onWaterLog, onSleepLog, onStepsLog }: {
       </View>
 
       {/* Quick nav — Leaderboard, Partners, Community */}
-<View style={styles.quickNav}>
-  {[
-    { label: 'Leaderboard', icon: 'trophy-outline',  route: 'Leaderboard' },
-    { label: 'Partners',    icon: 'people-outline',  route: 'Accountability' },
-    { label: 'Community',   icon: 'megaphone-outline', route: 'Community' },
-  ].map((item) => (
-    <TouchableOpacity
-      key={item.route}
-      onPress={() => navigation.navigate(item.route as never)}
-      style={[styles.quickNavBtn, {
-        backgroundColor: theme.card,
-        borderColor: theme.border,
-      }]}
-    >
-      <Ionicons name={item.icon as any} size={20} color={theme.accent} />
-      <Text style={[styles.quickNavLabel, { color: theme.textSecondary }]}>
-        {item.label}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</View>
+      <View style={styles.quickNav}>
+        {[
+          { label: 'Leaderboard', icon: 'trophy-outline',    route: 'Leaderboard' },
+          { label: 'Partners',    icon: 'people-outline',    route: 'Accountability' },
+          { label: 'Community',   icon: 'megaphone-outline', route: 'Community' },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.route}
+            onPress={() => navigation.navigate(item.route as never)}
+            style={[styles.quickNavBtn, {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            }]}
+          >
+            <Ionicons name={item.icon as any} size={20} color={theme.accent} />
+            <Text style={[styles.quickNavLabel, { color: theme.textSecondary }]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
@@ -350,8 +364,6 @@ function MoodCard({ theme }: { theme: typeof colors.dark }) {
 // ── FRIENDS TICKER ───────────────────────────────────────────
 function FriendsTicker({ theme }: { theme: typeof colors.dark }) {
   const navigation = useNavigation<any>();
-
-  // Will be populated with real friends data in Phase 4
   const hasFriends = false;
 
   if (!hasFriends) {
@@ -372,20 +384,18 @@ function FriendsTicker({ theme }: { theme: typeof colors.dark }) {
         <Text style={[styles.emptyFriendsSub, { color: theme.textMuted }]}>
           Invite friends to join CalFit and see their activity here in real time.
         </Text>
-
-<TouchableOpacity
-  onPress={() => navigation.navigate('Credits')}
-  style={[styles.inviteBtn, {
-    backgroundColor: theme.accentDim as string,
-    borderColor: theme.accent,
-  }]}
->
-  <Ionicons name="mail-outline" size={16} color={theme.accent} />
-  <Text style={[styles.inviteBtnText, { color: theme.accent }]}>
-    Copy Invite Link
-  </Text>
-</TouchableOpacity>
-
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Credits')}
+          style={[styles.inviteBtn, {
+            backgroundColor: theme.accentDim as string,
+            borderColor: theme.accent,
+          }]}
+        >
+          <Ionicons name="mail-outline" size={16} color={theme.accent} />
+          <Text style={[styles.inviteBtnText, { color: theme.accent }]}>
+            Copy Invite Link
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -412,35 +422,24 @@ export default function HomeScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
+  const stepGoal = (profile as any)?.step_goal ?? 10000;
+  const { steps: liveSteps } = useSteps(stepGoal);
+
   const [unreadCount, setUnreadCount] = useState(0);
-
-useEffect(() => {
-  if (!user?.id) return;
-  const loadUnread = async () => {
-    const { getUnreadCount } = await import('../../services/notificationService');
-    const count = await getUnreadCount(user.id);
-    setUnreadCount(count);
-  };
-  loadUnread();
-}, [user?.id]);
-
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [waterMl, setWaterMl] = useState(0);
-  const [steps, setSteps] = useState(0);
   const [sleepHrs, setSleepHrs] = useState(0);
   const [showSleepModal, setShowSleepModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const calorieGoal = profile?.daily_calorie_goal ?? 2000;
-  const waterGoalMl = profile?.water_goal_ml ?? 2500;
-  const stepGoal = profile?.step_goal ?? 10000;
-  const streakCount = profile?.streak_count ?? 0;
-  const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'there';
+  const calorieGoal = (profile as any)?.daily_calorie_goal ?? 2000;
+  const waterGoalMl = (profile as any)?.water_goal_ml ?? 2500;
+  const streakCount = (profile as any)?.streak_count ?? 0;
+  const firstName   = profile?.full_name ?? user?.email?.split('@')[0] ?? 'there';
 
-  // Readiness score calculated from real data
-  const waterScore = Math.min((waterMl / waterGoalMl) * 30, 30);
-  const stepScore = Math.min((steps / stepGoal) * 30, 30);
-  const sleepScore = sleepHrs >= 7 ? 40 : sleepHrs >= 5 ? 20 : 10;
+  const waterScore    = Math.min((waterMl / waterGoalMl) * 30, 30);
+  const stepScore     = Math.min((liveSteps / stepGoal) * 30, 30);
+  const sleepScore    = sleepHrs >= 7 ? 40 : sleepHrs >= 5 ? 20 : 10;
   const readinessScore = Math.round(waterScore + stepScore + sleepScore);
 
   const hour = new Date().getHours();
@@ -451,20 +450,26 @@ useEffect(() => {
   useEffect(() => {
     if (!user?.id) return;
     loadDashboardData();
+    loadUnreadCount();
   }, [user?.id]);
+
+  const loadUnreadCount = async () => {
+    if (!user?.id) return;
+    const { getUnreadCount } = await import('../../services/notificationService');
+    const count = await getUnreadCount(user.id);
+    setUnreadCount(count);
+  };
 
   const loadDashboardData = async () => {
     if (!user?.id) return;
     setIsLoading(true);
     try {
-      const [calories, water, stepCount] = await Promise.all([
+      const [calories, water] = await Promise.all([
         getTodayCalories(user.id),
         getTodayWater(user.id),
-        getTodaySteps(user.id),
       ]);
       setCaloriesConsumed(calories);
       setWaterMl(water);
-      setSteps(stepCount);
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -475,34 +480,19 @@ useEffect(() => {
   const handleQuickWater = async () => {
     if (!user?.id) return;
     const success = await logWater(user.id, 250);
-    if (success) {
-      setWaterMl((prev) => prev + 250);
-    }
+    if (success) setWaterMl((prev) => prev + 250);
   };
 
   const handleSleepLog = (hrs: number) => {
     setSleepHrs(hrs);
     setShowSleepModal(false);
-    // Will write to sleep_logs table in Phase 2
-    Alert.alert(
-      'Sleep Logged ✓',
-      `${hrs} hours logged for last night.`,
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleStepsLog = () => {
-    // Will connect to Expo Sensors in Phase 2
-    Alert.alert(
-      'Steps',
-      'Step tracking via your phone sensors will be connected in the next update. Your steps will count automatically.',
-      [{ text: 'OK' }]
-    );
+    Alert.alert('Sleep Logged ✓', `${hrs} hours logged for last night.`, [{ text: 'OK' }]);
   };
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-    {/* TOP BAR */}
+
+      {/* TOP BAR */}
       <View style={[styles.topBar, { backgroundColor: theme.bg }]}>
         <View>
           <Text style={[styles.greeting, { color: theme.textPrimary }]}>
@@ -510,23 +500,23 @@ useEffect(() => {
           </Text>
           <Text style={[styles.date, { color: theme.textSecondary }]}>
             {new Date().toLocaleDateString('en-US', {
-              weekday: 'long', month: 'long', day: 'numeric'
+              weekday: 'long', month: 'long', day: 'numeric',
             })}
           </Text>
         </View>
         <View style={styles.topBarRight}>
-         <TouchableOpacity
-  onPress={() => navigation.getParent()?.navigate('Notifications')}
-  style={[styles.bellBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
->
-  <Text style={styles.bellIcon}>🔔</Text>
-  {unreadCount > 0 && (
-    <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
-  )}
-</TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.getParent()?.navigate('Notifications')}
+            style={[styles.bellBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={[styles.bellDot, { backgroundColor: theme.orange }]} />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Settings')}>
-  <Avatar size={36} borderWidth={2} />
-</TouchableOpacity>
+            <Avatar size={36} borderWidth={2} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -545,16 +535,16 @@ useEffect(() => {
       >
         <ReadinessCard theme={theme} score={readinessScore} />
         <CalorieCard theme={theme} consumed={caloriesConsumed} goal={calorieGoal} />
+
         <SmallStatCards
           theme={theme}
           waterMl={waterMl}
           waterGoalMl={waterGoalMl}
-          steps={steps}
+          liveSteps={liveSteps}
           stepGoal={stepGoal}
           sleepHrs={sleepHrs}
         />
 
-        {/* Sleep log inline modal */}
         {showSleepModal && (
           <SleepLogModal theme={theme} onLog={handleSleepLog} />
         )}
@@ -571,7 +561,6 @@ useEffect(() => {
           theme={theme}
           onWaterLog={handleQuickWater}
           onSleepLog={() => setShowSleepModal(!showSleepModal)}
-          onStepsLog={handleStepsLog}
         />
 
         <MoodCard theme={theme} />
@@ -586,7 +575,7 @@ useEffect(() => {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: spacing.massive },
+  scrollContent: { paddingBottom: 100 },
 
   topBar: {
     flexDirection: 'row',
@@ -597,7 +586,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   greeting: { fontSize: fontSize.xl, fontWeight: '700' },
-  date: { fontSize: fontSize.md, marginTop: 2 },
+  date: { fontSize: fontSize.base, marginTop: 2 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   bellBtn: {
     width: 36, height: 36, borderRadius: 18,
@@ -609,12 +598,6 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 4, right: 4,
     width: 9, height: 9, borderRadius: 5,
   },
-  avatarBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2,
-  },
-  avatarText: { fontSize: fontSize.lg, fontWeight: '700' },
 
   card: {
     marginHorizontal: spacing.lg,
@@ -631,6 +614,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
+  // Readiness
   readinessRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -643,6 +627,7 @@ const styles = StyleSheet.create({
   progressBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 3 },
 
+  // Calorie donut
   donutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   donutContainer: {
     width: 90, height: 90,
@@ -675,6 +660,7 @@ const styles = StyleSheet.create({
   donutLabel: { fontSize: fontSize.sm, flex: 1 },
   donutVal: { fontSize: fontSize.sm, fontWeight: '700' },
 
+  // Small stat cards
   smallCardsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -682,11 +668,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   smallCard: {
-    flex: 1, padding: spacing.md,
-    borderRadius: radius.md, borderWidth: 1,
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 4,
   },
-  smallCardLabel: { fontSize: fontSize.xs, fontWeight: '600', marginBottom: 4 },
-  smallCardValue: { fontSize: fontSize.xxl, fontWeight: '800', marginBottom: 2 },
+  smallCardLabel: { fontSize: fontSize.xs, fontWeight: '600' },
+  smallCardValue: { fontSize: fontSize.xxl, fontWeight: '800' },
+  smallCardBar: {
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  smallCardBarFill: { height: '100%', borderRadius: 2 },
   smallCardSub: { fontSize: fontSize.xs },
 
   sectionLabel: {
@@ -698,6 +694,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
+  // Streak
   streakHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -721,6 +718,7 @@ const styles = StyleSheet.create({
   streakDotText: { fontSize: fontSize.xs, fontWeight: '700' },
   streakHint: { fontSize: fontSize.xs, marginTop: 4 },
 
+  // Quick log
   quickLogRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -728,11 +726,31 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   quickLogBtn: {
-    flex: 1, paddingVertical: spacing.sm,
-    borderRadius: radius.sm, borderWidth: 1,
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
     alignItems: 'center',
   },
   quickLogText: { fontSize: fontSize.sm, fontWeight: '600' },
+
+  // Quick nav
+  quickNav: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  quickNavBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  quickNavLabel: { fontSize: fontSize.xs, fontWeight: '600' },
 
   // Sleep modal
   sleepModal: {
@@ -743,11 +761,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sleepModalTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.md },
-  sleepOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
+  sleepOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   sleepOption: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -756,6 +770,7 @@ const styles = StyleSheet.create({
   },
   sleepOptionText: { fontSize: fontSize.base, fontWeight: '700' },
 
+  // Mood card
   moodCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -782,42 +797,18 @@ const styles = StyleSheet.create({
   liveText: { fontSize: fontSize.xs, fontWeight: '700' },
   emptyFriendsText: { fontSize: fontSize.base, fontWeight: '600', marginBottom: 4 },
   emptyFriendsSub: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
- inviteBtn: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: spacing.xs,
-  marginHorizontal: spacing.lg,
-  marginTop: spacing.sm,
-  marginBottom: spacing.md,
-  paddingVertical: spacing.md,
-  paddingHorizontal: spacing.lg,
-  borderRadius: radius.lg,
-  borderWidth: 1,
-  alignSelf: 'stretch',
-},
-inviteBtnText: {
-  fontSize: fontSize.base,
-  fontWeight: '700',
-},
 
-quickNav: {
-  flexDirection: 'row',
-  gap: spacing.sm,
-  marginHorizontal: spacing.lg,
-  marginBottom: spacing.md,
-},
-quickNavBtn: {
-  flex: 1,
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: spacing.xs,
-  paddingVertical: spacing.md,
-  borderRadius: radius.lg,
-  borderWidth: 1,
-},
-quickNavLabel: {
-  fontSize: fontSize.xs,
-  fontWeight: '600',
-},
+  // Invite button
+  inviteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    alignSelf: 'stretch',
+  },
+  inviteBtnText: { fontSize: fontSize.base, fontWeight: '700' },
 });

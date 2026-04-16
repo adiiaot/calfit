@@ -44,26 +44,30 @@ export function useGroup(userId: string, userTier: string) {
     setIsLoading(false);
   };
 
-  const create = async (
-    name: string,
-    description: string,
-    category: string
-  ): Promise<GroupData | null> => {
-    if (!canCreate) return null;
-    const group = await createGroup(userId, name, description, category);
-    if (group) {
-      const newGroup: GroupData = {
-        ...group,
-        emoji: '✨',
-        is_joined: true,
-        is_owner: true,
-      };
-      setMyGroups((prev) => [newGroup, ...prev]);
-      setOwnedCount((prev) => prev + 1);
-    }
-    return group;
-  };
+ // Function to create a new group
+ const create = async (
+  name: string,
+  description: string,
+  category: string
+): Promise<GroupData | null> => {
+  if (!canCreate) return null;
+  const group = await createGroup(userId, name, description, category);
+  if (group) {
+    const newGroup: GroupData = {
+      ...group,
+      emoji: '✨',
+      is_joined: true,
+      is_owner: true,
+    };
+    // Add to both My Groups and Discover simultaneously
+    setMyGroups((prev) => [newGroup, ...prev]);
+    setDiscoverGroups((prev) => [newGroup, ...prev]);
+    setOwnedCount((prev) => prev + 1);
+  }
+  return group;
+};
 
+// Function to join a Group
   const join = async (groupId: string) => {
     await joinGroup(userId, groupId);
     const group = discoverGroups.find((g) => g.id === groupId);
@@ -75,6 +79,8 @@ export function useGroup(userId: string, userTier: string) {
     }
   };
 
+  // Function to Leave a Group
+
   const leave = async (groupId: string) => {
     await leaveGroup(userId, groupId);
     setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
@@ -83,6 +89,7 @@ export function useGroup(userId: string, userTier: string) {
     );
   };
 
+  // Function to Remove a Group (only for owners)
   const remove = async (groupId: string): Promise<{ success: boolean; error?: string }> => {
     // Remove from UI immediately before Supabase call
     // This prevents useFocusEffect from re-fetching it before delete completes

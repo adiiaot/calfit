@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useState, useEffect } from 'react';
 import {
   loadMyGroups,
   loadDiscoverGroups,
@@ -26,11 +25,11 @@ export function useGroup(userId: string, userTier: string) {
   const groupLimit = getGroupLimit();
   const canCreate = ownedCount < groupLimit;
 
-  useFocusEffect(
-    useCallback(() => {
-      if (userId) reload();
-    }, [userId])
-  );
+  // Only load once on mount — not on every focus
+  // useFocusEffect was causing reload after delete which brought groups back
+  useEffect(() => {
+    if (userId) reload();
+  }, [userId]);
 
   const reload = async () => {
     setIsLoading(true);
@@ -85,11 +84,19 @@ export function useGroup(userId: string, userTier: string) {
   };
 
   const remove = async (groupId: string): Promise<{ success: boolean; error?: string }> => {
+    // Remove from UI immediately before Supabase call
+    // This prevents useFocusEffect from re-fetching it before delete completes
+    setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
+    setDiscoverGroups((prev) => prev.filter((g) => g.id !== groupId));
+    setOwnedCount((prev) => Math.max(prev - 1, 0));
+
     const result = await deleteGroup(userId, groupId);
-    if (result.success) {
-      setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
-      setOwnedCount((prev) => Math.max(prev - 1, 0));
+
+    if (!result.success) {
+      // Delete failed — restore correct state from Supabase
+      await reload();
     }
+
     return result;
   };
 

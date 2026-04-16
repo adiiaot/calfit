@@ -7,16 +7,14 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState, useRef } from 'react';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
-
-
-import { PERSONALITIES } from './PersonalitySelector';
-
+import { PERSONALITIES, PersonalitySelector } from './PersonalitySelector';
 
 // ── MESSAGE BUBBLE ───────────────────────────────────────────
 function MessageBubble({
@@ -114,13 +112,17 @@ function WeeklyNudge({ theme }: { theme: typeof colors.dark }) {
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function CoachScreen() {
   const { colorScheme } = useThemeStore();
-  const { user } = useAuthStore();
+  const { user, profile, coachPersonality, setCoachPersonality } = useAuthStore();
   const theme = colors[colorScheme];
   const scrollRef = useRef<ScrollView>(null);
 
-  const firstName = user?.email?.split('@')[0] ?? 'Favour';
-  
+  const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'there';
 
+  // Active personality object
+  const activePersonality =
+    PERSONALITIES.find((p) => p.id === coachPersonality) ?? PERSONALITIES[0];
+
+  const [showPersonality, setShowPersonality] = useState(false);
   const [messages, setMessages] = useState([
     {
       from: 'coach' as const,
@@ -152,6 +154,20 @@ export default function CoachScreen() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
+  // ── Build system prompt from personality ─────────────────
+  const buildSystemPrompt = () => {
+    return `${activePersonality.tone}
+
+The user's name is ${firstName}.
+Their fitness goal is: ${(profile as any)?.goal ?? 'general fitness'}.
+Their current streak is: ${(profile as any)?.streak_count ?? 0} days.
+Current calorie goal: ${(profile as any)?.daily_calorie_goal ?? 2000} kcal/day.
+
+Always be helpful, safe, and never recommend anything dangerous.
+Keep responses concise and actionable. Max 3 sentences unless the user asks for more detail.`;
+  };
+
+  // ── Send message ─────────────────────────────────────────
   const sendMessage = async () => {
     if (!input.trim()) return;
 
@@ -164,29 +180,63 @@ export default function CoachScreen() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = input.trim();
     setInput('');
     setIsTyping(true);
 
-    // Scroll to bottom
     setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
-    // Simulate coach response — we'll replace this with real Claude API in Phase 3
-    setTimeout(() => {
+    try {
+      // Build conversation history for Claude
+      const conversationHistory = messages.map((m) => ({
+        role: m.from === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      }));
+      conversationHistory.push({ role: 'user', content: userInput });
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: buildSystemPrompt(),
+          messages: conversationHistory,
+        }),
+      });
+
+      const data = await response.json();
+      const replyText =
+        data?.content?.[0]?.text ??
+        "I'm here to help! Could you rephrase that question?";
+
       const coachReply = {
         from: 'coach' as const,
-        text: "Great question! I'm analysing your data now. Based on your current macros and activity level, here's what I recommend...",
+        text: replyText,
+        time: new Date().toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit',
+        }),
+      };
+
+      setMessages((prev) => [...prev, coachReply]);
+    } catch (error) {
+      // Fallback response when API key is not yet connected
+      const coachReply = {
+        from: 'coach' as const,
+        text: "I'm analysing your data now. Based on your current progress, you're doing great — keep it consistent!",
         time: new Date().toLocaleTimeString('en-US', {
           hour: 'numeric', minute: '2-digit',
         }),
       };
       setMessages((prev) => [...prev, coachReply]);
+    } finally {
       setIsTyping(false);
       setTimeout(() => {
         scrollRef.current?.scrollToEnd({ animated: true });
       }, 100);
-    }, 1500);
+    }
   };
 
   const handleChipSelect = (text: string) => {
@@ -194,40 +244,54 @@ export default function CoachScreen() {
   };
 
   return (
-
-
-<AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-       <KeyboardAvoidingView
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+      <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={120}
       >
-        {/* COACH HEADER */}
+        {/* ── COACH HEADER ─────────────────────────────────── */}
         <View style={[styles.coachHeader, {
-          backgroundColor: theme.surface,
+          backgroundColor: theme.bg,
           borderBottomColor: theme.border,
         }]}>
+          {/* Avatar */}
           <View style={[styles.coachAvatar, {
             backgroundColor: theme.accentDim as string,
             borderColor: theme.accent,
           }]}>
             <Text style={[styles.coachAvatarText, { color: theme.accent }]}>C</Text>
           </View>
+
+          {/* Name + sub */}
           <View style={styles.coachInfo}>
             <Text style={[styles.coachName, { color: theme.textPrimary }]}>
               CalFit Coach
             </Text>
             <Text style={[styles.coachSub, { color: theme.textSecondary }]}>
-              Personalised to you · Always on
+              {activePersonality.name} · {activePersonality.emoji}
             </Text>
           </View>
+
+          {/* Online badge */}
           <View style={styles.onlineBadge}>
             <View style={[styles.onlineDot, { backgroundColor: theme.accent }]} />
             <Text style={[styles.onlineText, { color: theme.accent }]}>Online</Text>
           </View>
+
+          {/* ── Personality button ──────────────────────────── */}
+          <TouchableOpacity
+            onPress={() => setShowPersonality(true)}
+            style={[styles.personalityBtn, {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            }]}
+          >
+            <Text style={styles.personalityEmoji}>{activePersonality.emoji}</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* MESSAGES */}
+        {/* ── MESSAGES ─────────────────────────────────────── */}
         <ScrollView
           ref={scrollRef}
           style={styles.messagesScroll}
@@ -237,15 +301,12 @@ export default function CoachScreen() {
             scrollRef.current?.scrollToEnd({ animated: false })
           }
         >
-          {/* Weekly nudge */}
           <WeeklyNudge theme={theme} />
 
-          {/* Messages */}
           {messages.map((msg, i) => (
             <MessageBubble key={i} message={msg} theme={theme} />
           ))}
 
-          {/* Typing indicator */}
           {isTyping && (
             <View style={[styles.bubbleWrap, { alignItems: 'flex-start' }]}>
               <View style={[styles.bubble, {
@@ -254,21 +315,19 @@ export default function CoachScreen() {
                 borderWidth: 1,
               }]}>
                 <Text style={[styles.bubbleText, { color: theme.textMuted }]}>
-                  Coach is typing...
+                  {activePersonality.emoji} Coach is typing...
                 </Text>
               </View>
             </View>
           )}
         </ScrollView>
 
-        {/* QUICK CHIPS */}
-        <View style={{ backgroundColor: 'transparent' }}>
-          <QuickChips theme={theme} onSelect={handleChipSelect} />
-        </View>
+        {/* ── QUICK CHIPS ──────────────────────────────────── */}
+        <QuickChips theme={theme} onSelect={handleChipSelect} />
 
-        {/* INPUT BAR */}
+        {/* ── INPUT BAR ────────────────────────────────────── */}
         <View style={[styles.inputBar, {
-          backgroundColor: theme.surface,
+          backgroundColor: theme.bg,
           borderTopColor: theme.border,
         }]}>
           <View style={[styles.inputField, {
@@ -290,13 +349,94 @@ export default function CoachScreen() {
           </View>
           <TouchableOpacity
             onPress={sendMessage}
-            style={[styles.sendBtn, { backgroundColor: theme.accent }]}
+            disabled={!input.trim()}
+            style={[styles.sendBtn, {
+              backgroundColor: input.trim() ? theme.accent : theme.border,
+            }]}
           >
-            <Text style={styles.sendBtnText}>→</Text>
+            <Text style={[styles.sendBtnText, {
+              color: input.trim() ? theme.bg : theme.textMuted,
+            }]}>→</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-</AndroidSafeView>
+
+      {/* ── PERSONALITY SELECTOR MODAL ────────────────────── */}
+      <Modal
+        visible={showPersonality}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPersonality(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalDismiss}
+            onPress={() => setShowPersonality(false)}
+          />
+          <View style={[styles.modalSheet, {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }]}>
+            {/* Sheet header */}
+            <View style={[styles.modalSheetHeader, {
+              borderBottomColor: theme.border,
+            }]}>
+              <Text style={[styles.modalSheetTitle, { color: theme.textPrimary }]}>
+                Coach Personality
+              </Text>
+              <TouchableOpacity onPress={() => setShowPersonality(false)}>
+                <Text style={[styles.modalSheetClose, { color: theme.textMuted }]}>
+                  Done
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalSheetContent}
+            >
+              <Text style={[styles.modalSheetSub, { color: theme.textMuted }]}>
+                Choose how your CalFit Coach speaks to you. Takes effect on your next message.
+              </Text>
+
+              {PERSONALITIES.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  onPress={() => {
+                    setCoachPersonality(p.id as any);
+                    setShowPersonality(false);
+                  }}
+                  style={[styles.personalityCard, {
+                    backgroundColor: coachPersonality === p.id
+                      ? p.color + '18'
+                      : theme.bg,
+                    borderColor: coachPersonality === p.id
+                      ? p.color
+                      : theme.border,
+                    borderWidth: coachPersonality === p.id ? 2 : 1,
+                  }]}
+                >
+                  <Text style={styles.personalityCardEmoji}>{p.emoji}</Text>
+                  <View style={styles.personalityCardInfo}>
+                    <Text style={[styles.personalityCardName, {
+                      color: coachPersonality === p.id ? p.color : theme.textPrimary,
+                    }]}>
+                      {p.name}
+                    </Text>
+                    <Text style={[styles.personalityCardDesc, { color: theme.textMuted }]}>
+                      {p.description}
+                    </Text>
+                  </View>
+                  {coachPersonality === p.id && (
+                    <Text style={[styles.personalityCheck, { color: p.color }]}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </AndroidSafeView>
   );
 }
 
@@ -311,24 +451,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     borderBottomWidth: 1,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   coachAvatar: {
     width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 2, flexShrink: 0,
   },
   coachAvatarText: { fontSize: fontSize.xl, fontWeight: '700' },
   coachInfo: { flex: 1 },
-  coachName: { fontSize: fontSize.lg, fontWeight: '700' },
-  coachSub: { fontSize: fontSize.sm, marginTop: 2 },
+  coachName: { fontSize: fontSize.base, fontWeight: '700' },
+  coachSub: { fontSize: fontSize.xs, marginTop: 2 },
   onlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   onlineDot: { width: 7, height: 7, borderRadius: 4 },
   onlineText: { fontSize: fontSize.sm, fontWeight: '600' },
 
+  // Personality button in header
+  personalityBtn: {
+    width: 38, height: 38,
+    borderRadius: radius.md,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, flexShrink: 0,
+  },
+  personalityEmoji: { fontSize: 20 },
+
   // Messages
-  messagesScroll: { flex: 1, minHeight: 0,},
-  messagesContent: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl, flexGrow: 1,},
+  messagesScroll: { flex: 1, minHeight: 0 },
+  messagesContent: {
+    padding: spacing.lg,
+    gap: spacing.md,
+    paddingBottom: spacing.xl,
+    flexGrow: 1,
+  },
 
   // Nudge card
   nudgeCard: {
@@ -356,8 +510,8 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: fontSize.base, lineHeight: 20 },
   bubbleTime: { fontSize: fontSize.xs, marginTop: 2 },
 
-// Chips
-chipsRow: {
+  // Chips
+  chipsRow: {
     paddingHorizontal: spacing.lg,
     paddingVertical: 6,
     gap: spacing.sm,
@@ -370,10 +524,7 @@ chipsRow: {
     height: 28,
     justifyContent: 'center',
   },
-  chipText: {
-    fontSize: fontSize.xs,
-    fontWeight: '500',
-  },
+  chipText: { fontSize: fontSize.xs, fontWeight: '500' },
 
   // Input bar
   inputBar: {
@@ -383,7 +534,6 @@ chipsRow: {
     gap: spacing.sm,
     borderTopWidth: 1,
     alignItems: 'center',
-    backgroundColor: 'transparent',
   },
   inputField: {
     flex: 1,
@@ -394,7 +544,7 @@ chipsRow: {
     borderRadius: radius.md,
     borderWidth: 1,
     gap: spacing.sm,
-    height: 48,
+    minHeight: 48,
   },
   inputText: { flex: 1, fontSize: fontSize.base, maxHeight: 100 },
   micIcon: { fontSize: 20 },
@@ -403,5 +553,50 @@ chipsRow: {
     borderRadius: radius.md,
     alignItems: 'center', justifyContent: 'center',
   },
-  sendBtnText: { fontSize: fontSize.xxl, fontWeight: '700', color: '#0C0D10' },
+  sendBtnText: { fontSize: fontSize.xxl, fontWeight: '700' },
+
+  // Personality modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalDismiss: { flex: 1 },
+  modalSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    maxHeight: '80%',
+  },
+  modalSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+  },
+  modalSheetTitle: { fontSize: fontSize.lg, fontWeight: '700' },
+  modalSheetClose: { fontSize: fontSize.base, fontWeight: '600' },
+  modalSheetContent: {
+    padding: spacing.lg,
+    gap: spacing.sm,
+    paddingBottom: 48,
+  },
+  modalSheetSub: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.xs },
+
+  // Personality cards inside modal
+  personalityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+  },
+  personalityCardEmoji: { fontSize: 28, width: 40, textAlign: 'center' },
+  personalityCardInfo: { flex: 1 },
+  personalityCardName: { fontSize: fontSize.base, fontWeight: '700' },
+  personalityCardDesc: { fontSize: fontSize.sm, marginTop: 2, lineHeight: 18 },
+  personalityCheck: { fontSize: fontSize.xl, fontWeight: '800', flexShrink: 0 },
 });

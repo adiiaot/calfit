@@ -3,10 +3,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   loadMyGroups,
   loadDiscoverGroups,
+  createGroup,
   joinGroup,
   leaveGroup,
   deleteGroup,
-  createGroup,
   getOwnedGroupCount,
   GroupData,
 } from '../services/groupService';
@@ -17,21 +17,22 @@ export function useGroup(userId: string, userTier: string) {
   const [ownedCount, setOwnedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  const getGroupLimit = () => {
-    if (userTier === 'premium') return Infinity;
+  const getGroupLimit = (): number => {
+    if (userTier === 'premium') return 999;
     if (userTier === 'pro') return 5;
     return 1;
   };
 
-  const canCreate = ownedCount < getGroupLimit();
+  const groupLimit = getGroupLimit();
+  const canCreate = ownedCount < groupLimit;
 
   useFocusEffect(
     useCallback(() => {
-      if (userId) load();
+      if (userId) reload();
     }, [userId])
   );
 
-  const load = async () => {
+  const reload = async () => {
     setIsLoading(true);
     const [mine, discover, count] = await Promise.all([
       loadMyGroups(userId),
@@ -68,14 +69,9 @@ export function useGroup(userId: string, userTier: string) {
     await joinGroup(userId, groupId);
     const group = discoverGroups.find((g) => g.id === groupId);
     if (group) {
-      setMyGroups((prev) => [
-        ...prev,
-        { ...group, is_joined: true },
-      ]);
+      setMyGroups((prev) => [...prev, { ...group, is_joined: true }]);
       setDiscoverGroups((prev) =>
-        prev.map((g) =>
-          g.id === groupId ? { ...g, is_joined: true } : g
-        )
+        prev.map((g) => g.id === groupId ? { ...g, is_joined: true } : g)
       );
     }
   };
@@ -84,17 +80,17 @@ export function useGroup(userId: string, userTier: string) {
     await leaveGroup(userId, groupId);
     setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
     setDiscoverGroups((prev) =>
-      prev.map((g) =>
-        g.id === groupId ? { ...g, is_joined: false } : g
-      )
+      prev.map((g) => g.id === groupId ? { ...g, is_joined: false } : g)
     );
   };
 
-  const remove = async (groupId: string) => {
-    await deleteGroup(groupId);
-    setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
-    setDiscoverGroups((prev) => prev.filter((g) => g.id !== groupId));
-    setOwnedCount((prev) => Math.max(0, prev - 1));
+  const remove = async (groupId: string): Promise<{ success: boolean; error?: string }> => {
+    const result = await deleteGroup(userId, groupId);
+    if (result.success) {
+      setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
+      setOwnedCount((prev) => Math.max(prev - 1, 0));
+    }
+    return result;
   };
 
   return {
@@ -102,12 +98,12 @@ export function useGroup(userId: string, userTier: string) {
     discoverGroups,
     canCreate,
     ownedCount,
-    groupLimit: getGroupLimit(),
+    groupLimit,
     isLoading,
     create,
     join,
     leave,
     remove,
-    reload: load,
+    reload,
   };
 }

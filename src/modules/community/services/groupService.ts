@@ -13,6 +13,7 @@ export interface GroupData {
   is_owner?: boolean;
 }
 
+// ── CREATE GROUP ──────────────────────────────────────────────
 export const createGroup = async (
   userId: string,
   name: string,
@@ -38,6 +39,7 @@ export const createGroup = async (
   return data as any;
 };
 
+// ── LOAD MY GROUPS ────────────────────────────────────────────
 export const loadMyGroups = async (userId: string): Promise<GroupData[]> => {
   const { data, error } = await supabase
     .from('group_members')
@@ -53,14 +55,17 @@ export const loadMyGroups = async (userId: string): Promise<GroupData[]> => {
 
   if (error || !data) return [];
 
-  return (data as any[]).map((item) => ({
-    ...item.groups,
-    emoji: getEmojiForCategory(item.groups?.category),
-    is_joined: true,
-    is_owner: item.role === 'creator',
-  }));
+  return (data as any[])
+    .filter((item) => item.groups !== null)
+    .map((item) => ({
+      ...item.groups,
+      emoji: getEmojiForCategory(item.groups?.category),
+      is_joined: true,
+      is_owner: item.role === 'creator',
+    }));
 };
 
+// ── LOAD DISCOVER GROUPS ──────────────────────────────────────
 export const loadDiscoverGroups = async (userId: string): Promise<GroupData[]> => {
   const { data, error } = await supabase
     .from('groups')
@@ -87,23 +92,36 @@ export const loadDiscoverGroups = async (userId: string): Promise<GroupData[]> =
   }));
 };
 
+// ── JOIN GROUP ────────────────────────────────────────────────
 export const joinGroup = async (
   userId: string,
   groupId: string
 ): Promise<boolean> => {
-  const { error } = await supabase
+  // Add member record
+  const { error: memberError } = await supabase
     .from('group_members')
     .insert({ user_id: userId, group_id: groupId, role: 'member' });
 
-  if (!error) {
-    await supabase
-      .from('groups')
-      .update({ member_count: supabase.rpc('increment_group_members', { gid: groupId }) })
-      .eq('id', groupId);
+  if (memberError) {
+    console.error('joinGroup error:', memberError.message);
+    return false;
   }
-  return !error;
+
+  // Increment member count directly
+  const { error: countError } = await supabase.rpc(
+    'increment_group_member_count',
+    { gid: groupId }
+  );
+
+  if (countError) {
+    // Non-critical — log but don't fail the join
+    console.warn('increment member count error:', countError.message);
+  }
+
+  return true;
 };
 
+// ── LEAVE GROUP ───────────────────────────────────────────────
 export const leaveGroup = async (
   userId: string,
   groupId: string
@@ -113,17 +131,63 @@ export const leaveGroup = async (
     .delete()
     .eq('user_id', userId)
     .eq('group_id', groupId);
-  return !error;
+
+  if (error) {
+    console.error('leaveGroup error:', error.message);
+    return false;
+  }
+
+  // Decrement member count
+  await supabase.rpc('decrement_group_member_count', { gid: groupId });
+
+  return true;
 };
 
-export const deleteGroup = async (groupId: string): Promise<boolean> => {
+// ── DELETE GROUP ──────────────────────────────────────────────
+// The creator_id RLS policy requires the user to be authenticated
+// and the row's creator_id must match auth.uid().
+// Passing userId here ensures the correct session is active.
+export const deleteGroup = async (
+  userId: string,
+  groupId: string
+): Promise<{ success: boolean; error?: string }> => {
+  // First verify this user is actually the creator
+  const { data: group, error: fetchError } = await supabase
+    .from('groups')
+    .select('creator_id')
+    .eq('id', groupId)
+    .single();
+
+  if (fetchError || !group) {
+    return { success: false, error: 'Group not found.' };
+  }
+
+  if (group.creator_id !== userId) {
+    return { success: false, error: 'Only the group creator can delete this group.' };
+  }
+
+  // Delete all members first (cascade may handle this but being explicit)
+  await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId);
+
+  // Delete the group
   const { error } = await supabase
     .from('groups')
     .delete()
-    .eq('id', groupId);
-  return !error;
+    .eq('id', groupId)
+    .eq('creator_id', userId); // Double-lock: matches RLS policy
+
+  if (error) {
+    console.error('deleteGroup error:', error.message);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
 };
 
+// ── GET OWNED GROUP COUNT ─────────────────────────────────────
 export const getOwnedGroupCount = async (userId: string): Promise<number> => {
   const { count } = await supabase
     .from('groups')
@@ -132,6 +196,7 @@ export const getOwnedGroupCount = async (userId: string): Promise<number> => {
   return count ?? 0;
 };
 
+// ── EMOJI MAP ─────────────────────────────────────────────────
 const getEmojiForCategory = (category: string): string => {
   const map: Record<string, string> = {
     Fitness: '💪',

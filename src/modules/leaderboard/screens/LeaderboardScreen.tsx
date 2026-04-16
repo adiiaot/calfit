@@ -48,9 +48,9 @@ export default function LeaderboardScreen() {
   const myEntry = entries.find((e) => e.isCurrentUser);
 
   return (
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-              {/* Header */}
+
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -62,7 +62,7 @@ export default function LeaderboardScreen() {
         <View style={{ width: 26 }} />
       </View>
 
-      {/* Tab toggle */}
+      {/* Global / Friends tab toggle */}
       <View style={[styles.tabToggle, {
         backgroundColor: theme.card,
         borderColor: theme.border,
@@ -85,7 +85,7 @@ export default function LeaderboardScreen() {
         ))}
       </View>
 
-      {/* Category selector */}
+      {/* Category selector — fixed height pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -147,7 +147,6 @@ export default function LeaderboardScreen() {
             />
           }
         >
-          {/* My rank card */}
           {myEntry && (
             <MyRankCard
               theme={theme}
@@ -194,6 +193,7 @@ export default function LeaderboardScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: { paddingBottom: 100, paddingTop: spacing.sm },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,6 +202,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   title: { fontSize: fontSize.lg, fontWeight: '700' },
+
+  // Global / Friends toggle
   tabToggle: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
@@ -218,21 +220,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabBtnText: { fontSize: fontSize.base },
+
+  // Category pills — fixed height so they never go cylinder-shaped
   categoryRow: {
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     gap: spacing.xs,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   catBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
+    height: 34,           // fixed height — kills the cylinder issue
+    borderRadius: radius.md, // md not full — proper pill shape not oval
     borderWidth: 1,
   },
   catBtnText: { fontSize: fontSize.sm },
+
   resetNotice: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -9,7 +9,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef } from 'react';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
@@ -111,6 +111,7 @@ export default function CoachScreen() {
   const { user, profile, coachPersonality, setCoachPersonality } = useAuthStore();
   const theme = colors[colorScheme];
   const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'there';
   const activePersonality =
@@ -165,7 +166,9 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
     const userMessage = {
       from: 'user' as const,
       text: input.trim(),
-      time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      time: new Date().toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit',
+      }),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -194,18 +197,24 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
       });
 
       const data = await response.json();
-      const replyText = data?.content?.[0]?.text ?? "I'm here to help! Could you rephrase that?";
+      const replyText =
+        data?.content?.[0]?.text ??
+        "I'm here to help! Could you rephrase that?";
 
       setMessages((prev) => [...prev, {
         from: 'coach' as const,
         text: replyText,
-        time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        time: new Date().toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit',
+        }),
       }]);
     } catch {
       setMessages((prev) => [...prev, {
         from: 'coach' as const,
         text: "I'm analysing your data now. Based on your current progress, you're doing great — keep it consistent!",
-        time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        time: new Date().toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit',
+        }),
       }]);
     } finally {
       setIsTyping(false);
@@ -214,14 +223,17 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
   };
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      {/* KeyboardAvoidingView with corrected offset — 0 on iOS lets SafeAreaView handle it */}
+    // Plain View as root — no SafeAreaView, no AndroidSafeView
+    // We handle insets manually so KeyboardAvoidingView gets the full screen
+    <View style={[styles.safe, {
+      backgroundColor: theme.bg,
+      paddingTop: insets.top,
+    }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 20}
       >
-
         {/* COACH HEADER */}
         <View style={[styles.coachHeader, {
           backgroundColor: theme.bg,
@@ -234,7 +246,9 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
             <Text style={[styles.coachAvatarText, { color: theme.accent }]}>C</Text>
           </View>
           <View style={styles.coachInfo}>
-            <Text style={[styles.coachName, { color: theme.textPrimary }]}>CalFit Coach</Text>
+            <Text style={[styles.coachName, { color: theme.textPrimary }]}>
+              CalFit Coach
+            </Text>
             <Text style={[styles.coachSub, { color: theme.textSecondary }]}>
               {activePersonality.name} · {activePersonality.emoji}
             </Text>
@@ -254,7 +268,7 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
           </TouchableOpacity>
         </View>
 
-        {/* MESSAGES — flex: 1 ensures it fills all space between header and input */}
+        {/* MESSAGES */}
         <ScrollView
           ref={scrollRef}
           style={styles.messagesScroll}
@@ -292,6 +306,7 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
         <View style={[styles.inputBar, {
           backgroundColor: theme.bg,
           borderTopColor: theme.border,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : spacing.sm,
         }]}>
           <View style={[styles.inputField, {
             backgroundColor: theme.card,
@@ -340,12 +355,16 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
             backgroundColor: theme.card,
             borderColor: theme.border,
           }]}>
-            <View style={[styles.modalSheetHeader, { borderBottomColor: theme.border }]}>
+            <View style={[styles.modalSheetHeader, {
+              borderBottomColor: theme.border,
+            }]}>
               <Text style={[styles.modalSheetTitle, { color: theme.textPrimary }]}>
                 Coach Personality
               </Text>
               <TouchableOpacity onPress={() => setShowPersonality(false)}>
-                <Text style={[styles.modalSheetClose, { color: theme.textMuted }]}>Done</Text>
+                <Text style={[styles.modalSheetClose, { color: theme.textMuted }]}>
+                  Done
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -365,24 +384,34 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
                     setShowPersonality(false);
                   }}
                   style={[styles.personalityCard, {
-                    backgroundColor: coachPersonality === p.id ? p.color + '18' : theme.bg,
-                    borderColor: coachPersonality === p.id ? p.color : theme.border,
+                    backgroundColor: coachPersonality === p.id
+                      ? p.color + '18'
+                      : theme.bg,
+                    borderColor: coachPersonality === p.id
+                      ? p.color
+                      : theme.border,
                     borderWidth: coachPersonality === p.id ? 2 : 1,
                   }]}
                 >
                   <Text style={styles.personalityCardEmoji}>{p.emoji}</Text>
                   <View style={styles.personalityCardInfo}>
                     <Text style={[styles.personalityCardName, {
-                      color: coachPersonality === p.id ? p.color : theme.textPrimary,
+                      color: coachPersonality === p.id
+                        ? p.color
+                        : theme.textPrimary,
                     }]}>
                       {p.name}
                     </Text>
-                    <Text style={[styles.personalityCardDesc, { color: theme.textMuted }]}>
+                    <Text style={[styles.personalityCardDesc, {
+                      color: theme.textMuted,
+                    }]}>
                       {p.description}
                     </Text>
                   </View>
                   {coachPersonality === p.id && (
-                    <Text style={[styles.personalityCheck, { color: p.color }]}>✓</Text>
+                    <Text style={[styles.personalityCheck, { color: p.color }]}>
+                      ✓
+                    </Text>
                   )}
                 </TouchableOpacity>
               ))}
@@ -390,15 +419,18 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
           </View>
         </View>
       </Modal>
-    </AndroidSafeView>
+    </View>
   );
 }
 
 // ── STYLES ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  // Root is a plain View — insets applied manually above
+  safe: {
+    flex: 1,
+  },
 
-  // KeyboardAvoidingView must be flex: 1 with column direction
+  // KeyboardAvoidingView fills everything under the safe area padding
   flex: {
     flex: 1,
     flexDirection: 'column',
@@ -432,7 +464,7 @@ const styles = StyleSheet.create({
   },
   personalityEmoji: { fontSize: 20 },
 
-  // Messages scroll — flex: 1 fills all remaining vertical space
+  // Messages — flex: 1 is the key, it fills ALL space between header and input
   messagesScroll: {
     flex: 1,
   },
@@ -469,7 +501,7 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: fontSize.base, lineHeight: 20 },
   bubbleTime: { fontSize: fontSize.xs, marginTop: 2 },
 
-  // Chips — always visible above input bar
+  // Chips
   chipsRow: {
     paddingHorizontal: spacing.lg,
     paddingVertical: 6,
@@ -485,19 +517,19 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: fontSize.xs, fontWeight: '500' },
 
-  // Input bar — anchored to bottom
+  // Input bar
   inputBar: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
     gap: spacing.sm,
     borderTopWidth: 1,
-    alignItems: 'flex-end', // flex-end so multiline input grows upward
+    alignItems: 'flex-end',
   },
   inputField: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-end', // multiline grows upward from bottom
+    alignItems: 'flex-end',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.md,

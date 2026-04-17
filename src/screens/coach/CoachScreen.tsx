@@ -5,12 +5,13 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   Modal,
+  Keyboard,
+  KeyboardEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
@@ -112,6 +113,28 @@ export default function CoachScreen() {
   const theme = colors[colorScheme];
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
+
+  // Track keyboard height manually — more reliable than KeyboardAvoidingView
+  // inside a tab navigator on iOS
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e: KeyboardEvent) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const firstName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'there';
   const activePersonality =
@@ -222,124 +245,123 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
     }
   };
 
+  // Bottom padding — keyboard height when open, safe area inset when closed
+  const bottomPad = keyboardHeight > 0
+    ? keyboardHeight
+    : insets.bottom > 0 ? insets.bottom : spacing.sm;
+
   return (
-    // Plain View as root — no SafeAreaView, no AndroidSafeView
-    // We handle insets manually so KeyboardAvoidingView gets the full screen
     <View style={[styles.safe, {
       backgroundColor: theme.bg,
       paddingTop: insets.top,
+      paddingBottom: bottomPad,
     }]}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 20}
-      >
-        {/* COACH HEADER */}
-        <View style={[styles.coachHeader, {
-          backgroundColor: theme.bg,
-          borderBottomColor: theme.border,
+
+      {/* ── COACH HEADER ────────────────────────────────── */}
+      <View style={[styles.coachHeader, {
+        backgroundColor: theme.bg,
+        borderBottomColor: theme.border,
+      }]}>
+        <View style={[styles.coachAvatar, {
+          backgroundColor: theme.accentDim as string,
+          borderColor: theme.accent,
         }]}>
-          <View style={[styles.coachAvatar, {
-            backgroundColor: theme.accentDim as string,
-            borderColor: theme.accent,
-          }]}>
-            <Text style={[styles.coachAvatarText, { color: theme.accent }]}>C</Text>
-          </View>
-          <View style={styles.coachInfo}>
-            <Text style={[styles.coachName, { color: theme.textPrimary }]}>
-              CalFit Coach
-            </Text>
-            <Text style={[styles.coachSub, { color: theme.textSecondary }]}>
-              {activePersonality.name} · {activePersonality.emoji}
-            </Text>
-          </View>
-          <View style={styles.onlineBadge}>
-            <View style={[styles.onlineDot, { backgroundColor: theme.accent }]} />
-            <Text style={[styles.onlineText, { color: theme.accent }]}>Online</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setShowPersonality(true)}
-            style={[styles.personalityBtn, {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            }]}
-          >
-            <Text style={styles.personalityEmoji}>{activePersonality.emoji}</Text>
-          </TouchableOpacity>
+          <Text style={[styles.coachAvatarText, { color: theme.accent }]}>C</Text>
         </View>
-
-        {/* MESSAGES */}
-        <ScrollView
-          ref={scrollRef}
-          style={styles.messagesScroll}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() =>
-            scrollRef.current?.scrollToEnd({ animated: false })
-          }
-        >
-          <WeeklyNudge theme={theme} />
-
-          {messages.map((msg, i) => (
-            <MessageBubble key={i} message={msg} theme={theme} />
-          ))}
-
-          {isTyping && (
-            <View style={[styles.bubbleWrap, { alignItems: 'flex-start' }]}>
-              <View style={[styles.bubble, {
-                backgroundColor: theme.card,
-                borderColor: theme.border,
-                borderWidth: 1,
-              }]}>
-                <Text style={[styles.bubbleText, { color: theme.textMuted }]}>
-                  {activePersonality.emoji} Coach is typing...
-                </Text>
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* QUICK CHIPS */}
-        <QuickChips theme={theme} onSelect={setInput} />
-
-        {/* INPUT BAR */}
-        <View style={[styles.inputBar, {
-          backgroundColor: theme.bg,
-          borderTopColor: theme.border,
-          paddingBottom: insets.bottom > 0 ? insets.bottom : spacing.sm,
-        }]}>
-          <View style={[styles.inputField, {
+        <View style={styles.coachInfo}>
+          <Text style={[styles.coachName, { color: theme.textPrimary }]}>
+            CalFit Coach
+          </Text>
+          <Text style={[styles.coachSub, { color: theme.textSecondary }]}>
+            {activePersonality.name} · {activePersonality.emoji}
+          </Text>
+        </View>
+        <View style={styles.onlineBadge}>
+          <View style={[styles.onlineDot, { backgroundColor: theme.accent }]} />
+          <Text style={[styles.onlineText, { color: theme.accent }]}>Online</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => setShowPersonality(true)}
+          style={[styles.personalityBtn, {
             backgroundColor: theme.card,
             borderColor: theme.border,
-          }]}>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Ask your coach anything..."
-              placeholderTextColor={theme.textMuted}
-              style={[styles.inputText, { color: theme.textPrimary }]}
-              multiline
-              onSubmitEditing={sendMessage}
-            />
-            <TouchableOpacity>
-              <Text style={styles.micIcon}>🎤</Text>
-            </TouchableOpacity>
+          }]}
+        >
+          <Text style={styles.personalityEmoji}>{activePersonality.emoji}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── MESSAGES ────────────────────────────────────── */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.messagesScroll}
+        contentContainerStyle={styles.messagesContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() =>
+          scrollRef.current?.scrollToEnd({ animated: false })
+        }
+      >
+        <WeeklyNudge theme={theme} />
+
+        {messages.map((msg, i) => (
+          <MessageBubble key={i} message={msg} theme={theme} />
+        ))}
+
+        {isTyping && (
+          <View style={[styles.bubbleWrap, { alignItems: 'flex-start' }]}>
+            <View style={[styles.bubble, {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              borderWidth: 1,
+            }]}>
+              <Text style={[styles.bubbleText, { color: theme.textMuted }]}>
+                {activePersonality.emoji} Coach is typing...
+              </Text>
+            </View>
           </View>
-          <TouchableOpacity
-            onPress={sendMessage}
-            disabled={!input.trim()}
-            style={[styles.sendBtn, {
-              backgroundColor: input.trim() ? theme.accent : theme.border,
-            }]}
-          >
-            <Text style={[styles.sendBtnText, {
-              color: input.trim() ? theme.bg : theme.textMuted,
-            }]}>→</Text>
+        )}
+      </ScrollView>
+
+      {/* ── QUICK CHIPS ─────────────────────────────────── */}
+      <QuickChips theme={theme} onSelect={setInput} />
+
+      {/* ── INPUT BAR ───────────────────────────────────── */}
+      <View style={[styles.inputBar, {
+        backgroundColor: theme.bg,
+        borderTopColor: theme.border,
+      }]}>
+        <View style={[styles.inputField, {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }]}>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            placeholder="Ask your coach anything..."
+            placeholderTextColor={theme.textMuted}
+            style={[styles.inputText, { color: theme.textPrimary }]}
+            multiline
+            onSubmitEditing={sendMessage}
+          />
+          <TouchableOpacity>
+            <Text style={styles.micIcon}>🎤</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+        <TouchableOpacity
+          onPress={sendMessage}
+          disabled={!input.trim()}
+          style={[styles.sendBtn, {
+            backgroundColor: input.trim() ? theme.accent : theme.border,
+          }]}
+        >
+          <Text style={[styles.sendBtnText, {
+            color: input.trim() ? theme.bg : theme.textMuted,
+          }]}>→</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* PERSONALITY SELECTOR MODAL */}
+      {/* ── PERSONALITY SELECTOR MODAL ───────────────────── */}
       <Modal
         visible={showPersonality}
         transparent
@@ -425,15 +447,10 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
 
 // ── STYLES ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  // Root is a plain View — insets applied manually above
+  // Root plain View — no SafeAreaView, no KeyboardAvoidingView
+  // Insets applied manually via useSafeAreaInsets for predictable layout
   safe: {
     flex: 1,
-  },
-
-  // KeyboardAvoidingView fills everything under the safe area padding
-  flex: {
-    flex: 1,
-    flexDirection: 'column',
   },
 
   // Coach header
@@ -464,14 +481,14 @@ const styles = StyleSheet.create({
   },
   personalityEmoji: { fontSize: 20 },
 
-  // Messages — flex: 1 is the key, it fills ALL space between header and input
+  // Messages — flex: 1 fills ALL remaining space between header and input
   messagesScroll: {
     flex: 1,
   },
   messagesContent: {
     padding: spacing.lg,
     gap: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
     flexGrow: 1,
   },
 
@@ -517,11 +534,12 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: fontSize.xs, fontWeight: '500' },
 
-  // Input bar
+  // Input bar — sits directly above keyboard via paddingBottom on root
   inputBar: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
     gap: spacing.sm,
     borderTopWidth: 1,
     alignItems: 'flex-end',

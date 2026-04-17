@@ -9,7 +9,6 @@ import {
   Modal,
   Keyboard,
   KeyboardEvent,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
@@ -17,8 +16,6 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { PERSONALITIES } from './PersonalitySelector';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 // ── MESSAGE BUBBLE ───────────────────────────────────────────
 function MessageBubble({
@@ -125,7 +122,7 @@ export default function CoachScreen() {
 
     const showSub = Keyboard.addListener(showEvent, (e: KeyboardEvent) => {
       setKeyboardHeight(e.endCoordinates.height);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardHeight(0);
@@ -246,22 +243,13 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
     }
   };
 
-  // Tab bar height — standard iOS tab bar is 49px + bottom inset
-  const TAB_BAR_HEIGHT = 49 + insets.bottom;
-
-  // Total usable height = screen - status bar - tab bar - keyboard
-  const usableHeight = SCREEN_HEIGHT
-    - insets.top
-    - TAB_BAR_HEIGHT
-    - keyboardHeight;
-
   return (
     <View style={[styles.safe, {
       backgroundColor: theme.bg,
-      // Fix the container to exact usable height
-      // This is the key — height not flex — so there's no dead space
-      height: usableHeight,
-      marginTop: insets.top,
+      paddingTop: insets.top,
+      // KEY FIX: no paddingBottom on root — keyboard offset handled by
+      // marginBottom on the bottom container instead
+      marginBottom: keyboardHeight > 0 ? keyboardHeight : 0,
     }]}>
 
       {/* COACH HEADER */}
@@ -277,7 +265,7 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
         </View>
         <View style={styles.coachInfo}>
           <Text style={[styles.coachName, { color: theme.textPrimary }]}>
-            CalFit Coach
+            My CalFit Coach
           </Text>
           <Text style={[styles.coachSub, { color: theme.textSecondary }]}>
             {activePersonality.name} · {activePersonality.emoji}
@@ -330,42 +318,62 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
         )}
       </ScrollView>
 
-      {/* QUICK CHIPS */}
-      <QuickChips theme={theme} onSelect={setInput} />
-
-      {/* INPUT BAR */}
-      <View style={[styles.inputBar, {
+      {/* CHIPS + INPUT grouped together — no gap between them */}
+      <View style={[styles.bottomContainer, {
         backgroundColor: theme.bg,
         borderTopColor: theme.border,
       }]}>
-        <View style={[styles.inputField, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Ask your coach anything..."
-            placeholderTextColor={theme.textMuted}
-            style={[styles.inputText, { color: theme.textPrimary }]}
-            multiline
-            onSubmitEditing={sendMessage}
-          />
-          <TouchableOpacity>
-            <Text style={styles.micIcon}>🎤</Text>
+        {/* QUICK CHIPS */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          {['Plan my meals', 'Analyse my sleep', 'Start workout', 'My macros today'].map((chip) => (
+            <TouchableOpacity
+              key={chip}
+              onPress={() => setInput(chip)}
+              style={[styles.chip, {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+              }]}
+            >
+              <Text style={[styles.chipText, { color: theme.textSecondary }]}>{chip}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* INPUT BAR */}
+        <View style={styles.inputRow}>
+          <View style={[styles.inputField, {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }]}>
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder="Ask your coach anything..."
+              placeholderTextColor={theme.textMuted}
+              style={[styles.inputText, { color: theme.textPrimary }]}
+              multiline
+              onSubmitEditing={sendMessage}
+            />
+            <TouchableOpacity>
+              <Text style={styles.micIcon}>🎤</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            onPress={sendMessage}
+            disabled={!input.trim()}
+            style={[styles.sendBtn, {
+              backgroundColor: input.trim() ? theme.accent : theme.border,
+            }]}
+          >
+            <Text style={[styles.sendBtnText, {
+              color: input.trim() ? theme.bg : theme.textMuted,
+            }]}>→</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={sendMessage}
-          disabled={!input.trim()}
-          style={[styles.sendBtn, {
-            backgroundColor: input.trim() ? theme.accent : theme.border,
-          }]}
-        >
-          <Text style={[styles.sendBtnText, {
-            color: input.trim() ? theme.bg : theme.textMuted,
-          }]}>→</Text>
-        </TouchableOpacity>
       </View>
 
       {/* PERSONALITY SELECTOR MODAL */}
@@ -438,9 +446,7 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
                     </Text>
                   </View>
                   {coachPersonality === p.id && (
-                    <Text style={[styles.personalityCheck, { color: p.color }]}>
-                      ✓
-                    </Text>
+                    <Text style={[styles.personalityCheck, { color: p.color }]}>✓</Text>
                   )}
                 </TouchableOpacity>
               ))}
@@ -455,10 +461,7 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
 // ── STYLES ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: {
-    // height is set dynamically in the component — not flex
-    // This is what eliminates the dead space
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
+    flex: 1,
   },
 
   coachHeader: {
@@ -488,15 +491,14 @@ const styles = StyleSheet.create({
   },
   personalityEmoji: { fontSize: 20 },
 
-  // This flex: 1 works correctly because the parent has a fixed height
   messagesScroll: {
     flex: 1,
   },
   messagesContent: {
     padding: spacing.lg,
     gap: spacing.md,
-    paddingBottom: spacing.xl,
-    flexGrow: 1,
+    paddingBottom: spacing.md,
+    // No flexGrow — this was causing the stretch gap
   },
 
   nudgeCard: {
@@ -523,9 +525,17 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: fontSize.base, lineHeight: 20 },
   bubbleTime: { fontSize: fontSize.xs, marginTop: 2 },
 
+  // KEY FIX: chips and input bar are now ONE container — no gap possible
+  bottomContainer: {
+    borderTopWidth: 1,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+
   chipsRow: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: 6,
+    paddingBottom: spacing.xs,
+    paddingTop: 2,
     gap: spacing.sm,
   },
   chip: {
@@ -538,13 +548,11 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: fontSize.xs, fontWeight: '500' },
 
-  inputBar: {
+  inputRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.xs,
     gap: spacing.sm,
-    borderTopWidth: 1,
     alignItems: 'flex-end',
   },
   inputField: {

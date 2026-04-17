@@ -1,6 +1,6 @@
 # CalFit — AI-Powered Fitness & Nutrition App
 
-> **Contract Project** · Developed by [AOT](https://github.com/adiiaot) for BigCut LLC 
+> **Contract Project** · Developed by [AOT](https://github.com/adiiaot) for Fabs Development
 
 [![React Native](https://img.shields.io/badge/React_Native-0.74-61DAFB?style=flat&logo=react)](https://reactnative.dev)
 [![Expo](https://img.shields.io/badge/Expo-51-000020?style=flat&logo=expo)](https://expo.dev)

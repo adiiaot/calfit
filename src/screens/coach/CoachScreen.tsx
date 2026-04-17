@@ -9,6 +9,7 @@ import {
   Modal,
   Keyboard,
   KeyboardEvent,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
@@ -16,6 +17,8 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { PERSONALITIES } from './PersonalitySelector';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 // ── MESSAGE BUBBLE ───────────────────────────────────────────
 function MessageBubble({
@@ -114,8 +117,6 @@ export default function CoachScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
 
-  // Track keyboard height manually — more reliable than KeyboardAvoidingView
-  // inside a tab navigator on iOS
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
@@ -124,7 +125,7 @@ export default function CoachScreen() {
 
     const showSub = Keyboard.addListener(showEvent, (e: KeyboardEvent) => {
       setKeyboardHeight(e.endCoordinates.height);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardHeight(0);
@@ -245,19 +246,25 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
     }
   };
 
-  // Bottom padding — keyboard height when open, safe area inset when closed
-  const bottomPad = keyboardHeight > 0
-    ? keyboardHeight
-    : insets.bottom > 0 ? insets.bottom : spacing.sm;
+  // Tab bar height — standard iOS tab bar is 49px + bottom inset
+  const TAB_BAR_HEIGHT = 49 + insets.bottom;
+
+  // Total usable height = screen - status bar - tab bar - keyboard
+  const usableHeight = SCREEN_HEIGHT
+    - insets.top
+    - TAB_BAR_HEIGHT
+    - keyboardHeight;
 
   return (
     <View style={[styles.safe, {
       backgroundColor: theme.bg,
-      paddingTop: insets.top,
-      paddingBottom: bottomPad,
+      // Fix the container to exact usable height
+      // This is the key — height not flex — so there's no dead space
+      height: usableHeight,
+      marginTop: insets.top,
     }]}>
 
-      {/* ── COACH HEADER ────────────────────────────────── */}
+      {/* COACH HEADER */}
       <View style={[styles.coachHeader, {
         backgroundColor: theme.bg,
         borderBottomColor: theme.border,
@@ -291,7 +298,7 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
         </TouchableOpacity>
       </View>
 
-      {/* ── MESSAGES ────────────────────────────────────── */}
+      {/* MESSAGES */}
       <ScrollView
         ref={scrollRef}
         style={styles.messagesScroll}
@@ -323,10 +330,10 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
         )}
       </ScrollView>
 
-      {/* ── QUICK CHIPS ─────────────────────────────────── */}
+      {/* QUICK CHIPS */}
       <QuickChips theme={theme} onSelect={setInput} />
 
-      {/* ── INPUT BAR ───────────────────────────────────── */}
+      {/* INPUT BAR */}
       <View style={[styles.inputBar, {
         backgroundColor: theme.bg,
         borderTopColor: theme.border,
@@ -361,7 +368,7 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
         </TouchableOpacity>
       </View>
 
-      {/* ── PERSONALITY SELECTOR MODAL ───────────────────── */}
+      {/* PERSONALITY SELECTOR MODAL */}
       <Modal
         visible={showPersonality}
         transparent
@@ -447,13 +454,13 @@ Keep responses concise and actionable. Max 3 sentences unless the user asks for 
 
 // ── STYLES ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  // Root plain View — no SafeAreaView, no KeyboardAvoidingView
-  // Insets applied manually via useSafeAreaInsets for predictable layout
   safe: {
-    flex: 1,
+    // height is set dynamically in the component — not flex
+    // This is what eliminates the dead space
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
 
-  // Coach header
   coachHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -481,7 +488,7 @@ const styles = StyleSheet.create({
   },
   personalityEmoji: { fontSize: 20 },
 
-  // Messages — flex: 1 fills ALL remaining space between header and input
+  // This flex: 1 works correctly because the parent has a fixed height
   messagesScroll: {
     flex: 1,
   },
@@ -492,7 +499,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  // Nudge card
   nudgeCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -507,7 +513,6 @@ const styles = StyleSheet.create({
   nudgeBody: { fontSize: fontSize.sm, lineHeight: 18 },
   nudgeArrow: { fontSize: fontSize.xl, fontWeight: '700' },
 
-  // Bubbles
   bubbleWrap: { marginBottom: spacing.sm },
   bubble: {
     maxWidth: '80%',
@@ -518,7 +523,6 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: fontSize.base, lineHeight: 20 },
   bubbleTime: { fontSize: fontSize.xs, marginTop: 2 },
 
-  // Chips
   chipsRow: {
     paddingHorizontal: spacing.lg,
     paddingVertical: 6,
@@ -534,12 +538,11 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: fontSize.xs, fontWeight: '500' },
 
-  // Input bar — sits directly above keyboard via paddingBottom on root
   inputBar: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.sm,
     gap: spacing.sm,
     borderTopWidth: 1,
     alignItems: 'flex-end',
@@ -565,7 +568,6 @@ const styles = StyleSheet.create({
   },
   sendBtnText: { fontSize: fontSize.xxl, fontWeight: '700' },
 
-  // Personality modal
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

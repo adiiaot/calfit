@@ -244,20 +244,22 @@ export default function CalFitSocialScreen() {
               />
             ) : (
               posts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  theme={theme}
-                  onLike={handleLike}
-                  onComment={(p) => {
-                    setSelectedPost(p);
-                    setShowComments(true);
-                  }}
-                  onShare={handleShare}
-                  onProfilePress={(userId) =>
-                    navigation.navigate('Profile' as never, { userId } as never)
-                  }
-                />
+      <PostCard
+  key={post.id}
+  post={post}
+  theme={theme}
+  currentUserId={user?.id}        // ← must be here
+  currentUserName={name}          // ← must be here
+  onLike={handleLike}
+  onComment={(p) => {
+    setSelectedPost(p);
+    setShowComments(true);
+  }}
+  onShare={handleShare}
+  onProfilePress={(userId) =>
+    navigation.navigate('Profile' as never, { userId } as never)
+  }
+/>
               ))
             )}
           </>

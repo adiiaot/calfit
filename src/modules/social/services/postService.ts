@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabase';
+import { Share } from 'react-native';
 
 export interface PostData {
   id: string;
@@ -150,7 +151,6 @@ export const loadUserPosts = async (userId: string): Promise<PostData[]> => {
 };
 
 // ── SHARE POST ────────────────────────────────────────────────
-import { Share } from 'react-native';
 
 export const sharePost = async (post: PostData): Promise<void> => {
   try {

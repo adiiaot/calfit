@@ -1,7 +1,7 @@
 import {
   View, StyleSheet,
   ScrollView, TouchableOpacity, Text,
-  FlatList, Image, ActivityIndicator,
+  Image, ActivityIndicator,
   Dimensions,
 } from 'react-native';
 import { AndroidSafeView } from '../../shared/AndriodSafeView';
@@ -31,7 +31,7 @@ export default function ProfileScreen() {
 
   const [profileData, setProfileData] = useState<any>(null);
   const [posts, setPosts] = useState<PostData[]>([]);
-  const [following, setFollowing] = useState(false);
+  const [followingUser, setFollowingUser] = useState(false);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -43,6 +43,32 @@ export default function ProfileScreen() {
 
   const load = async () => {
     setIsLoading(true);
+
+    // ── If viewing own profile use Zustand data directly ──────
+    // This avoids stale data from Supabase and fixes the
+    // "CalFit User" name bug when profile wasn't fully synced
+    if (isCurrentUser && currentProfile) {
+      setProfileData({
+        id: user?.id,
+        full_name: currentProfile.full_name,
+        calfit_id: (currentProfile as any).calfit_id,
+        avatar_url: (currentProfile as any).avatar_url,
+        goal: (currentProfile as any).goal,
+        bio: (currentProfile as any).bio,
+        streak_count: (currentProfile as any).streak_count ?? 0,
+      });
+
+      const [postsRes, counts] = await Promise.all([
+        loadUserPosts(targetUserId),
+        getFollowCounts(targetUserId),
+      ]);
+      setPosts(postsRes);
+      setFollowCounts(counts);
+      setIsLoading(false);
+      return;
+    }
+
+    // ── Viewing someone else's profile — fetch from Supabase ──
     const [profileRes, postsRes, counts] = await Promise.all([
       supabase
         .from('profiles')
@@ -57,29 +83,24 @@ export default function ProfileScreen() {
     setPosts(postsRes);
     setFollowCounts(counts);
 
-    if (!isCurrentUser && user?.id) {
-      const following = await isFollowing(user.id, targetUserId);
-      setFollowing(following);
+    if (user?.id) {
+      const isF = await isFollowing(user.id, targetUserId);
+      setFollowingUser(isF);
     }
+
     setIsLoading(false);
   };
 
   const handleFollow = async () => {
     if (!user?.id) return;
-    if (following) {
+    if (followingUser) {
       await unfollowUser(user.id, targetUserId);
-      setFollowing(false);
-      setFollowCounts((prev) => ({
-        ...prev,
-        followers: prev.followers - 1,
-      }));
+      setFollowingUser(false);
+      setFollowCounts((prev) => ({ ...prev, followers: prev.followers - 1 }));
     } else {
       await followUser(user.id, targetUserId);
-      setFollowing(true);
-      setFollowCounts((prev) => ({
-        ...prev,
-        followers: prev.followers + 1,
-      }));
+      setFollowingUser(true);
+      setFollowCounts((prev) => ({ ...prev, followers: prev.followers + 1 }));
     }
   };
 
@@ -101,9 +122,8 @@ export default function ProfileScreen() {
 
   if (isLoading) {
     return (
-
       <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-                <View style={styles.loading}>
+        <View style={styles.loading}>
           <ActivityIndicator color={theme.accent} />
         </View>
       </AndroidSafeView>
@@ -112,7 +132,7 @@ export default function ProfileScreen() {
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-              <View style={styles.header}>
+      <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -138,7 +158,7 @@ export default function ProfileScreen() {
           postsCount={posts.length}
           streakCount={profileData?.streak_count ?? 0}
           isCurrentUser={isCurrentUser}
-          isFollowing={following}
+          isFollowing={followingUser}
           onFollowPress={handleFollow}
           onMessagePress={handleMessage}
           onEditPress={() => navigation.navigate('EditProfile')}

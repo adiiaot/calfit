@@ -20,6 +20,8 @@ const TYPE_CONFIG = (theme: typeof colors.dark) => ({
 interface Props {
   post: PostData;
   theme: typeof colors.dark;
+  currentUserId?: string;
+  currentUserName?: string;
   onLike: (postId: string, isLiked: boolean) => void;
   onComment: (post: PostData) => void;
   onShare: (post: PostData) => void;
@@ -29,12 +31,15 @@ interface Props {
 export function PostCard({
   post,
   theme,
+  currentUserId,
+  currentUserName,
   onLike,
   onComment,
   onShare,
   onProfilePress,
 }: Props) {
   const [showKudos, setShowKudos] = useState(false);
+  const [sentKudos, setSentKudos] = useState<string | null>(null);
   const config = TYPE_CONFIG(theme)[post.type];
 
   const timeAgo = (dateStr: string) => {
@@ -45,11 +50,37 @@ export function PostCard({
     return `${Math.floor(diff / 86400)}d ago`;
   };
 
+  const handleKudos = async (kudos: string) => {
+    // Update UI immediately
+    setSentKudos(kudos);
+    setShowKudos(false);
+
+    // Send notification to post owner
+    // Skip if reacting to your own post
+    if (!post.user_id) return;
+    if (currentUserId && currentUserId === post.user_id) return;
+
+    try {
+      const { notifyKudosReceived } = await import(
+        '../../../services/notificationService'
+      );
+      await notifyKudosReceived(
+        post.user_id,
+        currentUserName ?? 'Someone',
+        kudos,
+        post.content
+      );
+    } catch (error) {
+      console.error('kudos notification error:', error);
+    }
+  };
+
   return (
     <View style={[styles.card, {
       backgroundColor: theme.card,
       borderColor: theme.border,
     }]}>
+
       {/* Header */}
       <TouchableOpacity
         style={styles.header}
@@ -98,7 +129,19 @@ export function PostCard({
         />
       )}
 
-      {/* Kudos pills */}
+      {/* Kudos sent confirmation banner */}
+      {sentKudos && (
+        <View style={[styles.kudosSent, {
+          backgroundColor: theme.accentDim as string,
+          borderColor: theme.accent,
+        }]}>
+          <Text style={[styles.kudosSentText, { color: theme.accent }]}>
+            You reacted {sentKudos}
+          </Text>
+        </View>
+      )}
+
+      {/* Kudos pills row */}
       {showKudos && (
         <ScrollView
           horizontal
@@ -108,7 +151,7 @@ export function PostCard({
           {KUDOS.map((k) => (
             <TouchableOpacity
               key={k}
-              onPress={() => setShowKudos(false)}
+              onPress={() => handleKudos(k)}
               style={[styles.kudosPill, {
                 backgroundColor: theme.accentDim as string,
                 borderColor: theme.accent,
@@ -122,8 +165,9 @@ export function PostCard({
         </ScrollView>
       )}
 
-      {/* Actions */}
+      {/* Actions row */}
       <View style={[styles.actions, { borderTopColor: theme.border }]}>
+
         {/* Like */}
         <TouchableOpacity
           onPress={() => onLike(post.id, post.is_liked ?? false)}
@@ -150,16 +194,26 @@ export function PostCard({
           </Text>
         </TouchableOpacity>
 
-        {/* Kudos */}
+        {/* Kudos — turns accent when reacted */}
         <TouchableOpacity
-          onPress={() => setShowKudos(!showKudos)}
+          onPress={() => {
+            if (!sentKudos) setShowKudos(!showKudos);
+          }}
           style={styles.action}
         >
-          <Ionicons name="hand-right-outline" size={20} color={theme.textMuted} />
-          <Text style={[styles.actionLabel, { color: theme.textMuted }]}>Kudos</Text>
+          <Ionicons
+            name="hand-right-outline"
+            size={20}
+            color={sentKudos ? theme.accent : theme.textMuted}
+          />
+          <Text style={[styles.actionLabel, {
+            color: sentKudos ? theme.accent : theme.textMuted,
+          }]}>
+            {sentKudos ? sentKudos.split(' ')[0] : 'Kudos'}
+          </Text>
         </TouchableOpacity>
 
-        {/* Share — now calls onShare which opens native share sheet */}
+        {/* Share */}
         <TouchableOpacity
           onPress={() => onShare(post)}
           style={styles.action}
@@ -211,6 +265,16 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   image: { width: '100%', height: 240 },
+  kudosSent: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  kudosSentText: { fontSize: fontSize.xs, fontWeight: '700' },
   kudosRow: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,

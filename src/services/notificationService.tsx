@@ -229,4 +229,24 @@ export const checkAndSendStreakReminder = async (
     "You haven't checked in today. Tap to check in now and keep your streak alive.",
     'Check In'
   );
+  
+};
+export const notifyKudosReceived = async (
+  postOwnerId: string,
+  reactorName: string,
+  kudosType: string,
+  postContent: string
+): Promise<void> => {
+  // Don't notify if reacting to your own post
+  const preview = postContent.length > 40
+    ? postContent.slice(0, 40) + '...'
+    : postContent;
+
+  await sendNotification(
+    postOwnerId,
+    'social',
+    `${reactorName} reacted to your post ${kudosType}`,
+    `"${preview}"`,
+    'View Post'
+  );
 };

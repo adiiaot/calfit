@@ -2,9 +2,9 @@ import {
   View, Text, StyleSheet,
   ScrollView, TouchableOpacity, RefreshControl,
 } from 'react-native';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { AndroidSafeView } from '../../shared/AndriodSafeView';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/authStore';
@@ -19,9 +19,7 @@ import { EmptyState } from '../../shared/EmptyState';
 import { useFeed } from '../hooks/useFeed';
 import { useFollow } from '../hooks/useFollow';
 import { usePost } from '../hooks/usePost';
-import { PostData } from '../services/postService';
-import { isFollowing as checkFollowing, followUser, unfollowUser } from '../services/followService';
-import { useState as useStateAlias } from 'react';
+import { PostData, sharePost } from '../services/postService';
 
 export default function SocialScreen() {
   const navigation = useNavigation<any>();
@@ -37,7 +35,7 @@ export default function SocialScreen() {
   const [discoverUsers, setDiscoverUsers] = useState<any[]>([]);
 
   const name = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const avatar = profile?.avatar_url ?? null;
+  const avatar = (profile as any)?.avatar_url ?? null;
 
   const { posts, isRefreshing, refresh, updatePost, prependPost } = useFeed(user?.id ?? '');
   const { toggle: toggleFollow } = useFollow(user?.id ?? '');
@@ -50,6 +48,39 @@ export default function SocialScreen() {
     moderationError,
     clearModerationError,
   } = usePost(user?.id ?? '');
+
+  // Load discover users on focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) loadDiscoverUsers();
+    }, [user?.id])
+  );
+
+  const loadDiscoverUsers = async () => {
+    if (!user?.id) return;
+    try {
+      const { supabase } = await import('../../../services/supabase');
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, calfit_id, avatar_url, goal')
+        .neq('id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (data) {
+        setDiscoverUsers((data as any[]).map((u) => ({
+          id: u.id,
+          name: u.full_name ?? 'CalFit User',
+          calfitId: u.calfit_id ?? u.id.slice(0, 8),
+          avatar: u.avatar_url ?? null,
+          goal: u.goal ?? '',
+          isFollowing: false,
+        })));
+      }
+    } catch (error) {
+      console.error('loadDiscoverUsers error:', error);
+    }
+  };
 
   const handlePost = async (content: string, type: PostData['type']) => {
     const newPost = await createPost(content, type, selectedImageUri ?? undefined);
@@ -86,9 +117,20 @@ export default function SocialScreen() {
     await toggleFollow(userId, currentlyFollowing);
   };
 
+  // ── Share post to WhatsApp, Instagram, TikTok etc ─────────
+  const handleShare = async (post: PostData) => {
+    await sharePost(post);
+  };
+
+  const handleRefresh = async () => {
+    await refresh();
+    await loadDiscoverUsers();
+  };
+
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-        {/* Header */}
+
+      {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Social</Text>
         <View style={styles.headerRight}>
@@ -101,6 +143,18 @@ export default function SocialScreen() {
           >
             <Ionicons name="people-outline" size={20} color={theme.textPrimary} />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Live')}
+            style={[styles.headerBtn, {
+              backgroundColor: (theme as any).red + '18',
+              borderColor: (theme as any).red,
+            }]}
+          >
+            <View style={styles.liveDot} />
+            <Ionicons name="radio-outline" size={20} color={(theme as any).red} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => navigation.navigate('Messages')}
             style={[styles.headerBtn, {
@@ -131,6 +185,9 @@ export default function SocialScreen() {
               fontWeight: activeTab === tab ? '700' : '400',
             }]}>
               {tab}
+              {tab === 'Discover' && discoverUsers.length > 0
+                ? ` (${discoverUsers.length})`
+                : ''}
             </Text>
           </TouchableOpacity>
         ))}
@@ -142,7 +199,7 @@ export default function SocialScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={refresh}
+            onRefresh={handleRefresh}
             tintColor={theme.accent}
             colors={[theme.accent]}
           />
@@ -184,11 +241,14 @@ export default function SocialScreen() {
                   key={post.id}
                   post={post}
                   theme={theme}
+                  currentUserId={user?.id}
+                  currentUserName={name}
                   onLike={handleLike}
                   onComment={(p) => {
                     setSelectedPost(p);
                     setShowComments(true);
                   }}
+                  onShare={handleShare}
                   onProfilePress={(userId) =>
                     navigation.navigate('Profile', { userId })
                   }
@@ -282,9 +342,19 @@ const styles = StyleSheet.create({
   title: { fontSize: fontSize.xxl, fontWeight: '800' },
   headerRight: { flexDirection: 'row', gap: spacing.sm },
   headerBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
+    flexDirection: 'row',
+  },
+  liveDot: {
+    width: 6, height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
+    position: 'absolute',
+    top: 6, right: 6,
   },
   tabToggle: {
     flexDirection: 'row',

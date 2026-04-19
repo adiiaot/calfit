@@ -1,6 +1,4 @@
 import { supabase } from '../../../services/supabase';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 
 export interface PostData {
   id: string;
@@ -152,40 +150,29 @@ export const loadUserPosts = async (userId: string): Promise<PostData[]> => {
 };
 
 // ── SHARE POST ────────────────────────────────────────────────
+import { Share } from 'react-native';
+
 export const sharePost = async (post: PostData): Promise<void> => {
   try {
-    const { Share } = await import('react-native');
-
     const authorName = post.profiles?.full_name ?? 'A CalFit member';
 
     let shareMessage = `${authorName} on CalFit:\n\n"${post.content}"`;
+
     if (post.type === 'workout') {
       shareMessage = `💪 ${authorName} just logged a workout on CalFit!\n\n"${post.content}"`;
     } else if (post.type === 'meal') {
       shareMessage = `🥗 ${authorName} shared a meal on CalFit!\n\n"${post.content}"`;
-    } else if (post.type === 'milestone') {
+    } else if (post.type === 'milestone') { 
       shareMessage = `🏆 ${authorName} hit a milestone on CalFit!\n\n"${post.content}"`;
     }
-    shareMessage += `\n\nJoin me on CalFit 👉 https://calfit.tech`;
 
-    if (post.image_url) {
-      // Share image using expo-sharing
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(post.image_url, {
-          dialogTitle: shareMessage,
-          mimeType: 'image/jpeg',
-          UTI: 'public.jpeg',
-        });
-      }
-    } else {
-      // Share text using React Native's built-in Share API
-      // No file system needed — works on both iOS and Android
-      await Share.share({
-        message: shareMessage,
-        title: 'Check this out on CalFit',
-      });
-    }
+    shareMessage += `\n\nJoin me on CalFit 👉 `;
+
+    await Share.share({
+      message: shareMessage,
+      title: 'Check this out on CalFit',
+      url: 'https://calfit.tech',
+    });
   } catch (error: any) {
     if (error?.message !== 'User did not share') {
       console.error('sharePost error:', error);

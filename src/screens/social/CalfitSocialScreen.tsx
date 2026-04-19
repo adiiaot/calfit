@@ -9,8 +9,8 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { PostData, sharePost } from '../../modules/social/services/postService';
 
-// ── Import all reusable module components ─────────────────────
 import { PostCard } from '../../modules/social/components/postCard';
 import { ComposeBox } from '../../modules/social/components/composeBox';
 import { CommentSheet } from '../../modules/social/components/commentSheet';
@@ -19,11 +19,9 @@ import { DiscoverUserCard } from '../../modules/social/components/discoverUserCa
 import { ImageUploadSheet } from '../../modules/social/components/imageuploadSheet';
 import { EmptyState } from '../../modules/shared/EmptyState';
 
-// ── Import all reusable module hooks ──────────────────────────
 import { useFeed } from '../../modules/social/hooks/useFeed';
 import { useFollow } from '../../modules/social/hooks/useFollow';
 import { usePost } from '../../modules/social/hooks/usePost';
-import { PostData } from '../../modules/social/services/postService';
 
 interface DiscoverUser {
   id: string;
@@ -134,18 +132,17 @@ export default function CalFitSocialScreen() {
     await loadDiscoverUsers();
   };
 
+  // ── Share post to WhatsApp, Instagram, TikTok etc ─────────
+  const handleShare = async (post: PostData) => {
+    await sharePost(post);
+  };
+
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
 
-      {/* ── CALFIT-SPECIFIC HEADER ────────────────────────────
-          This is what makes this screen CalFit-specific.
-          Community, Live, and Messages all accessible from here.
-          The module SocialScreen stays clean and reusable.       */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Social</Text>
         <View style={styles.headerRight}>
-
-          {/* Community */}
           <TouchableOpacity
             onPress={() => navigation.navigate('Community' as never)}
             style={[styles.headerBtn, {
@@ -156,7 +153,6 @@ export default function CalFitSocialScreen() {
             <Ionicons name="people-outline" size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          {/* Live */}
           <TouchableOpacity
             onPress={() => navigation.navigate('Live' as never)}
             style={[styles.headerBtn, {
@@ -168,7 +164,6 @@ export default function CalFitSocialScreen() {
             <Ionicons name="radio-outline" size={20} color={theme.red} />
           </TouchableOpacity>
 
-          {/* Messages */}
           <TouchableOpacity
             onPress={() => navigation.navigate('Messages' as never)}
             style={[styles.headerBtn, {
@@ -178,11 +173,9 @@ export default function CalFitSocialScreen() {
           >
             <Ionicons name="paper-plane-outline" size={20} color={theme.textPrimary} />
           </TouchableOpacity>
-
         </View>
       </View>
 
-      {/* Tab toggle */}
       <View style={[styles.tabToggle, {
         backgroundColor: theme.card,
         borderColor: theme.border,
@@ -220,7 +213,6 @@ export default function CalFitSocialScreen() {
           />
         }
       >
-        {/* Stories */}
         <StoryRow
           theme={theme}
           stories={[]}
@@ -261,6 +253,7 @@ export default function CalFitSocialScreen() {
                     setSelectedPost(p);
                     setShowComments(true);
                   }}
+                  onShare={handleShare}
                   onProfilePress={(userId) =>
                     navigation.navigate('Profile' as never, { userId } as never)
                   }
@@ -307,7 +300,6 @@ export default function CalFitSocialScreen() {
         )}
       </ScrollView>
 
-      {/* Comment Sheet */}
       <CommentSheet
         theme={theme}
         post={selectedPost}
@@ -321,7 +313,6 @@ export default function CalFitSocialScreen() {
         }}
       />
 
-      {/* Image Upload Sheet */}
       <ImageUploadSheet
         theme={theme}
         visible={showImageSheet}
@@ -345,7 +336,6 @@ export default function CalFitSocialScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',

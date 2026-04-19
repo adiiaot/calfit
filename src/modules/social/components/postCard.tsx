@@ -11,10 +11,10 @@ import { PostData } from '../services/postService';
 const KUDOS = ['🔥 Fire', '💪 Strong', '🎯 Goals', '🙌 Well done'];
 
 const TYPE_CONFIG = (theme: typeof colors.dark) => ({
-  workout:   { icon: 'barbell-outline',    color: theme.orange,        label: 'Workout' },
-  meal:      { icon: 'restaurant-outline', color: theme.accentSecond,  label: 'Meal' },
-  milestone: { icon: 'trophy-outline',     color: theme.gold,          label: 'Milestone' },
-  text:      { icon: 'chatbubble-outline', color: theme.textMuted,     label: 'Update' },
+  workout:   { icon: 'barbell-outline',    color: theme.orange,       label: 'Workout' },
+  meal:      { icon: 'restaurant-outline', color: theme.accentSecond, label: 'Meal' },
+  milestone: { icon: 'trophy-outline',     color: theme.gold,         label: 'Milestone' },
+  text:      { icon: 'chatbubble-outline', color: theme.textMuted,    label: 'Update' },
 });
 
 interface Props {
@@ -22,6 +22,7 @@ interface Props {
   theme: typeof colors.dark;
   onLike: (postId: string, isLiked: boolean) => void;
   onComment: (post: PostData) => void;
+  onShare: (post: PostData) => void;
   onProfilePress?: (userId: string) => void;
 }
 
@@ -30,6 +31,7 @@ export function PostCard({
   theme,
   onLike,
   onComment,
+  onShare,
   onProfilePress,
 }: Props) {
   const [showKudos, setShowKudos] = useState(false);
@@ -122,6 +124,7 @@ export function PostCard({
 
       {/* Actions */}
       <View style={[styles.actions, { borderTopColor: theme.border }]}>
+        {/* Like */}
         <TouchableOpacity
           onPress={() => onLike(post.id, post.is_liked ?? false)}
           style={styles.action}
@@ -136,6 +139,7 @@ export function PostCard({
           </Text>
         </TouchableOpacity>
 
+        {/* Comment */}
         <TouchableOpacity
           onPress={() => onComment(post)}
           style={styles.action}
@@ -146,6 +150,7 @@ export function PostCard({
           </Text>
         </TouchableOpacity>
 
+        {/* Kudos */}
         <TouchableOpacity
           onPress={() => setShowKudos(!showKudos)}
           style={styles.action}
@@ -154,7 +159,11 @@ export function PostCard({
           <Text style={[styles.actionLabel, { color: theme.textMuted }]}>Kudos</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.action}>
+        {/* Share — now calls onShare which opens native share sheet */}
+        <TouchableOpacity
+          onPress={() => onShare(post)}
+          style={styles.action}
+        >
           <Ionicons name="share-social-outline" size={20} color={theme.textMuted} />
           <Text style={[styles.actionLabel, { color: theme.textMuted }]}>Share</Text>
         </TouchableOpacity>

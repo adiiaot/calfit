@@ -15,9 +15,14 @@ import { useAuthStore } from './src/store/authStore';
 import { useThemeStore } from './src/store/themeStore';
 import { colors } from './src/theme';
 import AppNavigator from './src/navigation/AppNavigator';
+import {
+  initIAP,
+  endIAP,
+  setupPurchaseListeners,
+} from './src/services/iapService';
 
 export default function App() {
-  const { setSession } = useAuthStore();
+  const { setSession, user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
 
@@ -29,6 +34,7 @@ export default function App() {
     PlusJakartaSans_800ExtraBold,
   });
 
+  // ── Auth + streak check ───────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -67,6 +73,29 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // ── IAP listeners — only active when user is logged in ───
+  // Listens for successful Apple/Google purchases and
+  // automatically updates the user's subscription tier in Supabase
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let cleanupListeners: (() => void) | undefined;
+
+    const setupIAP = async () => {
+      const ready = await initIAP();
+      if (ready) {
+        cleanupListeners = setupPurchaseListeners(user.id);
+      }
+    };
+
+    setupIAP();
+
+    return () => {
+      cleanupListeners?.();
+      endIAP();
+    };
+  }, [user?.id]);
 
   if (!fontsLoaded) {
     return (

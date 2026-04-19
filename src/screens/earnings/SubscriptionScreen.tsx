@@ -5,35 +5,46 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import {
+  initIAP,
+  endIAP,
+  getSubscriptionProducts,
+  purchaseSubscription,
+  restorePurchases,
+  PRODUCT_IDS,
+} from '../../services/iapService';
 
-const PLANS = [
+const TIERS = [
   {
     id: 'free',
     name: 'Free',
     price: '$0',
     period: 'forever',
     color: '#6B7280',
-    description: 'Get started with the basics',
     features: [
       '5 AI Coach prompts per day',
       'Basic calorie tracking',
-      'Manual food logging',
+      '1 community group',
+      'Workout library access',
       'Step tracking',
-      'Ads shown',
+      'Ads shown in app',
     ],
     missing: [
-      'Food scanner (Claude Vision)',
-      'AI meal plans',
+      'Food scanner',
+      'AI Meal Planner',
       'Live streaming',
-      'Earnings wallet',
-      'Unlimited Coach prompts',
+      'Accountability partners',
+      'Referral earnings',
     ],
   },
   {
@@ -41,23 +52,20 @@ const PLANS = [
     name: 'Pro',
     price: '$9.99',
     period: 'per month',
-    color: '#F59E0B',
-    description: 'For serious fitness enthusiasts',
-    popular: true,
+    color: '#0DAE6C',
+    productId: PRODUCT_IDS.pro,
     features: [
       '20 AI Coach prompts per day',
-      'Food scanner (Claude Vision)',
-      'Manual meal planner',
+      'Food scanner (barcode + AI)',
+      'Up to 5 community groups',
+      'Accountability partners (up to 3)',
       'No ads',
-      'Accountability partner',
-      'Community groups',
-      'Advanced analytics',
       'Priority support',
     ],
     missing: [
+      'AI Meal Planner',
       'Live streaming',
-      'Earnings wallet',
-      'Unlimited Coach prompts',
+      'Referral earnings wallet',
     ],
   },
   {
@@ -65,140 +73,95 @@ const PLANS = [
     name: 'Premium',
     price: '$19.99',
     period: 'per month',
-    color: '#0DAE6C',
-    description: 'The full CalFit experience',
+    color: '#F59E0B',
+    productId: PRODUCT_IDS.premium,
+    badge: 'BEST VALUE',
     features: [
       'Unlimited AI Coach prompts',
-      'Food scanner (Claude Vision)',
-      'AI-generated meal plans',
+      'AI Meal Planner',
+      'Food scanner (barcode + AI)',
       'Live streaming access',
-      'Earnings & referral wallet',
-      'No ads ever',
-      'All Pro features included',
-      'Early access to new features',
-      'Priority 1-on-1 support',
+      'Unlimited community groups',
+      'Accountability partners (up to 3)',
+      'Referral earnings wallet',
+      'No ads',
+      'Priority support',
     ],
     missing: [],
   },
 ];
 
-function PlanCard({
-  plan,
-  theme,
-  isCurrent,
-  onSelect,
-}: {
-  plan: typeof PLANS[0];
-  theme: typeof colors.dark;
-  isCurrent: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <View style={[styles.planCard, {
-      backgroundColor: theme.card,
-      borderColor: isCurrent ? plan.color : theme.border,
-      borderWidth: isCurrent ? 2 : 1,
-    }]}>
-      {/* Popular badge */}
-      {plan.popular && (
-        <View style={[styles.popularBadge, { backgroundColor: plan.color }]}>
-          <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
-        </View>
-      )}
-
-      {/* Plan header */}
-      <View style={styles.planHeader}>
-        <View>
-          <Text style={[styles.planName, { color: plan.color }]}>{plan.name}</Text>
-          <Text style={[styles.planDescription, { color: theme.textSecondary }]}>
-            {plan.description}
-          </Text>
-        </View>
-        <View style={styles.planPriceWrap}>
-          <Text style={[styles.planPrice, { color: theme.textPrimary }]}>{plan.price}</Text>
-          <Text style={[styles.planPeriod, { color: theme.textMuted }]}>{plan.period}</Text>
-        </View>
-      </View>
-
-      {/* Features */}
-      <View style={styles.featuresList}>
-        {plan.features.map((f) => (
-          <View key={f} style={styles.featureRow}>
-            <Ionicons name="checkmark-circle" size={16} color={plan.color} />
-            <Text style={[styles.featureText, { color: theme.textPrimary }]}>{f}</Text>
-          </View>
-        ))}
-        {plan.missing.map((f) => (
-          <View key={f} style={styles.featureRow}>
-            <Ionicons name="close-circle" size={16} color={theme.textMuted} />
-            <Text style={[styles.featureTextMissing, { color: theme.textMuted }]}>{f}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* CTA */}
-      {isCurrent ? (
-        <View style={[styles.currentPlanBtn, {
-          backgroundColor: plan.color + '22',
-          borderColor: plan.color,
-        }]}>
-          <Ionicons name="checkmark-circle" size={16} color={plan.color} />
-          <Text style={[styles.currentPlanBtnText, { color: plan.color }]}>
-            Current Plan
-          </Text>
-        </View>
-      ) : (
-        <TouchableOpacity
-          onPress={onSelect}
-          style={[styles.selectPlanBtn, { backgroundColor: plan.color }]}
-        >
-          <Text style={[styles.selectPlanBtnText, { color: plan.id === 'free' ? '#fff' : '#0C0D10' }]}>
-            {plan.id === 'free' ? 'Downgrade to Free' : `Upgrade to ${plan.name}`}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
 export default function SubscriptionScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { userTier } = useAuthStore();
+  const { user, userTier } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const handleSelectPlan = (planId: string) => {
-    if (planId === 'free') {
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [iapReady, setIapReady] = useState(false);
+
+  // Initialise IAP connection when screen opens
+  useEffect(() => {
+    const init = async () => {
+      const ready = await initIAP();
+      setIapReady(ready);
+    };
+    init();
+
+    // Clean up IAP connection when screen closes
+    return () => {
+      endIAP();
+    };
+  }, []);
+
+  const handleSubscribe = async (tier: typeof TIERS[0]) => {
+  if (tier.id === 'free') return;
+  if (!tier.productId) return;
+
+  Alert.alert(
+    'Coming Soon',
+    'Subscription payments are being set up. CalFit Pro and Premium will be available very soon.',
+    [{ text: 'OK' }]
+  );
+};
+
+  const handleRestore = async () => {
+    if (!user?.id) return;
+    setIsRestoring(true);
+
+    const { restored, tier } = await restorePurchases(user.id);
+
+    if (restored) {
       Alert.alert(
-        'Downgrade to Free',
-        'You will lose access to all Pro/Premium features at the end of your billing cycle.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Downgrade', style: 'destructive', onPress: () => {} },
-        ]
+        'Purchases Restored ✓',
+        `Your ${tier} subscription has been restored.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-      return;
+    } else {
+      Alert.alert(
+        'Nothing to restore',
+        'No active subscriptions found for this account.'
+      );
     }
-    Alert.alert(
-      'Payment Coming Soon',
-      'Stripe payment integration will be connected once the Stripe account is set up. You will be able to subscribe directly from here.',
-      [{ text: 'OK' }]
-    );
+
+    setIsRestoring(false);
   };
 
   return (
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-               <View style={styles.header}>
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.backBtn}
         >
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>Credits</Text>
+          <Text style={[styles.backText, { color: theme.textPrimary }]}>Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Choose a Plan</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Upgrade CalFit</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -206,22 +169,135 @@ export default function SubscriptionScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Unlock the full power of CalFit with a Pro or Premium subscription.
-        </Text>
+        {/* Hero */}
+        <View style={styles.hero}>
+          <Text style={[styles.heroTitle, { color: theme.textPrimary }]}>
+            Choose your plan
+          </Text>
+          <Text style={[styles.heroSub, { color: theme.textSecondary }]}>
+            Unlock the full CalFit experience. Cancel anytime.
+          </Text>
+        </View>
 
-        {PLANS.map((plan) => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            theme={theme}
-            isCurrent={userTier === plan.id}
-            onSelect={() => handleSelectPlan(plan.id)}
-          />
-        ))}
+        {/* Current plan indicator */}
+        <View style={[styles.currentPlanBadge, {
+          backgroundColor: theme.accentDim as string,
+          borderColor: theme.accent,
+        }]}>
+          <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
+          <Text style={[styles.currentPlanText, { color: theme.accent }]}>
+            Current plan: {userTier?.charAt(0).toUpperCase() + (userTier?.slice(1) ?? 'Free')}
+          </Text>
+        </View>
 
-        <Text style={[styles.disclaimer, { color: theme.textMuted }]}>
-          Payments are processed securely via Stripe. Cancel anytime from your account settings. No hidden fees.
+        {/* Tier cards */}
+        {TIERS.map((tier) => {
+          const isCurrent = userTier === tier.id;
+          const isLoadingThis = loadingTier === tier.id && isLoading;
+
+          return (
+            <View
+              key={tier.id}
+              style={[styles.tierCard, {
+                backgroundColor: theme.card,
+                borderColor: isCurrent ? tier.color : theme.border,
+                borderWidth: isCurrent ? 2 : 1,
+              }]}
+            >
+              {/* Badge */}
+              {tier.badge && (
+                <View style={[styles.tierBadge, { backgroundColor: tier.color }]}>
+                  <Text style={styles.tierBadgeText}>{tier.badge}</Text>
+                </View>
+              )}
+              {isCurrent && (
+                <View style={[styles.currentBadge, { backgroundColor: tier.color + '22' }]}>
+                  <Text style={[styles.currentBadgeText, { color: tier.color }]}>
+                    Current Plan
+                  </Text>
+                </View>
+              )}
+
+              {/* Name + price */}
+              <View style={styles.tierHeader}>
+                <Text style={[styles.tierName, { color: tier.color }]}>{tier.name}</Text>
+                <View style={styles.tierPriceRow}>
+                  <Text style={[styles.tierPrice, { color: theme.textPrimary }]}>
+                    {tier.price}
+                  </Text>
+                  <Text style={[styles.tierPeriod, { color: theme.textMuted }]}>
+                    /{tier.period}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Features */}
+              <View style={styles.featureList}>
+                {tier.features.map((f) => (
+                  <View key={f} style={styles.featureRow}>
+                    <Ionicons name="checkmark-circle" size={16} color={tier.color} />
+                    <Text style={[styles.featureText, { color: theme.textPrimary }]}>{f}</Text>
+                  </View>
+                ))}
+                {tier.missing?.map((f) => (
+                  <View key={f} style={styles.featureRow}>
+                    <Ionicons name="close-circle" size={16} color={theme.textMuted} />
+                    <Text style={[styles.featureText, { color: theme.textMuted }]}>{f}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* CTA button */}
+              {tier.id !== 'free' && !isCurrent && (
+                <TouchableOpacity
+                  onPress={() => handleSubscribe(tier)}
+                  disabled={isLoading}
+                  style={[styles.ctaBtn, { backgroundColor: tier.color }]}
+                >
+                  {isLoadingThis ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.ctaBtnText}>
+                      Get {tier.name} — {tier.price}/mo
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {isCurrent && tier.id !== 'free' && (
+                <View style={[styles.activeTag, {
+                  backgroundColor: tier.color + '18',
+                  borderColor: tier.color,
+                }]}>
+                  <Ionicons name="checkmark-circle" size={16} color={tier.color} />
+                  <Text style={[styles.activeTagText, { color: tier.color }]}>
+                    Active — managed in {Platform.OS === 'ios' ? 'App Store' : 'Google Play'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          );
+        })}
+
+        {/* Restore purchases */}
+        <TouchableOpacity
+          onPress={handleRestore}
+          disabled={isRestoring}
+          style={styles.restoreBtn}
+        >
+          {isRestoring ? (
+            <ActivityIndicator size="small" color={theme.textMuted} />
+          ) : (
+            <Text style={[styles.restoreText, { color: theme.textMuted }]}>
+              Restore previous purchases
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Legal note */}
+        <Text style={[styles.legalNote, { color: theme.textMuted }]}>
+          Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period.
+          Manage or cancel your subscription in your {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} account settings.
         </Text>
       </ScrollView>
     </AndroidSafeView>
@@ -230,7 +306,7 @@ export default function SubscriptionScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100, paddingTop: spacing.sm },
+  scrollContent: { paddingBottom: 60 },
 
   header: {
     flexDirection: 'row',
@@ -242,75 +318,93 @@ const styles = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backText: { fontSize: fontSize.lg, fontWeight: '400' },
-  pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
+  title: { fontSize: fontSize.lg, fontWeight: '700' },
 
-  subtitle: {
-    fontSize: fontSize.base,
-    textAlign: 'center',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    lineHeight: 20,
+  hero: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+    gap: spacing.xs,
   },
+  heroTitle: { fontSize: fontSize.xxl, fontWeight: '800', textAlign: 'center' },
+  heroSub: { fontSize: fontSize.base, textAlign: 'center' },
 
-  planCard: {
+  currentPlanBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+  },
+  currentPlanText: { fontSize: fontSize.sm, fontWeight: '600' },
+
+  tierCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
     padding: spacing.lg,
     borderRadius: radius.xl,
-    overflow: 'hidden',
+    gap: spacing.md,
   },
-  popularBadge: {
+  tierBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.sm,
-    marginBottom: spacing.sm,
+    marginBottom: -spacing.xs,
   },
-  popularBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#0C0D10',
-    letterSpacing: 0.5,
+  tierBadgeText: { fontSize: fontSize.xs, fontWeight: '800', color: '#fff' },
+  currentBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
   },
-  planHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  planName: { fontSize: fontSize.xxl, fontWeight: '800' },
-  planDescription: { fontSize: fontSize.sm, marginTop: 2 },
-  planPriceWrap: { alignItems: 'flex-end' },
-  planPrice: { fontSize: fontSize.xxl, fontWeight: '800' },
-  planPeriod: { fontSize: fontSize.xs },
+  currentBadgeText: { fontSize: fontSize.xs, fontWeight: '700' },
 
-  featuresList: { gap: spacing.sm, marginBottom: spacing.lg },
+  tierHeader: { gap: 4 },
+  tierName: { fontSize: fontSize.xl, fontWeight: '800' },
+  tierPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  tierPrice: { fontSize: 32, fontWeight: '900' },
+  tierPeriod: { fontSize: fontSize.base },
+
+  featureList: { gap: spacing.xs },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   featureText: { fontSize: fontSize.base, flex: 1 },
-  featureTextMissing: { fontSize: fontSize.base, flex: 1 },
 
-  currentPlanBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  currentPlanBtnText: { fontSize: fontSize.base, fontWeight: '700' },
-  selectPlanBtn: {
+  ctaBtn: {
     padding: spacing.lg,
     borderRadius: radius.lg,
     alignItems: 'center',
   },
-  selectPlanBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
+  ctaBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
 
-  disclaimer: {
-    fontSize: fontSize.xs,
-    textAlign: 'center',
-    marginHorizontal: spacing.xl,
+  activeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  activeTagText: { fontSize: fontSize.sm, fontWeight: '600' },
+
+  restoreBtn: {
+    alignItems: 'center',
+    padding: spacing.lg,
     marginTop: spacing.sm,
-    lineHeight: 18,
+  },
+  restoreText: { fontSize: fontSize.sm },
+
+  legalNote: {
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
   },
 });

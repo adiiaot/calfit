@@ -205,29 +205,33 @@ const handleMarkRead = async (id: string) => {
   const notif = notifications.find((n) => n.id === id);
   if (!notif?.action_label) return;
 
-  // Small delay so mark-read saves before navigating
   setTimeout(() => {
+    // Tab screens must be navigated to via Main → screen
+    // Root stack screens can be navigated to directly
     const actionMap: Record<string, () => void> = {
-      'View Streaks':     () => navigation.navigate('Streaks' as never),
-      'Check In':         () => navigation.navigate('Streaks' as never),
-      'View Progress':    () => navigation.navigate('Progress' as never),
-      'View Calories':    () => navigation.navigate('Calorie' as never),
-      'View History':     () => navigation.navigate('Activity' as never),
-      'View Plan':        () => navigation.navigate('Meals' as never),
-      'Open Coach':       () => navigation.navigate('Coach' as never),
-      'View Group':       () => navigation.navigate('Community' as never),
-      'View Earnings':    () => navigation.navigate('Credits' as never),
-      'View Plans':       () => navigation.navigate('Subscription' as never),
-      'Complete Profile': () => navigation.navigate('Settings' as never),
-      'Reply':            () => navigation.navigate('Social' as never),
-      'View Post':        () => navigation.navigate('Social' as never),
+      'View Streaks':     () => navigation.navigate('Streaks'),
+      'Check In':         () => navigation.navigate('Streaks'),
+      'View Progress':    () => navigation.navigate('Progress'),
+
+      // These are tab screens — navigate to Main first then switch tab
+      'View Calories':    () => navigation.navigate('Main', { screen: 'Calorie' }),
+      'View History':     () => navigation.navigate('Main', { screen: 'Activity' }),
+      'View Plan':        () => navigation.navigate('Main', { screen: 'Meals' }),
+      'Open Coach':       () => navigation.navigate('Main', { screen: 'Coach' }),
+      'Reply':            () => navigation.navigate('Main', { screen: 'Social' }),
+      'View Post':        () => navigation.navigate('Main', { screen: 'Social' }),
+
+      // Root stack screens
+      'View Group':       () => navigation.navigate('Community'),
+      'View Earnings':    () => navigation.navigate('Main', { screen: 'Credits' }),
+      'View Plans':       () => navigation.navigate('Subscription'),
+      'Complete Profile': () => navigation.navigate('Settings'),
     };
 
     const navigate = actionMap[notif.action_label!];
     if (navigate) navigate();
   }, 100);
 };
-
   const handleMarkAllRead = async () => {
     if (!user?.id) return;
     await markAllNotificationsRead(user.id);

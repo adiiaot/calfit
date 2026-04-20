@@ -8,12 +8,30 @@ import {
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useNavigation } from '@react-navigation/native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+
+// ── TYPE DEFINITIONS ─────────────────────────────────────────
+type WorkoutSession = {
+  name: string;
+  calories_burned: number;
+  completed_at: string;
+};
+
+type ProgressStats = {
+  daysTracked: number;
+  workoutsDone: number;
+  avgSleep: number;
+  waterGoalDays: number;
+  avgSteps: number;
+  activeDays: number;
+  totalCaloriesBurned: number;
+  totalFoodLogs: number;
+};
 
 // ── PERIOD TABS ──────────────────────────────────────────────
 function PeriodTabs({
@@ -50,7 +68,7 @@ function PeriodTabs({
   );
 }
 
-// ── WEIGHT CHART ─────────────────────────────────────────────
+// ── WEIGHT CARD ──────────────────────────────────────────────
 function WeightCard({ theme, currentWeight, targetWeight }: {
   theme: typeof colors.dark;
   currentWeight: number | null;
@@ -106,8 +124,6 @@ function WeightCard({ theme, currentWeight, targetWeight }: {
           </View>
         )}
       </View>
-
-      {/* Progress bar */}
       {diff !== null && targetWeight && (
         <>
           <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
@@ -128,16 +144,7 @@ function WeightCard({ theme, currentWeight, targetWeight }: {
 // ── STATS GRID ───────────────────────────────────────────────
 function StatsGrid({ theme, stats }: {
   theme: typeof colors.dark;
-  stats: {
-    daysTracked: number;
-    workoutsDone: number;
-    avgSleep: number;
-    waterGoalDays: number;
-    avgSteps: number;
-    activeDays: number;
-    totalCaloriesBurned: number;
-    totalFoodLogs: number;
-  };
+  stats: ProgressStats;
 }) {
   const hasAnyData =
     stats.daysTracked > 0 ||
@@ -159,12 +166,12 @@ function StatsGrid({ theme, stats }: {
   }
 
   const items = [
-    { label: 'Days Tracked', value: `${stats.daysTracked}`, icon: 'calendar-outline', color: theme.accent },
-    { label: 'Workouts Done', value: `${stats.workoutsDone}`, icon: 'barbell-outline', color: theme.accentSecond },
-    { label: 'Avg Sleep', value: stats.avgSleep > 0 ? `${stats.avgSleep}h` : '—', icon: 'moon-outline', color: theme.purple },
-    { label: 'Water Days', value: `${stats.waterGoalDays}`, icon: 'water-outline', color: theme.accentSecond },
-    { label: 'Cal Burned', value: `${stats.totalCaloriesBurned}`, icon: 'flame-outline', color: theme.orange },
-    { label: 'Meals Logged', value: `${stats.totalFoodLogs}`, icon: 'restaurant-outline', color: theme.gold },
+    { label: 'Days Tracked',  value: `${stats.daysTracked}`,        icon: 'calendar-outline',   color: theme.accent },
+    { label: 'Workouts Done', value: `${stats.workoutsDone}`,        icon: 'barbell-outline',    color: theme.accentSecond },
+    { label: 'Avg Sleep',     value: stats.avgSleep > 0 ? `${stats.avgSleep}h` : '—', icon: 'moon-outline', color: (theme as any).purple },
+    { label: 'Water Days',    value: `${stats.waterGoalDays}`,       icon: 'water-outline',      color: theme.accentSecond },
+    { label: 'Cal Burned',    value: `${stats.totalCaloriesBurned}`, icon: 'flame-outline',      color: (theme as any).orange },
+    { label: 'Meals Logged',  value: `${stats.totalFoodLogs}`,       icon: 'restaurant-outline', color: (theme as any).gold },
   ];
 
   return (
@@ -230,10 +237,10 @@ function StreakProgress({ theme, streakCount }: {
   );
 }
 
-// ── WORKOUT HISTORY SUMMARY ───────────────────────────────────
+// ── WORKOUT SUMMARY ───────────────────────────────────────────
 function WorkoutSummary({ theme, sessions }: {
   theme: typeof colors.dark;
-  sessions: { name: string; calories_burned: number; completed_at: string }[];
+  sessions: WorkoutSession[];
 }) {
   if (sessions.length === 0) {
     return (
@@ -308,12 +315,8 @@ export default function ProgressScreen() {
 
   const [period, setPeriod] = useState('Month');
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Real data from Supabase
-  const [workoutSessions, setWorkoutSessions] = useState<
-    { name: string; calories_burned: number; completed_at: string }[]
-  >([]);
-  const [stats, setStats] = useState({
+  const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
+  const [stats, setStats] = useState<ProgressStats>({
     daysTracked: 0,
     workoutsDone: 0,
     avgSleep: 0,
@@ -368,33 +371,30 @@ export default function ProgressScreen() {
           .gte('logged_at', fromISO),
       ]);
 
-      const workouts = workoutsData.data ?? [];
-      const foods = foodData.data ?? [];
-      const waters = waterData.data ?? [];
+      const workouts = (workoutsData.data ?? []) as WorkoutSession[];
+      const foods = (foodData.data ?? []) as any[];
+      const waters = (waterData.data ?? []) as any[];
 
-      // Unique days with food logs
-      const foodDates = new Set(foods.map((f: any) => f.date));
+      const foodDates = new Set(foods.map((f) => f.date));
 
-      // Days with water > 1500ml
       const waterByDay: Record<string, number> = {};
-      waters.forEach((w: any) => {
+      waters.forEach((w) => {
         const day = w.logged_at.split('T')[0];
         waterByDay[day] = (waterByDay[day] ?? 0) + w.amount_ml;
       });
       const waterGoalDays = Object.values(waterByDay).filter((v) => v >= 1500).length;
 
-      // Total calories burned
       const totalCaloriesBurned = workouts.reduce(
-        (sum: number, s: any) => sum + (s.calories_burned ?? 0), 0
+        (sum, s) => sum + (s.calories_burned ?? 0), 0
       );
 
       setWorkoutSessions(workouts);
       setStats({
         daysTracked: foodDates.size,
         workoutsDone: workouts.length,
-        avgSleep: 0, // Phase 2 — sleep_logs
+        avgSleep: 0,
         waterGoalDays,
-        avgSteps: 0, // Phase 2 — step sensor
+        avgSteps: 0,
         activeDays: Math.max(foodDates.size, workouts.length),
         totalCaloriesBurned,
         totalFoodLogs: foods.length,
@@ -411,10 +411,9 @@ export default function ProgressScreen() {
   };
 
   return (
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
 
-
-          <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -422,10 +421,22 @@ export default function ProgressScreen() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>Settings</Text>
+          <Text style={[styles.backText, { color: theme.textPrimary }]}>Back</Text>
         </TouchableOpacity>
+
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>My Progress</Text>
-        <View style={styles.backPlaceholder} />
+
+        {/* Recap button */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Recap')}
+          style={[styles.recapBtn, {
+            backgroundColor: theme.accentDim as string,
+            borderColor: theme.accent,
+          }]}
+        >
+          <Ionicons name="share-social-outline" size={14} color={theme.accent} />
+          <Text style={[styles.recapBtnText, { color: theme.accent }]}>Recap</Text>
+        </TouchableOpacity>
       </View>
 
       <PeriodTabs theme={theme} active={period} onSelect={setPeriod} />
@@ -459,7 +470,7 @@ export default function ProgressScreen() {
 
         <BodyMeasurements theme={theme} />
       </ScrollView>
-          </AndroidSafeView>
+    </AndroidSafeView>
   );
 }
 
@@ -478,8 +489,17 @@ const styles = StyleSheet.create({
   },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backText: { fontSize: fontSize.lg, fontWeight: '400' },
-  backPlaceholder: { width: 80 },
   pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
+  recapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+  },
+  recapBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
 
   periodTabs: {
     flexDirection: 'row',
@@ -510,7 +530,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Weight card
   weightRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -532,7 +551,6 @@ const styles = StyleSheet.create({
   progressBarFill: { height: '100%', borderRadius: 4 },
   progressNote: { fontSize: fontSize.xs },
 
-  // Stats grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -554,11 +572,9 @@ const styles = StyleSheet.create({
   statValue: { fontSize: fontSize.lg, fontWeight: '700', marginBottom: 2 },
   statLabel: { fontSize: fontSize.xs },
 
-  // Streak
   streakSub: { fontSize: fontSize.sm, marginTop: 4, marginBottom: spacing.sm },
   streakPct: { fontSize: fontSize.sm, fontWeight: '700', textAlign: 'right', marginTop: 4 },
 
-  // Workout summary
   workoutRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -580,7 +596,6 @@ const styles = StyleSheet.create({
   },
   workoutCal: { fontSize: fontSize.xs, fontWeight: '700' },
 
-  // Measurements
   measureHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -598,7 +613,6 @@ const styles = StyleSheet.create({
   },
   addMeasureText: { fontSize: fontSize.sm, fontWeight: '600' },
 
-  // Empty states
   emptyState: {
     alignItems: 'center',
     gap: spacing.sm,

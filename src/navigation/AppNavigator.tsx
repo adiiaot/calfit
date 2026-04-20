@@ -36,6 +36,7 @@ import PurchaseCreditsScreen from '../screens/earnings/PurchaseCreditsScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
+import RecapScreen from '../screens/progress/RecapScreen';
 
 // ── SOCIAL MODULE ─────────────────────────────────────────────
 import SocialScreen from '../screens/social/CalfitSocialScreen';
@@ -173,6 +174,7 @@ export default function AppNavigator() {
             <RootStack.Screen name="Language"        component={LanguageScreen} />
             <RootStack.Screen name="Privacy"         component={PrivacyScreen} />
             <RootStack.Screen name="DownloadData"    component={DownloadDataScreen} />
+            <RootStack.Screen name="Recap" component={RecapScreen} />
 
             {/* Social module */}
             <RootStack.Screen name="Profile"         component={ProfileScreen} />

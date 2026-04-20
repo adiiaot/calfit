@@ -70,6 +70,18 @@ const QUICK_WORKOUTS: Record<string, {
   },
 };
 
+// ── VOICE COACH ───────────────────────────────────────────────
+// Uses expo-speech (free, device TTS, no API key needed)
+// ElevenLabs skipped — requires paid API + dev build
+const speak = (text: string) => {
+  Speech.stop();
+  Speech.speak(text, {
+    language: 'en-US',
+    pitch: 1.0,
+    rate: 0.95,
+  });
+};
+
 export default function QuickStartScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -96,8 +108,10 @@ export default function QuickStartScreen() {
   const workoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Stop speech when screen unmounts
   useEffect(() => {
     return () => {
+      Speech.stop();
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
       if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     };
@@ -126,8 +140,13 @@ export default function QuickStartScreen() {
   };
 
   const handleStartExercise = (index: number) => {
+    // Start workout timer on first exercise
     if (!workoutStarted) {
       setWorkoutStarted(true);
+
+      // Voice: announce workout start
+      speak(`Starting ${workoutData.name}. Let's go!`);
+
       workoutTimerRef.current = setInterval(() => {
         setWorkoutSeconds((prev) => prev + 1);
       }, 1000);
@@ -136,13 +155,25 @@ export default function QuickStartScreen() {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     setActiveIndex(index);
 
-    const duration = exercises[index].duration;
+    const exercise = exercises[index];
+    const duration = exercise.duration;
     setExerciseSecondsLeft(duration);
+
+    // Voice: announce exercise starting
+    speak(`Starting ${exercise.name}. ${duration} seconds. Go!`);
 
     exerciseTimerRef.current = setInterval(() => {
       setExerciseSecondsLeft((prev) => {
+        // Voice: 10 second warning
+        if (prev === 11) {
+          speak('Ten seconds left. Push through!');
+        }
+        // Voice: 5 second countdown
+        if (prev === 6) {
+          speak('Five. Four. Three. Two. One.');
+        }
+
         if (prev <= 1) {
-          // Auto complete when timer runs out
           clearInterval(exerciseTimerRef.current!);
           handleCompleteExercise(index);
           return 0;
@@ -163,22 +194,34 @@ export default function QuickStartScreen() {
 
   const handleCompleteExercise = (index: number) => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
+
     setExercises((prev) =>
       prev.map((ex, i) => i === index ? { ...ex, done: true } : ex)
     );
     setActiveIndex(-1);
     setExerciseSecondsLeft(0);
 
-    // Auto start next exercise after 2 seconds
     const nextIndex = index + 1;
+
     if (nextIndex < exercises.length) {
-      setTimeout(() => handleStartExercise(nextIndex), 2000);
+      // Voice: exercise done, next coming up
+      const nextExercise = exercises[nextIndex];
+      speak(
+        `${exercises[index].name} complete! Great work. ` +
+        `Next up: ${nextExercise.name} in 3 seconds.`
+      );
+      // Auto start next exercise after 3 seconds
+      setTimeout(() => handleStartExercise(nextIndex), 3000);
+    } else {
+      // Voice: all exercises done
+      speak('All exercises complete! Tap the button to finish your workout.');
     }
   };
 
   const handleCompleteWorkout = async () => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
+    Speech.stop();
 
     const totalCal = exercises.reduce((sum, ex) => sum + ex.calories_burned, 0);
     const timeStr = totalWorkoutTime();
@@ -186,23 +229,45 @@ export default function QuickStartScreen() {
     try {
       if (user?.id) {
         const { supabase } = await import('../../services/supabase');
-       await supabase.from('workout_sessions').insert({
-  user_id: user.id,
-  name: workoutData.name,
-  status: 'completed',
-  duration_seconds: workoutSeconds,
-  calories_burned: totalCal,
-  completed_at: new Date().toISOString(),
-  exercises: exercises.map((ex) => ({
-    name: ex.name,
-    seconds: ex.seconds,
-    calories: ex.calories_burned,
-  })),
-});
+        await supabase.from('workout_sessions').insert({
+          user_id: user.id,
+          name: workoutData.name,
+          status: 'completed',
+          duration_seconds: workoutSeconds,
+          calories_burned: totalCal,
+          completed_at: new Date().toISOString(),
+          exercises: exercises.map((ex) => ({
+            name: ex.name,
+            seconds: ex.seconds,
+            calories: ex.calories_burned,
+          })),
+        });
+
+        // ── Workout complete notification ─────────────────────
+        try {
+          const { notifyWorkoutComplete } = await import(
+            '../../services/notificationService'
+          );
+          await notifyWorkoutComplete(
+            user.id,
+            workoutData.name,
+            totalCal,
+            workoutSeconds
+          );
+        } catch (e) {
+          // Silent fail — non critical
+        }
       }
     } catch (error) {
       console.error('Failed to save session:', error);
     }
+
+    // Voice: final congratulation
+    speak(
+      `Workout complete! You burned ${totalCal} calories in ${
+        Math.floor(workoutSeconds / 60)
+      } minutes. Amazing work!`
+    );
 
     Alert.alert(
       '🎉 Workout Complete!',
@@ -218,10 +283,9 @@ export default function QuickStartScreen() {
   const completedCount = exercises.filter((e) => e.done).length;
 
   return (
-    
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-        {/* Header */}
+
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
@@ -231,10 +295,18 @@ export default function QuickStartScreen() {
                 'Your progress will not be saved.',
                 [
                   { text: 'Keep going', style: 'cancel' },
-                  { text: 'Leave', style: 'destructive', onPress: () => navigation.goBack() },
+                  {
+                    text: 'Leave',
+                    style: 'destructive',
+                    onPress: () => {
+                      Speech.stop();
+                      navigation.goBack();
+                    },
+                  },
                 ]
               );
             } else {
+              Speech.stop();
               navigation.goBack();
             }
           }}
@@ -301,15 +373,11 @@ export default function QuickStartScreen() {
           <View
             key={ex.name}
             style={[styles.exerciseRow, {
-              backgroundColor: ex.done
-                ? theme.accent + '15'
-                : i === activeIndex
-                ? theme.card
-                : theme.card,
+              backgroundColor: theme.card,
               borderColor: ex.done
                 ? theme.accent
                 : i === activeIndex
-                ? theme.orange
+                ? (theme as any).orange
                 : theme.border,
               borderWidth: i === activeIndex ? 2 : 1,
             }]}
@@ -319,7 +387,7 @@ export default function QuickStartScreen() {
               backgroundColor: ex.done
                 ? theme.accent
                 : i === activeIndex
-                ? theme.orange
+                ? (theme as any).orange
                 : theme.border + '88',
             }]}>
               {ex.done ? (
@@ -356,7 +424,7 @@ export default function QuickStartScreen() {
             ) : i === activeIndex ? (
               <TouchableOpacity
                 onPress={() => handleCompleteExercise(i)}
-                style={[styles.doneBtn, { backgroundColor: theme.orange }]}
+                style={[styles.doneBtn, { backgroundColor: (theme as any).orange }]}
               >
                 <Text style={[styles.doneBtnText, { color: theme.bg }]}>Done</Text>
               </TouchableOpacity>
@@ -384,7 +452,6 @@ export default function QuickStartScreen() {
         </TouchableOpacity>
       </ScrollView>
     </AndroidSafeView>
-
   );
 }
 
@@ -404,7 +471,6 @@ const styles = StyleSheet.create({
   backText: { fontSize: fontSize.lg, fontWeight: '400' },
   pageTitle: { fontSize: fontSize.base, fontWeight: '700', textAlign: 'center', flex: 1 },
 
-  // Timer bar
   timerBar: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
@@ -418,7 +484,6 @@ const styles = StyleSheet.create({
   timerLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
   timerValue: { fontSize: fontSize.lg, fontWeight: '800' },
 
-  // Active banner
   activeBanner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -428,13 +493,15 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radius.md,
   },
-  activeBannerLabel: { fontSize: 9, fontWeight: '700', color: 'rgba(0,0,0,0.6)', letterSpacing: 0.5 },
+  activeBannerLabel: {
+    fontSize: 9, fontWeight: '700',
+    color: 'rgba(0,0,0,0.6)', letterSpacing: 0.5,
+  },
   activeBannerName: { fontSize: fontSize.lg, fontWeight: '800', color: '#0C0D10' },
   activeBannerRight: { alignItems: 'flex-end' },
   activeBannerTimer: { fontSize: 22, fontWeight: '800', color: '#0C0D10' },
   activeBannerLeft: { fontSize: 9, color: 'rgba(0,0,0,0.6)', fontWeight: '600' },
 
-  // Exercise rows
   exerciseRow: {
     flexDirection: 'row',
     alignItems: 'center',

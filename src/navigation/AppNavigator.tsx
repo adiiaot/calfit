@@ -37,6 +37,7 @@ import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import RecapScreen from '../screens/progress/RecapScreen';
+import IntermittentFastingScreen from '../screens/meals/IntermittentFastingScreen';
 
 // ── SOCIAL MODULE ─────────────────────────────────────────────
 import SocialScreen from '../screens/social/CalfitSocialScreen';
@@ -175,6 +176,8 @@ export default function AppNavigator() {
             <RootStack.Screen name="Privacy"         component={PrivacyScreen} />
             <RootStack.Screen name="DownloadData"    component={DownloadDataScreen} />
             <RootStack.Screen name="Recap" component={RecapScreen} />
+            <RootStack.Screen name="IntermittentFasting" component={IntermittentFastingScreen} />
+
 
             {/* Social module */}
             <RootStack.Screen name="Profile"         component={ProfileScreen} />

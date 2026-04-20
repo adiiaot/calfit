@@ -7,8 +7,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared//AndriodSafeView';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useEffect, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
@@ -189,7 +190,7 @@ function MealPlanCard({
           </Text>
           <Text style={[styles.planDate, { color: theme.textMuted }]}>
             Created {new Date(plan.created_at).toLocaleDateString('en-GB', {
-              day: 'numeric', month: 'short', year: 'numeric'
+              day: 'numeric', month: 'short', year: 'numeric',
             })}
           </Text>
         </View>
@@ -203,7 +204,7 @@ function MealPlanCard({
             ]
           )}
         >
-          <Ionicons name="trash-outline" size={18} color={theme.red} />
+          <Ionicons name="trash-outline" size={18} color={(theme as any).red} />
         </TouchableOpacity>
       </View>
 
@@ -231,9 +232,8 @@ function DayPlanViewer({
   const dayPlan = plan.plan[activeDay];
 
   return (
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-        <View style={styles.header}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
           <Text style={[styles.backText, { color: theme.textPrimary }]}>Plans</Text>
@@ -244,7 +244,6 @@ function DayPlanViewer({
         <View style={{ width: 60 }} />
       </View>
 
-      {/* Day selector */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -299,7 +298,7 @@ function DayPlanViewer({
               {[
                 { label: 'P', value: meal.protein, color: theme.accent },
                 { label: 'C', value: meal.carbs, color: theme.accentSecond },
-                { label: 'F', value: meal.fats, color: theme.purple },
+                { label: 'F', value: meal.fats, color: (theme as any).purple },
               ].map((m) => (
                 <View key={m.label} style={[styles.macroBadge, {
                   backgroundColor: m.color + '22',
@@ -313,13 +312,13 @@ function DayPlanViewer({
           </View>
         ))}
       </ScrollView>
-
     </AndroidSafeView>
   );
 }
 
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function MealsScreen() {
+  const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
@@ -330,7 +329,6 @@ export default function MealsScreen() {
   const [savedPlans, setSavedPlans] = useState<MealPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null);
   const [duration, setDuration] = useState(7);
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (user?.id) loadSavedPlans();
@@ -405,30 +403,6 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
           "protein": number,
           "carbs": number,
           "fats": number
-        },
-        {
-          "type": "Lunch",
-          "name": "Food name and brief description",
-          "calories": number,
-          "protein": number,
-          "carbs": number,
-          "fats": number
-        },
-        {
-          "type": "Dinner",
-          "name": "Food name and brief description",
-          "calories": number,
-          "protein": number,
-          "carbs": number,
-          "fats": number
-        },
-        {
-          "type": "Snack",
-          "name": "Food name and brief description",
-          "calories": number,
-          "protein": number,
-          "carbs": number,
-          "fats": number
         }
       ],
       "total_calories": number
@@ -449,13 +423,11 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
       const data = await response.json();
       const text = data.content?.[0]?.text ?? '';
 
-      // Parse JSON from response
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('Invalid response from AI');
 
       const parsed = JSON.parse(jsonMatch[0]);
 
-      // Build the meal plan object
       const newPlan: MealPlan = {
         id: Date.now().toString(),
         title: parsed.title,
@@ -469,7 +441,6 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
         })),
       };
 
-      // Save to Supabase
       if (user?.id) {
         const { supabase } = await import('../../services/supabase');
         const { data: saved } = await supabase
@@ -479,7 +450,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
             title: newPlan.title,
             duration_days: newPlan.duration_days,
             calories_per_day: newPlan.calories_per_day,
-            goal: goal,
+            goal,
             preferences: finalAnswers,
             plan: newPlan.plan,
           })
@@ -497,7 +468,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
       console.error('Meal plan generation failed:', error);
       Alert.alert(
         'Generation Failed',
-        'Could not generate your meal plan. Please check your internet connection and try again.',
+        'Could not generate your meal plan. Please check your connection and try again.',
         [{ text: 'OK', onPress: () => setView('home') }]
       );
     }
@@ -519,7 +490,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
     setView('questions');
   };
 
-  // ── VIEWS ──────────────────────────────────────────────────
+  // ── VIEWS ─────────────────────────────────────────────────
 
   if (view === 'viewPlan' && selectedPlan) {
     return (
@@ -533,18 +504,15 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
 
   if (view === 'generating') {
     return (
-
       <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-             <GeneratingScreen theme={theme} />
+        <GeneratingScreen theme={theme} />
       </AndroidSafeView>
     );
   }
 
   if (view === 'questions') {
     return (
-
       <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-              {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => {
@@ -564,7 +532,6 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
           <View style={{ width: 60 }} />
         </View>
 
-        {/* Duration selector */}
         {questionIndex === 0 && (
           <View style={styles.durationWrap}>
             <Text style={[styles.durationLabel, { color: theme.textSecondary }]}>
@@ -608,22 +575,37 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
             questionNum={questionIndex + 1}
             total={questions.length}
           />
-        </ScrollView> 
+        </ScrollView>
       </AndroidSafeView>
     );
   }
 
-  // ── HOME VIEW ──────────────────────────────────────────────
+  // ── HOME VIEW ─────────────────────────────────────────────
   return (
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-          <View style={styles.header}>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
-          Meal Planner
-        </Text>
-        <Text style={[styles.pageSub, { color: theme.textSecondary }]}>
-          AI-powered nutrition plans
-        </Text>
+
+      {/* Header — IF button added here */}
+      <View style={styles.homeHeader}>
+        <View>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
+            Meal Planner
+          </Text>
+          <Text style={[styles.pageSub, { color: theme.textSecondary }]}>
+            AI-powered nutrition plans
+          </Text>
+        </View>
+
+        {/* Intermittent Fasting shortcut */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('IntermittentFasting')}
+          style={[styles.ifBtn, {
+            backgroundColor: theme.accentDim as string,
+            borderColor: theme.accent,
+          }]}
+        >
+          <Ionicons name="timer-outline" size={16} color={theme.accent} />
+          <Text style={[styles.ifBtnText, { color: theme.accent }]}>Fasting</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -633,9 +615,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
         {/* Generate new plan CTA */}
         <TouchableOpacity
           onPress={startNewPlan}
-          style={[styles.generateCard, {
-            backgroundColor: theme.accent,
-          }]}
+          style={[styles.generateCard, { backgroundColor: theme.accent }]}
         >
           <View>
             <Text style={[styles.generateCardTitle, { color: theme.bg }]}>
@@ -645,7 +625,36 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
               Answer 5 quick questions and CalFit Coach builds your personalised plan in seconds
             </Text>
           </View>
-          <Ionicons name="arrow-forward-circle" size={36} color={theme.bg} style={{ opacity: 0.9 }} />
+          <Ionicons
+            name="arrow-forward-circle"
+            size={36}
+            color={theme.bg}
+            style={{ opacity: 0.9 }}
+          />
+        </TouchableOpacity>
+
+        {/* Intermittent Fasting banner */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('IntermittentFasting')}
+          style={[styles.ifBanner, {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }]}
+        >
+          <View style={[styles.ifBannerIcon, {
+            backgroundColor: theme.accentDim as string,
+          }]}>
+            <Ionicons name="timer-outline" size={24} color={theme.accent} />
+          </View>
+          <View style={styles.ifBannerInfo}>
+            <Text style={[styles.ifBannerTitle, { color: theme.textPrimary }]}>
+              Intermittent Fasting
+            </Text>
+            <Text style={[styles.ifBannerSub, { color: theme.textMuted }]}>
+              Track 16:8, 18:6, 20:4 and more. Start your fast timer.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
         </TouchableOpacity>
 
         {/* Profile summary */}
@@ -657,10 +666,10 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format, no other text:
             Your Plan Will Be Based On
           </Text>
           {[
-            { icon: 'flag-outline', label: 'Goal', value: profile?.goal ?? 'Not set — complete onboarding' },
-            { icon: 'flame-outline', label: 'Daily Calories', value: profile?.daily_calorie_goal ? `${profile.daily_calorie_goal} kcal` : '2,000 kcal (default)' },
-            { icon: 'leaf-outline', label: 'Diet', value: profile?.dietary_preference?.join(', ') ?? 'No preference' },
-            { icon: 'body-outline', label: 'Activity', value: profile?.activity_level ?? 'Moderately Active' },
+            { icon: 'flag-outline',      label: 'Goal',     value: profile?.goal ?? 'Not set — complete onboarding' },
+            { icon: 'flame-outline',     label: 'Calories', value: profile?.daily_calorie_goal ? `${profile.daily_calorie_goal} kcal` : '2,000 kcal (default)' },
+            { icon: 'leaf-outline',      label: 'Diet',     value: profile?.dietary_preference?.join(', ') ?? 'No preference' },
+            { icon: 'body-outline',      label: 'Activity', value: profile?.activity_level ?? 'Moderately Active' },
           ].map((item) => (
             <View key={item.label} style={styles.profileSummaryRow}>
               <Ionicons name={item.icon as any} size={16} color={theme.accent} />
@@ -719,15 +728,59 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
 
+  // Home header — row layout with IF button
+  homeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
   },
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
-  pageSub: { fontSize: fontSize.md, marginTop: 2 },
+  pageSub: { fontSize: fontSize.base, marginTop: 2 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backText: { fontSize: fontSize.lg, fontWeight: '400' },
+
+  // Intermittent Fasting button in header
+  ifBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  ifBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
+
+  // Intermittent Fasting banner card in feed
+  ifBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  ifBannerIcon: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  ifBannerInfo: { flex: 1 },
+  ifBannerTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  ifBannerSub: { fontSize: fontSize.sm, marginTop: 2, lineHeight: 18 },
 
   // Generate card
   generateCard: {
@@ -757,7 +810,6 @@ const styles = StyleSheet.create({
   profileSummaryLabel: { fontSize: fontSize.sm, width: 80 },
   profileSummaryValue: { fontSize: fontSize.sm, flex: 1, fontWeight: '500' },
 
-  // Section label
   sectionLabel: {
     fontSize: fontSize.xs,
     fontWeight: '700',
@@ -793,7 +845,6 @@ const styles = StyleSheet.create({
   },
   viewPlanBtnText: { fontSize: fontSize.base, fontWeight: '700' },
 
-  // Empty state
   emptyState: {
     marginHorizontal: spacing.lg,
     padding: spacing.xxl,
@@ -805,7 +856,6 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: fontSize.xl, fontWeight: '700' },
   emptySub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 20 },
 
-  // Questions
   questionScrollContent: { paddingBottom: 100 },
   questionWrap: {
     paddingHorizontal: spacing.lg,
@@ -827,7 +877,6 @@ const styles = StyleSheet.create({
   },
   optionText: { fontSize: fontSize.lg, fontWeight: '500', flex: 1 },
 
-  // Duration
   durationWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   durationLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.sm },
   durationRow: { gap: spacing.sm },
@@ -839,7 +888,6 @@ const styles = StyleSheet.create({
   },
   durationPillText: { fontSize: fontSize.sm },
 
-  // Generating
   generatingWrap: {
     flex: 1,
     alignItems: 'center',
@@ -856,7 +904,6 @@ const styles = StyleSheet.create({
   generatingStep: { fontSize: fontSize.base, fontWeight: '600', textAlign: 'center' },
   generatingHint: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
 
-  // Day viewer
   daySelectorRow: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -879,8 +926,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.sm,
   },
-  dayMealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dayMealType: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  dayMealHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayMealType: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   dayMealCal: { fontSize: fontSize.sm, fontWeight: '700' },
   dayMealName: { fontSize: fontSize.lg, fontWeight: '600' },
   dayMealMacros: { flexDirection: 'row', gap: spacing.xs },

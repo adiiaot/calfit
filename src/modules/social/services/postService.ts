@@ -118,6 +118,7 @@ export const toggleLike = async (
   isLiked: boolean
 ): Promise<boolean> => {
   if (isLiked) {
+    // Unlike — no notification needed when unliking
     await supabase
       .from('post_likes')
       .delete()
@@ -125,10 +126,47 @@ export const toggleLike = async (
       .eq('post_id', postId);
     await supabase.rpc('decrement_likes', { post_id: postId });
   } else {
+    // Like — notify the post owner
     await supabase
       .from('post_likes')
       .insert({ user_id: userId, post_id: postId });
     await supabase.rpc('increment_likes', { post_id: postId });
+
+    // ── Notify post owner ──────────────────────────────────
+    // Skip if liking your own post
+    try {
+      const { data: postData } = await supabase
+        .from('posts')
+        .select('user_id, content, profiles:user_id(full_name)')
+        .eq('id', postId)
+        .single();
+
+      if (postData && postData.user_id !== userId) {
+        const { data: likerProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', userId)
+          .single();
+
+        const likerName = likerProfile?.full_name ?? 'Someone';
+        const preview = (postData.content ?? '').length > 40
+          ? postData.content.slice(0, 40) + '...'
+          : postData.content;
+
+        const { sendNotification } = await import(
+          '../../../services/notificationService'
+        );
+        await sendNotification(
+          postData.user_id,
+          'social',
+          `${likerName} liked your post ❤️`,
+          `"${preview}"`,
+          'View Post'
+        );
+      }
+    } catch (e) {
+      // Silent fail — non-critical
+    }
   }
   return true;
 };
@@ -151,7 +189,6 @@ export const loadUserPosts = async (userId: string): Promise<PostData[]> => {
 };
 
 // ── SHARE POST ────────────────────────────────────────────────
-
 export const sharePost = async (post: PostData): Promise<void> => {
   try {
     const authorName = post.profiles?.full_name ?? 'A CalFit member';
@@ -162,11 +199,11 @@ export const sharePost = async (post: PostData): Promise<void> => {
       shareMessage = `💪 ${authorName} just logged a workout on CalFit!\n\n"${post.content}"`;
     } else if (post.type === 'meal') {
       shareMessage = `🥗 ${authorName} shared a meal on CalFit!\n\n"${post.content}"`;
-    } else if (post.type === 'milestone') { 
+    } else if (post.type === 'milestone') {
       shareMessage = `🏆 ${authorName} hit a milestone on CalFit!\n\n"${post.content}"`;
     }
 
-    shareMessage += `\n\nJoin me on CalFit 👉 `;
+    shareMessage += `\n\nJoin me on CalFit 👉 https://calfit.tech`;
 
     await Share.share({
       message: shareMessage,

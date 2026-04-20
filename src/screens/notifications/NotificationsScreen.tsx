@@ -212,6 +212,7 @@ const handleMarkRead = async (id: string) => {
       'View Streaks':     () => navigation.navigate('Streaks'),
       'Check In':         () => navigation.navigate('Streaks'),
       'View Progress':    () => navigation.navigate('Progress'),
+      'View Fasting': () => navigation.navigate('IntermittentFasting'),
 
       // These are tab screens — navigate to Main first then switch tab
       'View Calories':    () => navigation.navigate('Main', { screen: 'Calorie' }),

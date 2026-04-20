@@ -43,7 +43,39 @@ export const addComment = async (
 
   if (error) return null;
 
+  // Increment comment count on the post
   await supabase.rpc('increment_comments', { post_id: postId });
+
+  // ── Notify post owner ──────────────────────────────────────
+  // Fetch the post owner's user_id so we can notify them
+  // Skip notification if the commenter is the post owner
+  try {
+    const { data: postData } = await supabase
+      .from('posts')
+      .select('user_id')
+      .eq('id', postId)
+      .single();
+
+    if (postData && postData.user_id !== userId) {
+      const commenterName = (data as any)?.profiles?.full_name ?? 'Someone';
+      const preview = content.length > 40
+        ? content.slice(0, 40) + '...'
+        : content;
+
+      const { sendNotification } = await import(
+        '../../../services/notificationService'
+      );
+      await sendNotification(
+        postData.user_id,
+        'social',
+        `${commenterName} commented on your post`,
+        `"${preview}"`,
+        'View Post'
+      );
+    }
+  } catch (e) {
+    // Silent fail — notification is non-critical
+  }
 
   return data as any;
 };

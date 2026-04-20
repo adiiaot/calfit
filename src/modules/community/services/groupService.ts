@@ -36,6 +36,23 @@ export const createGroup = async (
     console.error('createGroup error:', error.message);
     return null;
   }
+
+  // ── Notify the creator ────────────────────────────────────
+  try {
+    const { sendNotification } = await import(
+      '../../../services/notificationService'
+    );
+    await sendNotification(
+      userId,
+      'community',
+      `Group created! 🎉`,
+      `"${name}" is live. Share it with others to grow your community.`,
+      'View Group'
+    );
+  } catch (e) {
+    // Silent fail — non-critical
+  }
+
   return data as any;
 };
 
@@ -97,7 +114,6 @@ export const joinGroup = async (
   userId: string,
   groupId: string
 ): Promise<boolean> => {
-  // Add member record
   const { error: memberError } = await supabase
     .from('group_members')
     .insert({ user_id: userId, group_id: groupId, role: 'member' });
@@ -107,15 +123,38 @@ export const joinGroup = async (
     return false;
   }
 
-  // Increment member count directly
+  // Increment member count
   const { error: countError } = await supabase.rpc(
     'increment_group_member_count',
     { gid: groupId }
   );
 
   if (countError) {
-    // Non-critical — log but don't fail the join
     console.warn('increment member count error:', countError.message);
+  }
+
+  // ── Notify the user who joined ────────────────────────────
+  try {
+    const { data: groupData } = await supabase
+      .from('groups')
+      .select('name')
+      .eq('id', groupId)
+      .single();
+
+    const groupName = groupData?.name ?? 'the group';
+
+    const { sendNotification } = await import(
+      '../../../services/notificationService'
+    );
+    await sendNotification(
+      userId,
+      'community',
+      `You joined ${groupName}! 👥`,
+      'Check out the group feed, join challenges and connect with members.',
+      'View Group'
+    );
+  } catch (e) {
+    // Silent fail — non-critical
   }
 
   return true;
@@ -137,21 +176,16 @@ export const leaveGroup = async (
     return false;
   }
 
-  // Decrement member count
   await supabase.rpc('decrement_group_member_count', { gid: groupId });
 
   return true;
 };
 
 // ── DELETE GROUP ──────────────────────────────────────────────
-// The creator_id RLS policy requires the user to be authenticated
-// and the row's creator_id must match auth.uid().
-// Passing userId here ensures the correct session is active.
 export const deleteGroup = async (
   userId: string,
   groupId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  // First verify this user is actually the creator
   const { data: group, error: fetchError } = await supabase
     .from('groups')
     .select('creator_id')
@@ -166,18 +200,16 @@ export const deleteGroup = async (
     return { success: false, error: 'Only the group creator can delete this group.' };
   }
 
-  // Delete all members first (cascade may handle this but being explicit)
   await supabase
     .from('group_members')
     .delete()
     .eq('group_id', groupId);
 
-  // Delete the group
   const { error } = await supabase
     .from('groups')
     .delete()
     .eq('id', groupId)
-    .eq('creator_id', userId); // Double-lock: matches RLS policy
+    .eq('creator_id', userId);
 
   if (error) {
     console.error('deleteGroup error:', error.message);
@@ -199,14 +231,14 @@ export const getOwnedGroupCount = async (userId: string): Promise<number> => {
 // ── EMOJI MAP ─────────────────────────────────────────────────
 const getEmojiForCategory = (category: string): string => {
   const map: Record<string, string> = {
-    Fitness: '💪',
-    Nutrition: '🥗',
+    Fitness:       '💪',
+    Nutrition:     '🥗',
     'Weight Loss': '⚡',
     'Muscle Gain': '🏋️',
-    Running: '🏃',
-    'Mental Health': '🧘',
-    Yoga: '🌿',
-    Sports: '⚽',
+    Running:       '🏃',
+    'Mental Health':'🧘',
+    Yoga:          '🌿',
+    Sports:        '⚽',
   };
   return map[category] ?? '✨';
 };

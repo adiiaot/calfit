@@ -101,13 +101,8 @@ function ProgressRing({
   bgColor: string;
   children?: React.ReactNode;
 }) {
-  const radius2 = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius2;
-  const strokeDashoffset = circumference * (1 - Math.min(progress, 1));
-
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Background ring */}
       <View style={{
         position: 'absolute',
         width: size,
@@ -116,7 +111,6 @@ function ProgressRing({
         borderWidth: strokeWidth,
         borderColor: bgColor,
       }} />
-      {/* Progress arc using border trick */}
       <View style={{
         position: 'absolute',
         width: size,
@@ -156,7 +150,6 @@ export default function IntermittentFastingScreen() {
     }, [user?.id])
   );
 
-  // ── Live timer ────────────────────────────────────────────
   useEffect(() => {
     if (activeFast) {
       timerRef.current = setInterval(() => {
@@ -177,7 +170,6 @@ export default function IntermittentFastingScreen() {
     try {
       const { supabase } = await import('../../services/supabase');
 
-      // Check for active fast (no ended_at)
       const { data: activeFastData } = await supabase
         .from('fasting_logs')
         .select('*')
@@ -189,16 +181,12 @@ export default function IntermittentFastingScreen() {
 
       if (activeFastData) {
         setActiveFast(activeFastData as FastingLog);
-        // Set protocol to match active fast
-        const proto = PROTOCOLS.find(
-          (p) => p.id === activeFastData.protocol
-        );
+        const proto = PROTOCOLS.find((p) => p.id === activeFastData.protocol);
         if (proto) setSelectedProtocol(proto);
       } else {
         setActiveFast(null);
       }
 
-      // Load history
       const { data: historyData } = await supabase
         .from('fasting_logs')
         .select('*')
@@ -218,6 +206,22 @@ export default function IntermittentFastingScreen() {
     if (activeFast) return;
 
     setIsLoading(true);
+
+    // Inside handleStartFast after the insert succeeds — find this block and update:
+try {
+  const { sendNotification } = await import(
+    '../../services/notificationService'
+  );
+  await sendNotification(
+    user.id,
+    'goal',
+    `${selectedProtocol.label} Fast Started ⏳`,
+    `Your fast has begun. Stay hydrated and stay strong!`,
+    'View Fasting'  // ← changed from 'View History'
+  );
+} catch (e) {
+  // Silent fail
+}
     try {
       const { supabase } = await import('../../services/supabase');
       const now = new Date();
@@ -241,6 +245,26 @@ export default function IntermittentFastingScreen() {
 
       if (error) throw error;
       setActiveFast(data as FastingLog);
+
+      // ── Notify fast started ──────────────────────────────
+      try {
+        const { sendNotification } = await import(
+          '../../services/notificationService'
+        );
+        const endTimeStr = targetEnd.toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', hour12: true,
+        });
+        await sendNotification(
+          user.id,
+          'goal',
+          `${selectedProtocol.label} fast started! ⏳`,
+          `Your fast is running. Eating window opens at ${endTimeStr}. Stay hydrated!`,
+          'View Fast'
+        );
+      } catch (e) {
+        // Silent fail — non-critical
+      }
+
     } catch (error) {
       console.error('startFast error:', error);
       Alert.alert('Error', 'Could not start fast. Please try again.');
@@ -255,47 +279,69 @@ export default function IntermittentFastingScreen() {
       'Are you sure you want to end your fast early?',
       [
         { text: 'Keep Going', style: 'cancel' },
-        {
-          text: 'End Fast',
-          style: 'destructive',
-          onPress: endFast,
-        },
+        { text: 'End Fast', style: 'destructive', onPress: endFast },
       ]
     );
   };
 
   const endFast = async () => {
-    if (!activeFast || !user?.id) return;
-    setIsLoading(true);
+  if (!activeFast || !user?.id) return;
+  setIsLoading(true);
+  try {
+    const { supabase } = await import('../../services/supabase');
+    const now = new Date();
+    const targetEnd = new Date(activeFast.target_end_at);
+    const completed = now >= targetEnd;
+
+    await supabase
+      .from('fasting_logs')
+      .update({
+        ended_at: now.toISOString(),
+        completed,
+      })
+      .eq('id', activeFast.id);
+
+    setActiveFast(null);
+    await loadData();
+
+    // ── Send notification with correct action label ────────
     try {
-      const { supabase } = await import('../../services/supabase');
-      const now = new Date();
-      const targetEnd = new Date(activeFast.target_end_at);
-      const completed = now >= targetEnd;
-
-      await supabase
-        .from('fasting_logs')
-        .update({
-          ended_at: now.toISOString(),
-          completed,
-        })
-        .eq('id', activeFast.id);
-
-      setActiveFast(null);
-      await loadData();
-
-      Alert.alert(
-        completed ? '🎉 Fast Complete!' : 'Fast Ended',
-        completed
-          ? `You completed your ${activeFast.protocol} fast! Great discipline.`
-          : `Fast ended after ${formatDuration(elapsed)}. Every fast counts!`
+      const { sendNotification } = await import(
+        '../../services/notificationService'
       );
-    } catch (error) {
-      console.error('endFast error:', error);
-    } finally {
-      setIsLoading(false);
+      if (completed) {
+        await sendNotification(
+          user.id,
+          'achievement',
+          `${activeFast.protocol} Fast Complete! 🎉`,
+          `You completed your ${activeFast.protocol} fast. Incredible discipline!`,
+          'View Fasting'  // ← matches actionMap now
+        );
+      } else {
+        await sendNotification(
+          user.id,
+          'goal',
+          'Fast ended',
+          `Your ${activeFast.protocol} fast has been ended. Every fast counts!`,
+          'View Fasting'  // ← matches actionMap now
+        );
+      }
+    } catch (e) {
+      // Silent fail
     }
-  };
+
+    Alert.alert(
+      completed ? '🎉 Fast Complete!' : 'Fast Ended',
+      completed
+        ? `You completed your ${activeFast.protocol} fast! Great discipline.`
+        : `Fast ended after ${formatDuration(elapsed)}. Every fast counts!`
+    );
+  } catch (error) {
+    console.error('endFast error:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -303,7 +349,6 @@ export default function IntermittentFastingScreen() {
     setIsRefreshing(false);
   };
 
-  // ── Computed values ───────────────────────────────────────
   const totalFastMs = selectedProtocol.fastHours * 60 * 60 * 1000;
   const progress = activeFast ? Math.min(elapsed / totalFastMs, 1) : 0;
   const remaining = activeFast ? Math.max(totalFastMs - elapsed, 0) : 0;
@@ -348,7 +393,7 @@ export default function IntermittentFastingScreen() {
           />
         }
       >
-        {/* Protocol selector — hidden when fast is active */}
+        {/* Protocol selector */}
         {!activeFast && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
@@ -427,14 +472,12 @@ export default function IntermittentFastingScreen() {
         {/* Active fast timer */}
         {activeFast ? (
           <View style={styles.timerSection}>
-            {/* Status label */}
             <Text style={[styles.statusLabel, { color: theme.textSecondary }]}>
               {isFastComplete
                 ? '🎉 Fast complete! You can break your fast.'
                 : '⏳ Fasting in progress...'}
             </Text>
 
-            {/* Protocol badge */}
             <View style={[styles.activeBadge, {
               backgroundColor: theme.accentDim as string,
               borderColor: theme.accent,
@@ -444,7 +487,6 @@ export default function IntermittentFastingScreen() {
               </Text>
             </View>
 
-            {/* Progress ring */}
             <View style={styles.ringWrap}>
               <ProgressRing
                 progress={progress}
@@ -467,7 +509,6 @@ export default function IntermittentFastingScreen() {
               </ProgressRing>
             </View>
 
-            {/* Remaining time */}
             {!isFastComplete && (
               <View style={[styles.remainingCard, {
                 backgroundColor: theme.card,
@@ -482,7 +523,6 @@ export default function IntermittentFastingScreen() {
               </View>
             )}
 
-            {/* Eating window */}
             {eatingWindowStart && eatingWindowEnd && (
               <View style={[styles.windowCard, {
                 backgroundColor: theme.card,
@@ -509,7 +549,6 @@ export default function IntermittentFastingScreen() {
               </View>
             )}
 
-            {/* Started at */}
             <Text style={[styles.startedAt, { color: theme.textMuted }]}>
               Started at {new Date(activeFast.started_at).toLocaleTimeString('en-US', {
                 hour: 'numeric', minute: '2-digit', hour12: true,
@@ -518,34 +557,28 @@ export default function IntermittentFastingScreen() {
               })}
             </Text>
 
-            {/* End fast button */}
             <TouchableOpacity
               onPress={isFastComplete ? endFast : handleEndFast}
               disabled={isLoading}
               style={[styles.endBtn, {
-                backgroundColor: isFastComplete
-                  ? (theme as any).gold
-                  : theme.card,
-                borderColor: isFastComplete
-                  ? (theme as any).gold
-                  : theme.red,
+                backgroundColor: isFastComplete ? (theme as any).gold : theme.card,
+                borderColor: isFastComplete ? (theme as any).gold : (theme as any).red,
                 borderWidth: 1,
               }]}
             >
               <Ionicons
                 name={isFastComplete ? 'checkmark-circle' : 'stop-circle-outline'}
                 size={20}
-                color={isFastComplete ? theme.bg : theme.red}
+                color={isFastComplete ? theme.bg : (theme as any).red}
               />
               <Text style={[styles.endBtnText, {
-                color: isFastComplete ? theme.bg : theme.red,
+                color: isFastComplete ? theme.bg : (theme as any).red,
               }]}>
                 {isFastComplete ? 'Complete Fast 🎉' : 'End Fast Early'}
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
-          // Start fast button
           <TouchableOpacity
             onPress={handleStartFast}
             disabled={isLoading}
@@ -558,7 +591,7 @@ export default function IntermittentFastingScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Fasting tips */}
+        {/* Tips */}
         {!activeFast && (
           <View style={[styles.tipsCard, {
             backgroundColor: theme.card,
@@ -590,9 +623,7 @@ export default function IntermittentFastingScreen() {
             {history.map((log) => {
               const start = new Date(log.started_at);
               const end = log.ended_at ? new Date(log.ended_at) : null;
-              const durationMs = end
-                ? end.getTime() - start.getTime()
-                : 0;
+              const durationMs = end ? end.getTime() - start.getTime() : 0;
 
               return (
                 <View key={log.id} style={[styles.historyCard, {
@@ -667,7 +698,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // Protocol cards
   protocolCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -691,7 +721,6 @@ const styles = StyleSheet.create({
   protocolStatValue: { fontSize: fontSize.lg, fontWeight: '800' },
   protocolStatLabel: { fontSize: fontSize.xs },
 
-  // Start button
   startBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -704,7 +733,6 @@ const styles = StyleSheet.create({
   },
   startBtnText: { color: '#fff', fontSize: fontSize.lg, fontWeight: '700' },
 
-  // Active fast
   timerSection: {
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
@@ -762,7 +790,6 @@ const styles = StyleSheet.create({
   },
   endBtnText: { fontSize: fontSize.base, fontWeight: '700' },
 
-  // Tips
   tipsCard: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.lg,
@@ -776,7 +803,6 @@ const styles = StyleSheet.create({
   tipDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6, flexShrink: 0 },
   tipText: { fontSize: fontSize.sm, lineHeight: 20, flex: 1 },
 
-  // History
   historyCard: {
     flexDirection: 'row',
     alignItems: 'center',

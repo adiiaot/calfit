@@ -124,8 +124,7 @@
 
 These are genuine gaps that need building before deployment:
 
-**1. Social — Share post to external apps**
-Share button exists but `Expo Sharing` is not wired in. Users cannot share posts to WhatsApp, Instagram, TikTok etc yet.
+**1. 
 
 **2. Social — Kudos notification**
 When a user reacts with Kudos on someone's post, no notification is sent to the post owner. The `notifyKudosReceived` call is missing from the kudos handler.
@@ -139,17 +138,12 @@ New groups do not appear in the Social Discover tab. The `create` function in `u
 **5. Community — Group real-time chat**
 Groups have workouts but no live group chat inside each group. Only 1-1 chat is built.
 
-**6. Intermittent Fasting screen**
-This was in the spec (feature 16) and was never built at all.
+**6.
 
 **7. Voice food logging**
 Spec requires users to speak what they ate to log it. Pro: 10/day limit, Premium: unlimited. Not built — needs Whisper or Claude API.
 
-**8. Recap cards (Daily, Weekly, Monthly)**
-The spec requires exportable recap cards (daily summary, weekly highlights, Spotify-style monthly/yearly). The structure exists but the actual shareable image card generation is not built.
 
-**9. Progress screen**
-The screen exists in navigation but the actual charts for weight changes, body stats over time, and milestone tracking are not fully wired to real Supabase data.
 
 **10. Sleep tracker**
 Manual sleep logging works but Apple Health / Google Fit / smartwatch integration is not built.
@@ -157,8 +151,6 @@ Manual sleep logging works but Apple Health / Google Fit / smartwatch integratio
 **11. Notifications — Push (Firebase)**
 The notification service exists in code but Firebase Cloud Messaging is not configured so push notifications don't actually arrive on devices.
 
-**12. AndroidSafeView on remaining screens**
-Several screens still use `SafeAreaView` instead of `AndroidSafeView` — Social, Chat, Settings, EditProfile, Progress, Streaks, Notifications screens all need the swap for Android layout fix.
 
 **13. App icon and splash screen**
 Still using default Expo icon. CalFit branded icon and splash screen needed before store submission.
@@ -188,10 +180,10 @@ These are built but blocked on external accounts:
 
 In priority order — highest impact first:
 
-1. **Share post to external apps** — quick win, Expo Sharing
-2. **Kudos notification** — one line fix in post service
-3. **Recap cards** — high value, users will share these organically
-4. **Intermittent Fasting screen** — it's in the spec, client will notice it's missing
+1. **Share post to external apps** — quick win, Expo Sharing (DONE)
+2. **Kudos notification** — one line fix in post service (DONE)
+3. **Recap cards** — high value, users will share these organically (DONE)
+4. **Intermittent Fasting screen** — it's in the spec, client will notice it's missing (DONE)
 5. **Group real-time chat** — community feature that drives engagement
 6. **Progress screen** — wire to real Supabase data
 7. **AndroidSafeView** on remaining screens — Android users will have layout issues

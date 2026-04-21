@@ -108,13 +108,23 @@ function TabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.tabBar,
-          borderTopColor: theme.border,
-          borderTopWidth: 1,
-          height: 80,
-          paddingBottom: 12,
-          paddingTop: 8,
-        },
+  backgroundColor: theme.tabBar,
+  borderTopColor: theme.border,
+  borderTopWidth: 0.5,       // hairline — Apple uses 0.5px not 1px
+  height: 80,
+  paddingBottom: 12,
+  paddingTop: 8,
+  // Glass shadow on tab bar
+  ...Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+    },
+    android: { elevation: 8 },
+  }),
+},
         tabBarActiveTintColor: theme.tabBarActive,
         tabBarInactiveTintColor: theme.tabBarInactive,
         tabBarLabelStyle: {

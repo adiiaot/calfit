@@ -1,190 +1,314 @@
-## Full CalFit Feature Audit
-
-### ✅ BUILT AND WORKING
-
-**Onboarding**
-- 7-step onboarding flow
-- Goal, body stats, activity level, tracking preferences, dietary preferences, CalFit ID, personalization
-- Auto-calculated calorie and macro targets
-- Welcome message from Coach
-
-**Home Dashboard**
-- Personalized greeting with time of day
-- Daily Readiness Score (live from steps, water, sleep)
-- Calorie card (goal, consumed, burned)
-- Water, Steps, Sleep stat cards with progress bars
-- Personal Streak card with day dots
-- Quick Log buttons (Food, Water, Sleep, Workout)
-- Quick Nav row (Leaderboard, Partners, Community)
-- Mood check-in card → navigates to Coach
-- Friends Activity Ticker
-- Invite Link button
-- Pull to refresh
-
-**Calorie Tracker**
-- Food log split into Breakfast, Lunch, Dinner, Snacks
-- Open Food Facts search with 400ms debounce
-- Nigerian food database fallback (25 foods)
-- Portion size adjustment with nutrition preview
-- Water intake card with +250ml, +500ml, +1L buttons
-- Calorie history loads from Supabase
-- Notifications when calorie and water goals are hit
-
-**Activity Screen**
-- 40-exercise catalogue with categories and filters
-- Live workout timer
-- Per-exercise timer and calorie tracking
-- Complete workout saves to Supabase
-- Workout history tab
-- Calories tab with weekly bar chart
-- Steps tab with live Expo Pedometer data
-- Voice coach (announces start, exercise complete, workout complete)
-- Quick Start screen
-
-**Coach Screen**
-- Chat interface with message bubbles
-- 5 personality selector with modal
-- System prompt changes based on personality
-- Claude API call wired (awaiting API key)
-- Quick chips for common questions
-- Fallback response when API not connected
-
-**Meal Planner**
-- Manual meal planning by slot
-- AI meal plan generation structure (awaiting API key)
-- Recipe library placeholder
-
-**Social Screen**
-- Following feed and Discover tab
-- Post types (workout, meal, milestone, text)
-- Likes, comments, kudos reactions
-- Follow/unfollow users
-- Public profile screen with post grid
-- Stories (auto-generated from workouts and streaks)
-- Image upload structure (awaiting Claude Vision API)
-
-**Community Screen**
-- Create/join/leave/delete groups
-- Tier limits (Free: 1, Pro: 5, Premium: unlimited)
-- Group workouts
-- Auto-generated challenges with real participant counts
-- Challenge join/leave with points reward
-
-**Chat / Messages**
-- Real-time 1-1 messaging via Supabase Realtime
-- Conversation list with unread badges
-- Privacy-first design (CalFit ID only)
-
-**Leaderboard**
-- Global and Friends tabs
-- 4 categories (Overall, Streaks, Workouts, Referrals)
-- My rank card
-- Weekly reset scoring formula
-
-**Accountability**
-- Add up to 3 partners by CalFit ID
-- Shared dashboard (side by side streaks)
-- Message partner directly
-
-**Live Screen**
-- UI complete, Go Live button present
-- Blocked on Agora account
-
-**Credits / Earnings**
-- Points balance, earned today, lifetime earned
-- Spend store (5 items)
-- Referral section with invite link copy/share
-- Withdrawal balance (PayPal, Bank Transfer structure)
-
-**Settings**
-- Light/dark mode
-- Units selection
-- Notification controls
-- Account settings
-- Privacy controls
-- Delete account (Edge Function)
-
-**Streaks**
-- Personal streak auto-tracking
-- Weekly streak freeze
-- Milestone badges
-
-**Notifications**
-- Notification screen with unread count
-- Push notification service (awaiting Firebase setup)
-
-**Auth**
-- Email/password login and signup
-- Forgot password / reset link
-- Session management via Supabase
+# CalFit — Build To-Do List
+### BigCut Store / Fabs Development (fabsdevelopment.com) · Updated April 2026
+### Stack: React Native · Expo · TypeScript · Supabase · Claude API
 
 ---
 
-### ❌ NOT YET BUILT OR INCOMPLETE
+## ✅ COMPLETED
 
-These are genuine gaps that need building before deployment:
+### Auth & Onboarding
+- [x] 7-step onboarding flow (goal, body stats, activity level, tracking prefs, dietary prefs, CalFit ID, personalization)
+- [x] Auto-calculated daily calorie and macro targets
+- [x] Email/password login and signup
+- [x] Forgot password / reset link
+- [x] Session management via Supabase Auth
 
-**1. 
+### Home Dashboard
+- [x] Personalized greeting (Good morning / afternoon / evening)
+- [x] Daily Readiness Score (live from steps, water, sleep)
+- [x] Calorie card (goal, consumed, burned, remaining)
+- [x] Water, Steps, Sleep stat cards with progress bars
+- [x] Personal streak card with day dots
+- [x] Quick log buttons (Food, Water, Sleep, Workout)
+- [x] Quick nav row (Leaderboard, Partners, Community)
+- [x] Mood check-in card → navigates to Coach
+- [x] Friends Activity Ticker
+- [x] Invite Link button
+- [x] Pull to refresh
 
-**2. Social — Kudos notification**
-When a user reacts with Kudos on someone's post, no notification is sent to the post owner. The `notifyKudosReceived` call is missing from the kudos handler.
+### Calorie Tracker
+- [x] Food log split into Breakfast, Lunch, Dinner, Snacks
+- [x] Open Food Facts search with 400ms debounce
+- [x] Nigerian food database fallback (25 foods)
+- [x] Portion size adjustment with nutrition preview
+- [x] Water intake card with +250ml, +500ml, +1L buttons
+- [x] Calorie history loads from Supabase
+- [x] Notifications when calorie and water goals are hit
 
-**3. Social — Stories manual upload**
-Stories auto-generate from workouts and streaks but users cannot manually upload their own story yet.
+### Activity Screen
+- [x] 40-exercise catalogue with categories and filters
+- [x] Live workout timer
+- [x] Per-exercise timer and calorie tracking
+- [x] Complete workout saves to Supabase
+- [x] Workout history tab
+- [x] Calories tab with weekly bar chart
+- [x] Steps tab with live Expo Pedometer data
+- [x] Voice coach using expo-speech (free, no API key)
+- [x] Quick Start screen with voice coach and workout complete notification
 
-**4. Social — Group discovery in Social feed**
-New groups do not appear in the Social Discover tab. The `create` function in `useGroup` doesn't post to the feed.
+### Coach Screen
+- [x] Chat interface with message bubbles
+- [x] 5 personality selector with modal
+- [x] System prompt changes per personality
+- [x] Claude API call wired (awaiting Anthropic API key)
+- [x] Quick chips for common questions
+- [x] Fallback response when API not connected
+- [x] Input bar gap fixed
 
-**5. Community — Group real-time chat**
-Groups have workouts but no live group chat inside each group. Only 1-1 chat is built.
+### Meal Planner
+- [x] AI meal plan generation with 5-question flow
+- [x] Duration selector (1, 3, 7, 14, 30 days)
+- [x] Day-by-day plan viewer with macro breakdown
+- [x] Saved plans stored in Supabase
+- [x] Delete plan
+- [x] Intermittent Fasting screen (16:8, 18:6, 20:4, 24hr, 5:2)
+- [x] Fasting live timer with progress ring
+- [x] Fasting history saved to Supabase
+- [x] Fasting started/completed notifications → navigate correctly
 
-**6.
+### Social Feed
+- [x] Following feed and Discover tab
+- [x] Post types: workout, meal, milestone, text (constraint fixed)
+- [x] Likes, comments, kudos reactions
+- [x] Kudos notification → post owner notified
+- [x] Comment notification → post owner notified
+- [x] Follow notification → person notified when followed
+- [x] Share post to external apps (WhatsApp, Instagram, TikTok etc)
+- [x] Follow/unfollow users
+- [x] Profile screen fixed (name/avatar from Zustand for own profile)
+- [x] Profiles RLS fixed (all authenticated users can read profiles)
+- [x] Post grid on profile
 
-**7. Voice food logging**
-Spec requires users to speak what they ate to log it. Pro: 10/day limit, Premium: unlimited. Not built — needs Whisper or Claude API.
+### Community
+- [x] Create/join/leave/delete groups
+- [x] Tier limits (Free: 1, Pro: 5, Premium: unlimited)
+- [x] Group created notification
+- [x] Group joined notification
+- [x] Auto-generated challenges with real participant counts
+- [x] Challenge join/leave with points reward
 
+### Chat / Messages
+- [x] Real-time 1-1 messaging via Supabase Realtime
+- [x] Conversation list with unread badges
+- [x] Privacy-first design (CalFit ID only)
 
+### Leaderboard
+- [x] Global and Friends tabs
+- [x] 4 categories (Overall, Streaks, Workouts, Referrals)
+- [x] My rank card
+- [x] Weekly reset scoring formula
 
-**10. Sleep tracker**
-Manual sleep logging works but Apple Health / Google Fit / smartwatch integration is not built.
+### Accountability
+- [x] Add up to 3 partners by CalFit ID
+- [x] Shared dashboard (side by side streaks)
+- [x] Message partner directly
 
-**11. Notifications — Push (Firebase)**
-The notification service exists in code but Firebase Cloud Messaging is not configured so push notifications don't actually arrive on devices.
+### Streaks
+- [x] Personal streak auto-tracking
+- [x] Weekly streak freeze
+- [x] Milestone badges
+- [x] Streak check-in notification
 
+### Recap Cards
+- [x] Daily, Weekly, Monthly recap
+- [x] 4 design styles (Minimal, Bold, Gradient, Dark)
+- [x] Real Supabase data wired
+- [x] Share via native iOS/Android share sheet
+- [x] Recap button added to Progress screen
 
-**13. App icon and splash screen**
-Still using default Expo icon. CalFit branded icon and splash screen needed before store submission.
+### Progress Screen
+- [x] Weight card with progress bar toward goal
+- [x] Stats grid wired to real Supabase data
+- [x] Streak progress card
+- [x] Recent workouts list
+- [x] Period selector (Week, Month, 3 Months, Year)
 
-**14. EAS build configuration**
-`eas.json` not yet configured. Needed to generate APK and IPA.
+### Notifications Screen
+- [x] Notification screen with unread count
+- [x] Filter tabs (All, Unread, Activity, Achievements, System)
+- [x] Mark all read
+- [x] Delete notification (long press)
+- [x] Navigation fixed — all tap actions go to correct screens
+- [x] Fasting notifications navigate to IntermittentFasting screen
+
+### Settings
+- [x] Light/dark mode toggle
+- [x] Units selection (metric/imperial)
+- [x] Notification controls UI
+- [x] Account settings
+- [x] Privacy controls
+- [x] Delete account (Supabase Edge Function)
+
+### Payments & Subscriptions
+- [x] IAP service stub (react-native-iap) — awaiting store accounts
+- [x] Subscription screen UI (Pro $9.99, Premium $19.99)
+- [x] Stripe removed — using Apple IAP + Google Play Billing only
+- [x] Payment README documented
+
+### Live Screen
+- [x] UI complete, Go Live button present
 
 ---
 
-### ⏳ WAITING ON FABS DEVELOPMENT
+## ❌ PENDING — CAN BUILD NOW (no external accounts needed)
 
-These are built but blocked on external accounts:
+### High Priority
 
-- Claude Vision food scanner → needs Anthropic API key
-- AI Meal Planner → needs Anthropic API key
-- Social image moderation → needs Anthropic API key
-- Live streaming → needs Agora account
-- Apple Sign In → needs Apple Developer account
-- Google Sign In → needs Google OAuth credentials
-- Push notifications → needs Firebase setup
-- Subscription payments → needs App Store and Play Store products
-- Supabase migration → needs FABS Development Supabase account
+- [ ] **Sleep tracker screen** — manual sleep logging, daily goal, sleep history, sleep consistency score. Feeds into dashboard sleep card, readiness score, and progress screen (all currently show 0)
+- [ ] **Notification reminder scheduling** — wire the toggle buttons in Settings to actually schedule local Expo Notifications for meal, water, workout, and sleep reminders at set times
+- [ ] **Save favourite meals** in calorie tracker — save a logged meal combination and re-add it in one tap
+- [ ] **Post like notification** — add to `postService.toggleLike` (when liking, not unliking, notify post owner)
+- [ ] **Stories manual upload** — users tap their story bubble to upload their own story (currently only auto-generated from workouts and streaks)
+- [ ] **Group real-time chat** — groups have feed and workouts but no live group chat inside each group
+- [ ] **Post-workout meal suggestions** — after workout completes, suggest a recovery meal via Claude fallback
+- [ ] **Personal records tracking** — detect and display PRs (new max weight, longest duration etc) in workout history
+- [ ] **Leaderboard rank-up notification** — notify user when their rank improves
+- [ ] **Privacy policy page** — required by Apple and Google before app approval. Publish at `calfit.tech/privacy`
+- [ ] **App icon and splash screen** — blocking store submission on both platforms
+- [ ] **EAS build configuration** — `eas.json` not yet set up. Needed to generate APK and IPA
+
+### Medium Priority
+
+- [ ] **Micronutrient tracking** — toggle in Settings to show/hide micronutrients in food log. UI placeholder exists but not wired
+- [ ] **Equipment preferences** — save preferred equipment in Settings, used to filter workout library
+- [ ] **Calorie trend charts** — view by day/week/month with actual chart rendering (currently flat list)
+- [ ] **Sleep-to-performance connection** — show how sleep quality affects readiness score with explanation card
+- [ ] **Comeback Mode Banner** — show warm return message on Home if user inactive for 2+ days
+- [ ] **Weekly summary widget** — sleep average currently always shows 0 (needs sleep logs)
+- [ ] **Accountability partner streak shared goals** — partners can set a shared goal beyond just streaks
+- [ ] **Linked Instagram on profile** — field exists in onboarding and profile but doesn't actually link/open
+- [ ] **PR showcase on profile** — show personal records section on public profile page
+- [ ] **Withdrawal history in Credits screen** — show past withdrawal records (date, amount, method, status)
+- [ ] **App Store listing copy** — description, keywords, subtitle, age rating answers
+
+### Lower Priority (Phase 2)
+
+- [ ] **Manual meal planning** — drag and drop meal slots, save templates, auto grocery list
+- [ ] **Recipes library** — organised recipe library with ratings, save/submit, step-by-step instructions, import via URL
+- [ ] **Meal plan history** — planned vs actual adherence score
+- [ ] **Workout scheduling** — schedule workouts, set rest days, recurring schedules
+- [ ] **Adaptive recovery system** — auto-adjust workout intensity based on readiness score
+- [ ] **Group/Community streak threshold logic** — admin sets completion threshold (e.g. 4 of 5 members must log)
+- [ ] **Streak Keeper badge** — badge for most consistent group streak member
+- [ ] **Challenge leaderboards** — leaderboard scoped to active challenges
+- [ ] **Milestone celebrations** — in-app celebration animation + shareable milestone card when hitting streak milestones
+- [ ] **Mood trends** — track mood over time from daily check-ins, show trend chart
 
 ---
 
-## What I Recommend We Build Now
+## ⏳ PENDING — WAITING ON FABS DEVELOPMENT
 
-In priority order — highest impact first:
+### Requires Anthropic API Key
+- [ ] AI Coach real responses (currently falls back to static message)
+- [ ] AI Meal Planner generation
+- [ ] Food photo/AI logging (Claude Vision)
+- [ ] Food barcode scanner
+- [ ] Social image moderation (Claude Vision — flags inappropriate uploads)
+- [ ] Voice food logging (speak what you ate)
+- [ ] AI Form Check in workout screen
 
-1. **Share post to external apps** — quick win, Expo Sharing (DONE)
-2. **Kudos notification** — one line fix in post service (DONE)
-3. **Recap cards** — high value, users will share these organically (DONE)
-4. **Intermittent Fasting screen** — it's in the spec, client will notice it's missing (DONE)
-5. **Group real-time chat** — community feature that drives engagement
-6. **Progress screen** — wire to real Supabase data
-7. **AndroidSafeView** on remaining screens — Android users will have layout issues
-8. **App icon and splash screen** — blocks store submission
+### Requires Apple Developer Account ($99/year)
+- [ ] App Store submission
+- [ ] TestFlight beta testing
+- [ ] Apple Sign In (onboarding Step 7)
+- [ ] Apple In-App Purchase products (`com.fabsdevelopment.calfit.pro.monthly`, `com.fabsdevelopment.calfit.premium.monthly`)
+
+### Requires Google Play Console ($25 one-time)
+- [ ] Play Store submission
+- [ ] Google Sign In
+- [ ] Google Play Billing products (same product IDs as App Store)
+
+### Requires Firebase Setup
+- [ ] Push notifications to device (FCM)
+- [ ] Notification delivered to device even when app is closed
+- [ ] `google-services.json` and `GoogleService-Info.plist` added to project
+
+### Requires Agora Account
+- [ ] Live streaming (Go Live screen — UI complete, Agora SDK not configured)
+- [ ] Accountability partner audio/video calls (spec requirement)
+
+### Requires Stripe Connect
+- [ ] Referral payout processing (paying out 15% commission to referring users via PayPal/Bank Transfer)
+- [ ] Note: Stripe is NOT used for user subscriptions — that goes through Apple/Google IAP only
+
+### Requires Supabase Migration
+- [ ] Move database from AOT's Supabase account to FABS Development Supabase org
+- [ ] Re-deploy Edge Functions with new service role key
+- [ ] Update `.env` with new Supabase URL and keys
+
+### Requires Hostinger Email Setup
+- [ ] `dev@fabsdevelopment.com` — register Apple Developer, Google Play, Firebase, Supabase, GitHub, Expo, Anthropic
+- [ ] `support@calfit.tech` — shown in App Store and Play Store as user support contact
+
+### Requires Apple Health / Google Fit Entitlements
+- [ ] Smartwatch integration (sleep, steps, heart rate)
+- [ ] Apple Health read/write permissions
+- [ ] Google Fit API
+
+---
+
+## 💰 FUNDS NEEDED FROM FABS DEVELOPMENT
+
+| Item | Cost | Type | Unblocks |
+|------|------|------|---------|
+| Apple Developer Program | $99/year | One-time (annual) | App Store, TestFlight, Apple Sign In, Apple IAP |
+| Google Play Console | $25 | One-time | Play Store, Google Sign In, Google Play Billing |
+| Hostinger Premium Email ×2 | ~$4/month | Monthly | All platform registrations |
+| Anthropic API credits | ~$50/month | Monthly | AI Coach, Meal Planner, Vision, Food Scanner |
+| **Total first month** | **~$178** | | |
+
+---
+
+## 🏗️ INFRASTRUCTURE REFERENCE
+
+### App Bundle IDs
+```
+iOS:     com.bigcutstore.calfit
+Android: com.bigcutstore.calfit
+```
+
+### IAP Product IDs (must match exactly in App Store Connect + Google Play Console)
+```
+com.bigcutstore.calfit.pro.monthly      — $9.99/month
+com.bigcutstore.calfit.premium.monthly  — $19.99/month
+```
+
+### Subscription Tiers
+| Tier | Price | Key Features |
+|------|-------|-------------|
+| Free | $0 | 5 Coach prompts/day, ads, 1 group |
+| Pro | $9.99/mo | 20 prompts, food scanner, no ads, 5 groups, accountability |
+| Premium | $19.99/mo | Unlimited Coach, AI Meal Planner, live streaming, earnings wallet |
+
+### Key Domains
+- App: `calfit.tech`
+- Company: `bigcut.store`
+- Privacy Policy (required): `calfit.tech/privacy`
+
+### Key Files
+```
+src/services/iapService.ts              — IAP stub (activate when store accounts ready)
+src/services/notificationService.ts    — All in-app notification triggers
+src/services/iapService.ts             — Subscription purchase flow
+CalFit_Payment_Setup_README.md         — Full store setup guide
+```
+
+### Revenue Split
+- Apple App Store: 85% to BigCut (15% small business rate if <$1M/year)
+- Google Play: 85% to BigCut (15% small business rate for first $1M/year)
+- Referral commission: 15% of referred user's subscription for 5 years
+
+---
+
+## 📋 SUGGESTED BUILD ORDER (next sessions)
+
+1. Sleep tracker screen
+2. Notification reminder scheduling (local Expo Notifications)
+3. Post like notification in postService
+4. Stories manual upload
+5. Privacy policy at calfit.tech/privacy
+6. App icon and splash screen
+7. EAS build configuration (eas.json)
+8. Personal records tracking
+9. Post-workout meal suggestions
+10. Leaderboard rank-up notification

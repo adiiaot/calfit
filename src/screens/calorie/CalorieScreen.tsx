@@ -7,6 +7,7 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useEffect, useState, useRef } from 'react';
@@ -54,9 +55,19 @@ function AddFoodModal({
   const [selected, setSelected] = useState<FoodResult | null>(null);
   const [portion, setPortion] = useState('100');
   const [isSaving, setIsSaving] = useState(false);
+
+  // ── Manual entry state ─────────────────────────────────────
+  const [showManual, setShowManual] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualCalories, setManualCalories] = useState('');
+  const [manualProtein, setManualProtein] = useState('');
+  const [manualCarbs, setManualCarbs] = useState('');
+  const [manualFat, setManualFat] = useState('');
+  const [manualGrams, setManualGrams] = useState('');
+
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset state when modal opens
+  // Reset all state when modal opens/closes
   useEffect(() => {
     if (visible) {
       setQuery('');
@@ -64,10 +75,17 @@ function AddFoodModal({
       setSelected(null);
       setPortion('100');
       setIsSearching(false);
+      setShowManual(false);
+      setManualName('');
+      setManualCalories('');
+      setManualProtein('');
+      setManualCarbs('');
+      setManualFat('');
+      setManualGrams('');
     }
   }, [visible]);
 
-  // ── Debounced Open Food Facts search ──────────────────────
+  // ── Debounced search ───────────────────────────────────────
   const handleSearch = (text: string) => {
     setQuery(text);
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -85,7 +103,7 @@ function AddFoodModal({
     }, 400);
   };
 
-  // ── Scale nutrition values based on portion size ──────────
+  // ── Scale nutrition values by portion ─────────────────────
   const scaled = selected
     ? {
         calories:  Math.round(selected.calories  * (parseFloat(portion) || 100) / 100),
@@ -95,6 +113,7 @@ function AddFoodModal({
       }
     : null;
 
+  // ── Add from database result ───────────────────────────────
   const handleAdd = async () => {
     if (!selected || !scaled) return;
     setIsSaving(true);
@@ -110,7 +129,44 @@ function AddFoodModal({
     onClose();
   };
 
+  // ── Add from manual entry ──────────────────────────────────
+  const handleManualAdd = async () => {
+    if (!manualName.trim()) {
+      Alert.alert('Food name required', 'Please enter the name of the food.');
+      return;
+    }
+    const cal = parseInt(manualCalories, 10);
+    if (!cal || cal <= 0) {
+      Alert.alert('Calories required', 'Please enter a valid calorie amount.');
+      return;
+    }
+    setIsSaving(true);
+    await onAdd({
+      food_name: manualName.trim(),
+      meal_type: mealType,
+      calories:  cal,
+      protein_g: manualProtein ? parseFloat(manualProtein) : undefined,
+      carbs_g:   manualCarbs   ? parseFloat(manualCarbs)   : undefined,
+      fats_g:    manualFat     ? parseFloat(manualFat)      : undefined,
+    });
+    setIsSaving(false);
+    onClose();
+  };
+
   const mealLabel = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+
+  // ── Determine header back action ──────────────────────────
+  const handleBack = () => {
+    if (showManual) { setShowManual(false); return; }
+    if (selected)   { setSelected(null);    return; }
+    onClose();
+  };
+
+  const headerTitle = showManual
+    ? 'Log Manually'
+    : selected
+    ? selected.name
+    : `Add to ${mealLabel}`;
 
   return (
     <Modal
@@ -127,25 +183,130 @@ function AddFoodModal({
 
           {/* Header */}
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              onPress={selected ? () => setSelected(null) : onClose}
-              style={styles.modalBackBtn}
-            >
+            <TouchableOpacity onPress={handleBack} style={styles.modalBackBtn}>
               <Ionicons
-                name={selected ? 'chevron-back' : 'close'}
+                name={selected || showManual ? 'chevron-back' : 'close'}
                 size={22}
                 color={theme.textPrimary}
               />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-              {selected ? selected.name : `Add to ${mealLabel}`}
+              {headerTitle}
             </Text>
           </View>
 
+          {/* ── MANUAL ENTRY VIEW ──────────────────────────── */}
+          {showManual && (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={[styles.manualHint, { color: theme.textMuted }]}>
+                Can't find your food? Enter the details below. Only name and calories are required.
+              </Text>
+
+              {/* Food name */}
+              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
+                Food name *
+              </Text>
+              <View style={[styles.manualInput, {
+                backgroundColor: theme.bg,
+                borderColor: theme.border,
+              }]}>
+                <TextInput
+                  value={manualName}
+                  onChangeText={setManualName}
+                  placeholder="e.g. Egusi soup, Pounded yam..."
+                  placeholderTextColor={theme.textMuted}
+                  style={[styles.manualInputText, { color: theme.textPrimary }]}
+                  autoFocus
+                />
+              </View>
+
+              {/* Grams (optional) */}
+              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
+                Portion size (optional)
+              </Text>
+              <View style={[styles.manualInput, {
+                backgroundColor: theme.bg,
+                borderColor: theme.border,
+              }]}>
+                <TextInput
+                  value={manualGrams}
+                  onChangeText={setManualGrams}
+                  placeholder="e.g. 250 (grams)"
+                  placeholderTextColor={theme.textMuted}
+                  keyboardType="number-pad"
+                  style={[styles.manualInputText, { color: theme.textPrimary }]}
+                />
+              </View>
+
+              {/* Calories */}
+              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
+                Calories (kcal) *
+              </Text>
+              <View style={[styles.manualInput, {
+                backgroundColor: theme.bg,
+                borderColor: theme.accent,
+              }]}>
+                <TextInput
+                  value={manualCalories}
+                  onChangeText={setManualCalories}
+                  placeholder="e.g. 450"
+                  placeholderTextColor={theme.textMuted}
+                  keyboardType="number-pad"
+                  style={[styles.manualInputText, { color: theme.accent, fontWeight: '700' }]}
+                />
+              </View>
+
+              {/* Macros row — optional */}
+              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
+                Macros (optional)
+              </Text>
+              <View style={styles.macroRow}>
+                {[
+                  { label: 'Protein (g)', value: manualProtein, set: setManualProtein, color: theme.accent },
+                  { label: 'Carbs (g)',   value: manualCarbs,   set: setManualCarbs,   color: theme.accentSecond },
+                  { label: 'Fat (g)',     value: manualFat,     set: setManualFat,     color: (theme as any).purple },
+                ].map((m) => (
+                  <View key={m.label} style={[styles.macroInput, {
+                    backgroundColor: theme.bg,
+                    borderColor: theme.border,
+                  }]}>
+                    <TextInput
+                      value={m.value}
+                      onChangeText={m.set}
+                      placeholder="0"
+                      placeholderTextColor={theme.textMuted}
+                      keyboardType="decimal-pad"
+                      style={[styles.macroInputText, { color: m.color }]}
+                    />
+                    <Text style={[styles.macroInputLabel, { color: theme.textMuted }]}>
+                      {m.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                onPress={handleManualAdd}
+                disabled={isSaving}
+                style={[styles.modalAddBtn, { backgroundColor: theme.accent, marginTop: spacing.lg }]}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color={theme.bg} />
+                ) : (
+                  <Text style={[styles.modalAddBtnText, { color: theme.bg }]}>
+                    Add to {mealLabel}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+
           {/* ── SEARCH VIEW ─────────────────────────────────── */}
-          {!selected && (
+          {!selected && !showManual && (
             <>
-              {/* Search input */}
               <View style={[styles.modalSearchBar, {
                 backgroundColor: theme.bg,
                 borderColor: theme.border,
@@ -167,16 +328,14 @@ function AddFoodModal({
                 )}
               </View>
 
-              {/* Status label */}
               <Text style={[styles.modalListLabel, { color: theme.textMuted }]}>
                 {isSearching
                   ? 'Searching...'
                   : query.length === 0
                   ? 'Type to search millions of foods'
-                  : `${results.length} results`}
+                  : `${results.length} result${results.length !== 1 ? 's' : ''}`}
               </Text>
 
-              {/* Loading indicator */}
               {isSearching && (
                 <View style={styles.searchingRow}>
                   <ActivityIndicator size="small" color={theme.accent} />
@@ -186,20 +345,35 @@ function AddFoodModal({
                 </View>
               )}
 
-              {/* Results list */}
               <ScrollView
                 style={styles.modalFoodList}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
               >
+                {/* No results — show manual entry prompt */}
                 {!isSearching && query.length > 0 && results.length === 0 && (
                   <View style={styles.modalEmptyState}>
                     <Text style={[styles.modalEmptyText, { color: theme.textMuted }]}>
                       No results for "{query}"
                     </Text>
                     <Text style={[styles.modalEmptyHint, { color: theme.textMuted }]}>
-                      Try a different spelling or simpler name
+                      Try a different spelling, or log it manually below.
                     </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setManualName(query); // Pre-fill name from what they searched
+                        setShowManual(true);
+                      }}
+                      style={[styles.manualEntryBtn, {
+                        backgroundColor: theme.accentDim as string,
+                        borderColor: theme.accent,
+                      }]}
+                    >
+                      <Ionicons name="create-outline" size={16} color={theme.accent} />
+                      <Text style={[styles.manualEntryBtnText, { color: theme.accent }]}>
+                        Log "{query}" manually
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 )}
 
@@ -239,12 +413,43 @@ function AddFoodModal({
                     </View>
                   </TouchableOpacity>
                 ))}
+
+                {/* Always show manual option at the bottom of results too */}
+                {!isSearching && query.length > 0 && results.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setManualName(query);
+                      setShowManual(true);
+                    }}
+                    style={[styles.manualEntryBtnSmall, {
+                      borderColor: theme.border,
+                    }]}
+                  >
+                    <Ionicons name="create-outline" size={14} color={theme.textMuted} />
+                    <Text style={[styles.manualEntryBtnSmallText, { color: theme.textMuted }]}>
+                      Don't see your food? Log manually
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </ScrollView>
+
+              {/* Manual entry shortcut — always visible */}
+              <TouchableOpacity
+                onPress={() => setShowManual(true)}
+                style={[styles.manualEntryFooter, {
+                  borderTopColor: theme.border,
+                }]}
+              >
+                <Ionicons name="create-outline" size={16} color={theme.textSecondary} />
+                <Text style={[styles.manualEntryFooterText, { color: theme.textSecondary }]}>
+                  Log food manually
+                </Text>
+              </TouchableOpacity>
             </>
           )}
 
           {/* ── PORTION VIEW ────────────────────────────────── */}
-          {selected && scaled && (
+          {selected && scaled && !showManual && (
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -289,13 +494,12 @@ function AddFoodModal({
                 ))}
               </View>
 
-              {/* Nutrition preview */}
               <View style={styles.nutritionGrid}>
                 {[
                   { label: 'Calories', value: `${scaled.calories}`,  unit: 'kcal', color: theme.orange },
                   { label: 'Protein',  value: `${scaled.protein_g}`, unit: 'g',    color: theme.accent },
                   { label: 'Carbs',    value: `${scaled.carbs_g}`,   unit: 'g',    color: theme.accentSecond },
-                  { label: 'Fats',     value: `${scaled.fats_g}`,    unit: 'g',    color: theme.purple },
+                  { label: 'Fats',     value: `${scaled.fats_g}`,    unit: 'g',    color: (theme as any).purple },
                 ].map((n) => (
                   <View key={n.label} style={[styles.nutritionCell, {
                     backgroundColor: theme.bg,
@@ -335,27 +539,34 @@ function AddFoodModal({
   );
 }
 
-// ── SEARCH BAR ───────────────────────────────────────────────
+// ── SEARCH BAR ────────────────────────────────────────────────
+// Now wired — tapping or typing opens the AddFoodModal for Breakfast
+// (the meal type doesn't matter here since the user picks it per section below;
+// the top bar is a quick shortcut that opens the modal pre-focused)
 function SearchBar({
   theme,
+  onPress,
   onScanPress,
 }: {
   theme: typeof colors.dark;
+  onPress: () => void;
   onScanPress: () => void;
 }) {
   return (
     <View style={styles.searchRow}>
-      <View style={[styles.searchInput, {
-        backgroundColor: theme.card,
-        borderColor: theme.border,
-      }]}>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={[styles.searchInput, {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }]}
+      >
         <Ionicons name="search-outline" size={18} color={theme.textMuted} />
-        <TextInput
-          placeholder="Search food or log by voice..."
-          placeholderTextColor={theme.textMuted}
-          style={[styles.searchText, { color: theme.textPrimary }]}
-        />
-      </View>
+        <Text style={[styles.searchText, { color: theme.textMuted }]}>
+          Search food or log manually...
+        </Text>
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={onScanPress}
         style={[styles.scanBtn, { backgroundColor: theme.accent }]}
@@ -394,9 +605,9 @@ function CalorieSummary({
         </View>
         <View style={styles.donutStats}>
           {[
-            { dot: theme.textMuted, label: 'Goal',      value: `${goal} kcal` },
-            { dot: theme.orange,    label: 'Consumed',   value: `${consumed} kcal` },
-            { dot: theme.accent,    label: 'Remaining',  value: `${remaining} kcal` },
+            { dot: theme.textMuted, label: 'Goal',     value: `${goal} kcal` },
+            { dot: (theme as any).orange, label: 'Consumed',  value: `${consumed} kcal` },
+            { dot: theme.accent,    label: 'Remaining', value: `${remaining} kcal` },
           ].map((s) => (
             <View key={s.label} style={styles.donutStatRow}>
               <View style={[styles.donutDot, { backgroundColor: s.dot }]} />
@@ -538,6 +749,13 @@ export default function CalorieScreen() {
     navigation.getParent()?.navigate('FoodScanner');
   };
 
+  // Open modal from the top search bar — defaults to breakfast
+  // The user can switch meal type inside the per-section Add Food buttons
+  const handleOpenSearchBar = () => {
+    setActiveMeal('breakfast');
+    setShowAddFood(true);
+  };
+
   useEffect(() => {
     if (!user?.id) return;
     loadData();
@@ -643,7 +861,13 @@ export default function CalorieScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <SearchBar theme={theme} onScanPress={handleOpenScanner} />
+        {/* Top search bar — now tappable, opens AddFoodModal */}
+        <SearchBar
+          theme={theme}
+          onPress={handleOpenSearchBar}
+          onScanPress={handleOpenScanner}
+        />
+
         <CalorieSummary theme={theme} consumed={caloriesConsumed} goal={calorieGoal} />
 
         <TouchableOpacity
@@ -870,12 +1094,37 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs, fontWeight: '600', marginBottom: spacing.xs,
     textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  modalFoodList: { maxHeight: 360 },
-  modalEmptyState: { alignItems: 'center', paddingVertical: spacing.xl },
+  modalFoodList: { maxHeight: 320 },
+  modalEmptyState: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
   modalEmptyText: { fontSize: fontSize.base, fontWeight: '600' },
-  modalEmptyHint: { fontSize: fontSize.sm, marginTop: spacing.xs },
+  modalEmptyHint: { fontSize: fontSize.sm },
 
-  // Search result rows inside modal
+  // Manual entry button — shown when no results
+  manualEntryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    borderRadius: radius.md, borderWidth: 1, marginTop: spacing.sm,
+  },
+  manualEntryBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+
+  // Subtle manual entry link — shown at bottom of results list
+  manualEntryBtnSmall: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.xs, padding: spacing.md,
+    borderRadius: radius.sm, borderWidth: 1,
+    marginTop: spacing.sm, marginBottom: spacing.sm,
+  },
+  manualEntryBtnSmallText: { fontSize: fontSize.sm },
+
+  // Footer always visible at bottom of modal
+  manualEntryFooter: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, paddingTop: spacing.md,
+    borderTopWidth: 1, marginTop: spacing.sm,
+  },
+  manualEntryFooterText: { fontSize: fontSize.sm, fontWeight: '600' },
+
+  // Search result rows
   foodResultRow: {
     flexDirection: 'row', alignItems: 'center',
     padding: spacing.md, borderRadius: radius.md,
@@ -891,7 +1140,6 @@ const styles = StyleSheet.create({
   foodResultCalNum: { fontSize: fontSize.lg, fontWeight: '800' },
   foodResultCalUnit: { fontSize: 9, fontWeight: '600' },
 
-  // Searching indicator
   searchingRow: {
     flexDirection: 'row', alignItems: 'center',
     gap: spacing.sm, padding: spacing.md,
@@ -918,7 +1166,6 @@ const styles = StyleSheet.create({
   },
   portionPillText: { fontSize: fontSize.sm, fontWeight: '600' },
 
-  // Nutrition grid
   nutritionGrid: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
   nutritionCell: {
     flex: 1, padding: spacing.sm,
@@ -930,4 +1177,20 @@ const styles = StyleSheet.create({
 
   modalAddBtn: { padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center' },
   modalAddBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
+
+  // ── Manual entry form ─────────────────────────────────────
+  manualHint: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
+  manualLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.xs },
+  manualInput: {
+    padding: spacing.md, borderRadius: radius.md,
+    borderWidth: 1, marginBottom: spacing.md,
+  },
+  manualInputText: { fontSize: fontSize.base },
+  macroRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  macroInput: {
+    flex: 1, padding: spacing.sm,
+    borderRadius: radius.sm, borderWidth: 1, alignItems: 'center',
+  },
+  macroInputText: { fontSize: fontSize.lg, fontWeight: '800', width: '100%' },
+  macroInputLabel: { fontSize: 9, marginTop: 2, textAlign: 'center' },
 });

@@ -35,6 +35,9 @@ export default function ProfileScreen() {
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
+  // Re-run load every time this screen comes into focus.
+  // This ensures follow state and profile data are always fresh
+  // whether navigating from Leaderboard, Discover, or anywhere else.
   useFocusEffect(
     useCallback(() => {
       load();
@@ -44,10 +47,9 @@ export default function ProfileScreen() {
   const load = async () => {
     setIsLoading(true);
 
-    // ── If viewing own profile use Zustand data directly ──────
-    // This avoids stale data from Supabase and fixes the
-    // "CalFit User" name bug when profile wasn't fully synced
     if (isCurrentUser && currentProfile) {
+      // Own profile — use Zustand data for speed, still fetch counts from DB
+      const counts = await getFollowCounts(user!.id);
       setProfileData({
         id: user?.id,
         full_name: currentProfile.full_name,
@@ -57,32 +59,48 @@ export default function ProfileScreen() {
         bio: (currentProfile as any).bio,
         streak_count: (currentProfile as any).streak_count ?? 0,
       });
-
-      const [postsRes, counts] = await Promise.all([
-        loadUserPosts(targetUserId),
-        getFollowCounts(targetUserId),
-      ]);
+      const postsRes = await loadUserPosts(user!.id);
       setPosts(postsRes);
       setFollowCounts(counts);
       setIsLoading(false);
       return;
     }
 
-    // ── Viewing someone else's profile — fetch from Supabase ──
+    // ── Viewing someone else's profile ─────────────────────────
+    // Fetch profile, posts, follow counts, and follow status in parallel.
+    // The profiles table RLS must allow authenticated reads — if full_name
+    // still shows as null here, the RLS policy needs: FOR SELECT USING (true)
     const [profileRes, postsRes, counts] = await Promise.all([
       supabase
-        .from('profiles')
-        .select('id, full_name, calfit_id, avatar_url, goal, bio, streak_count')
-        .eq('id', targetUserId)
-        .single(),
+  .from('profiles')
+  .select('id, full_name, calfit_id, avatar_url, goal, streak_count')
+  .eq('id', targetUserId)
+  .single(),
       loadUserPosts(targetUserId),
       getFollowCounts(targetUserId),
     ]);
 
-    setProfileData(profileRes.data);
+    if (profileRes.error) {
+      console.error('ProfileScreen load error:', profileRes.error.message);
+    }
+
+    // Guarantee we always have a display name — fall back chain:
+    // full_name → calfit_id → first 8 chars of UUID
+    const rawProfile = profileRes.data;
+    setProfileData(rawProfile
+  ? {
+      ...rawProfile,
+      full_name: rawProfile.full_name
+        || rawProfile.calfit_id
+        || targetUserId.slice(0, 8),
+    }
+  : null
+);
     setPosts(postsRes);
     setFollowCounts(counts);
 
+    // Always re-check follow state on focus so it stays in sync
+    // when the user follows/unfollows from Discover and comes back here
     if (user?.id) {
       const isF = await isFollowing(user.id, targetUserId);
       setFollowingUser(isF);
@@ -94,13 +112,13 @@ export default function ProfileScreen() {
   const handleFollow = async () => {
     if (!user?.id) return;
     if (followingUser) {
-      await unfollowUser(user.id, targetUserId);
       setFollowingUser(false);
-      setFollowCounts((prev) => ({ ...prev, followers: prev.followers - 1 }));
+      setFollowCounts((prev) => ({ ...prev, followers: Math.max(prev.followers - 1, 0) }));
+      await unfollowUser(user.id, targetUserId);
     } else {
-      await followUser(user.id, targetUserId);
       setFollowingUser(true);
       setFollowCounts((prev) => ({ ...prev, followers: prev.followers + 1 }));
+      await followUser(user.id, targetUserId);
     }
   };
 
@@ -146,59 +164,60 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <ProfileHeader
-          theme={theme}
-          name={profileData?.full_name ?? 'CalFit User'}
-          calfitId={profileData?.calfit_id ?? ''}
-          avatarUrl={profileData?.avatar_url}
-          bio={profileData?.bio}
-          goal={profileData?.goal}
-          followersCount={followCounts.followers}
-          followingCount={followCounts.following}
-          postsCount={posts.length}
-          streakCount={profileData?.streak_count ?? 0}
-          isCurrentUser={isCurrentUser}
-          isFollowing={followingUser}
-          onFollowPress={handleFollow}
-          onMessagePress={handleMessage}
-          onEditPress={() => navigation.navigate('EditProfile')}
-        />
+       <ProfileHeader
+  theme={theme}
+  name={profileData?.full_name ?? 'CalFit User'}
+  calfitId={profileData?.calfit_id ?? ''}
+  avatarUrl={profileData?.avatar_url ?? null}
+  goal={profileData?.goal ?? 'Get Fit'}
+  bio=""
+  streakCount={profileData?.streak_count ?? 0}
+  followersCount={followCounts.followers}
+  followingCount={followCounts.following}
+  postsCount={posts.length}
+  isCurrentUser={isCurrentUser}
+  isFollowing={followingUser}
+  onFollowPress={handleFollow}
+  onMessagePress={handleMessage}
+  onEditPress={() => navigation.navigate('EditProfile')}
+/>
 
         {/* Post grid */}
-        {posts.length === 0 ? (
-          <View style={styles.noPosts}>
-            <Ionicons name="grid-outline" size={32} color={theme.textMuted} />
-            <Text style={[styles.noPostsText, { color: theme.textMuted }]}>
-              No posts yet
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.grid}>
-            {posts.map((post) => (
-              <TouchableOpacity key={post.id} style={styles.gridItem}>
-                {post.image_url ? (
-                  <Image
-                    source={{ uri: post.image_url }}
-                    style={[styles.gridImage, { backgroundColor: theme.border }]}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={[styles.gridTextPost, {
-                    backgroundColor: theme.card,
-                    borderColor: theme.border,
-                  }]}>
-                    <Text
-                      style={[styles.gridTextContent, { color: theme.textPrimary }]}
-                      numberOfLines={4}
-                    >
-                      {post.content}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        <View style={styles.gridSection}>
+          <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>
+            Posts
+          </Text>
+          {posts.length === 0 ? (
+            <View style={styles.emptyPosts}>
+              <Ionicons name="images-outline" size={32} color={theme.textMuted} />
+              <Text style={[styles.emptyPostsText, { color: theme.textMuted }]}>
+                No posts yet
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.grid}>
+              {posts.map((post) => (
+                <TouchableOpacity
+                  key={post.id}
+                  style={[styles.gridCell, { backgroundColor: theme.card, borderColor: theme.border }]}
+                >
+                  {post.image_url ? (
+                    <Image source={{ uri: post.image_url }} style={styles.gridImage} />
+                  ) : (
+                    <View style={[styles.gridTextCell, { backgroundColor: theme.surface }]}>
+                      <Text
+                        style={[styles.gridCellText, { color: theme.textSecondary }]}
+                        numberOfLines={3}
+                      >
+                        {post.content}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </AndroidSafeView>
   );
@@ -212,35 +231,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   headerTitle: { fontSize: fontSize.base, fontWeight: '700' },
-  noPosts: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-    gap: spacing.sm,
+  gridSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: 100,
   },
-  noPostsText: { fontSize: fontSize.base },
+  gridLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: spacing.lg,
     gap: spacing.xs,
   },
-  gridItem: {
+  gridCell: {
     width: GRID_SIZE,
     height: GRID_SIZE,
     borderRadius: radius.sm,
     overflow: 'hidden',
+    borderWidth: 1,
   },
   gridImage: { width: '100%', height: '100%' },
-  gridTextPost: {
-    width: '100%',
-    height: '100%',
+  gridTextCell: {
+    flex: 1,
     padding: spacing.xs,
+    alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: radius.sm,
   },
-  gridTextContent: { fontSize: 9, lineHeight: 13 },
+  gridCellText: { fontSize: 10, textAlign: 'center', lineHeight: 14 },
+  emptyPosts: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl,
+    gap: spacing.sm,
+  },
+  emptyPostsText: { fontSize: fontSize.sm },
 });

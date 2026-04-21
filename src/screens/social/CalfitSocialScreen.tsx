@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { PostData, sharePost } from '../../modules/social/services/postService';
+import { supabase } from '../../services/supabase';
 
 import { PostCard } from '../../modules/social/components/postCard';
 import { ComposeBox } from '../../modules/social/components/composeBox';
@@ -60,6 +61,8 @@ export default function CalFitSocialScreen() {
     clearModerationError,
   } = usePost(user?.id ?? '');
 
+  // Reload on every focus so follow state stays accurate after
+  // the user follows someone and navigates back to this screen.
   useFocusEffect(
     useCallback(() => {
       if (user?.id) loadDiscoverUsers();
@@ -69,23 +72,39 @@ export default function CalFitSocialScreen() {
   const loadDiscoverUsers = async () => {
     if (!user?.id) return;
     try {
-      const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, calfit_id, avatar_url, goal')
-        .neq('id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(30);
+      // Fetch profiles AND the current user's follows in parallel.
+      // This is what was missing before — isFollowing was always false
+      // because we never checked the DB for who the user already follows.
+      const [profilesRes, followsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name, calfit_id, avatar_url, goal')
+          .neq('id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id),
+      ]);
 
-      if (data) {
-        setDiscoverUsers((data as any[]).map((u) => ({
-          id: u.id,
-          name: u.full_name ?? 'CalFit User',
-          calfitId: u.calfit_id ?? u.id.slice(0, 8),
-          avatar: u.avatar_url ?? null,
-          goal: u.goal ?? '',
-          isFollowing: false,
-        })));
+      // Build a Set of IDs the current user follows for O(1) lookup
+      const followingSet = new Set(
+        ((followsRes.data ?? []) as any[]).map((f) => f.following_id)
+      );
+
+      if (profilesRes.data) {
+        setDiscoverUsers(
+          (profilesRes.data as any[]).map((u) => ({
+            id: u.id,
+            name: u.full_name ?? 'CalFit User',
+            calfitId: u.calfit_id ?? u.id.slice(0, 8),
+            avatar: u.avatar_url ?? null,
+            goal: u.goal ?? '',
+            // Real follow state from DB — not hardcoded false
+            isFollowing: followingSet.has(u.id),
+          }))
+        );
       }
     } catch (error) {
       console.error('loadDiscoverUsers error:', error);
@@ -119,12 +138,22 @@ export default function CalFitSocialScreen() {
   };
 
   const handleFollow = async (userId: string, currentlyFollowing: boolean) => {
+    // Optimistic update — flip immediately in UI
     setDiscoverUsers((prev) =>
       prev.map((u) =>
         u.id === userId ? { ...u, isFollowing: !currentlyFollowing } : u
       )
     );
-    await toggleFollow(userId, currentlyFollowing);
+    // Persist to DB
+    const success = await toggleFollow(userId, currentlyFollowing);
+    // Revert if DB call failed
+    if (!success) {
+      setDiscoverUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, isFollowing: currentlyFollowing } : u
+        )
+      );
+    }
   };
 
   const handleRefresh = async () => {
@@ -132,7 +161,6 @@ export default function CalFitSocialScreen() {
     await loadDiscoverUsers();
   };
 
-  // ── Share post to WhatsApp, Instagram, TikTok etc ─────────
   const handleShare = async (post: PostData) => {
     await sharePost(post);
   };
@@ -244,22 +272,22 @@ export default function CalFitSocialScreen() {
               />
             ) : (
               posts.map((post) => (
-      <PostCard
-  key={post.id}
-  post={post}
-  theme={theme}
-  currentUserId={user?.id}        // ← must be here
-  currentUserName={name}          // ← must be here
-  onLike={handleLike}
-  onComment={(p) => {
-    setSelectedPost(p);
-    setShowComments(true);
-  }}
-  onShare={handleShare}
-  onProfilePress={(userId) =>
-    navigation.navigate('Profile' as never, { userId } as never)
-  }
-/>
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  theme={theme}
+                  currentUserId={user?.id}
+                  currentUserName={name}
+                  onLike={handleLike}
+                  onComment={(p) => {
+                    setSelectedPost(p);
+                    setShowComments(true);
+                  }}
+                  onShare={handleShare}
+                  onProfilePress={(userId) =>
+                    navigation.navigate('Profile' as never, { userId } as never)
+                  }
+                />
               ))
             )}
           </>

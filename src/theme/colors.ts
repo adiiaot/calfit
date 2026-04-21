@@ -1,4 +1,4 @@
-/*const palette = {
+/* const palette = {
   // Greens
   green500: '#2DDC8C',
   green600: '#0DAE6C',
@@ -96,7 +96,10 @@ export const colors = {
 };
 
 export type ColorScheme = 'dark' | 'light';
-export type ThemeColors = typeof colors.dark;*/
+export type ThemeColors = typeof colors.dark;
+
+
+
 const palette = {
   // Greens
   green500: '#2DDC8C',
@@ -240,6 +243,151 @@ export const colors = {
   },
 
   // CalFit Points — unchanged
+  points: {
+    primary:   '#FFD133',
+    secondary: '#F59E0B',
+  },
+};
+
+export type ColorScheme = 'dark' | 'light';
+export type ThemeColors = typeof colors.dark; */
+
+const palette = {
+  // Greens
+  green500: '#2DDC8C',
+  green600: '#0DAE6C',
+  green900: '#065F46',
+
+  // Blues
+  blue400: '#6699FF',
+  blue600: '#4375E6',
+
+  // Neutrals dark
+  dark900: '#080A0F',
+  dark800: '#0F1117',
+  dark700: '#161820',  // solid card bg — was glass rgba
+  dark600: '#1E2130',  // solid border — was glass rgba
+
+  // Neutrals light
+  light100: '#F2F4F8',
+  light200: '#FFFFFF',
+  light300: '#E2E5EC',
+
+  // Text dark
+  textDark100: '#F0F2F5',
+  textDark200: '#8B92A1',
+  textDark300: '#545A66',
+
+  // Text light
+  textLight100: '#12151F',
+  textLight200: '#646B7B',
+  textLight300: '#A4AAB6',
+
+  // Accents
+  purple: '#B280FF',
+  orange: '#FFB347',
+  red: '#FF5959',
+  gold: '#FFD133',
+  yellow: '#FFD133',
+  amber: '#F59E0B',
+
+  // Transparent
+  transparent: 'transparent',
+  black: '#000000',
+  white: '#FFFFFF',
+};
+
+export const colors = {
+  dark: {
+    // ── Backgrounds ───────────────────────────────────────────
+    bg:      palette.dark900,   // #080A0F
+    surface: palette.dark800,   // #0F1117
+
+    // ── Cards — SOLID, no transparency ────────────────────────
+    // Previously rgba(255,255,255,0.06) which let background bleed through.
+    // Now solid so text behind cards never shows through.
+    card:   palette.dark700,    // #161820
+
+    // ── Borders — SOLID ───────────────────────────────────────
+    border: palette.dark600,    // #1E2130
+
+    // ── Accent ────────────────────────────────────────────────
+    accent:       palette.green500,
+    accentDim:    'rgba(45, 220, 140, 0.12)',
+    accentSecond: palette.blue400,
+
+    // ── Text ──────────────────────────────────────────────────
+    textPrimary:   palette.textDark100,
+    textSecondary: palette.textDark200,
+    textMuted:     palette.textDark300,
+
+    // ── Semantic ──────────────────────────────────────────────
+    purple: palette.purple,
+    orange: palette.orange,
+    red:    palette.red,
+    gold:   palette.gold,
+
+    // ── Tab bar — solid, no see-through ───────────────────────
+    tabBar:         palette.dark800,
+    tabBarActive:   palette.green500,
+    tabBarInactive: palette.textDark300,
+
+    // ── Overlay utilities (modals/sheets only) ─────────────────
+    glassStrong:  'rgba(255, 255, 255, 0.10)',
+    glassMedium:  'rgba(255, 255, 255, 0.06)',
+    glassSubtle:  'rgba(255, 255, 255, 0.03)',
+    glassOverlay: 'rgba(0, 0, 0, 0.60)',
+  },
+
+  light: {
+    // ── Backgrounds ───────────────────────────────────────────
+    bg:      palette.light100,  // #F2F4F8
+    surface: palette.light200,  // #FFFFFF
+
+    // ── Cards — SOLID, no transparency ────────────────────────
+    // Previously rgba(255,255,255,0.75) which was translucent.
+    // Now fully opaque white so nothing bleeds through.
+    card:   palette.light200,   // #FFFFFF
+
+    // ── Borders — SOLID ───────────────────────────────────────
+    border: palette.light300,   // #E2E5EC
+
+    // ── Accent ────────────────────────────────────────────────
+    accent:       palette.green600,
+    accentDim:    'rgba(13, 174, 108, 0.12)',
+    accentSecond: palette.blue600,
+
+    // ── Text ──────────────────────────────────────────────────
+    textPrimary:   palette.textLight100,
+    textSecondary: palette.textLight200,
+    textMuted:     palette.textLight300,
+
+    // ── Semantic ──────────────────────────────────────────────
+    purple: '#7B3FE4',
+    orange: palette.amber,
+    red:    '#C0392B',
+    gold:   '#B7770D',
+
+    // ── Tab bar ───────────────────────────────────────────────
+    tabBar:         palette.light200,
+    tabBarActive:   palette.green600,
+    tabBarInactive: palette.textLight300,
+
+    // ── Overlay utilities ─────────────────────────────────────
+    glassStrong:  'rgba(255, 255, 255, 0.85)',
+    glassMedium:  'rgba(255, 255, 255, 0.72)',
+    glassSubtle:  'rgba(255, 255, 255, 0.50)',
+    glassOverlay: 'rgba(0, 0, 0, 0.30)',
+  },
+
+  // Subscription tier colors
+  tiers: {
+    free:    '#6B7280',
+    pro:     '#F59E0B',
+    premium: '#0DAE6C',
+  },
+
+  // CalFit Points
   points: {
     primary:   '#FFD133',
     secondary: '#F59E0B',

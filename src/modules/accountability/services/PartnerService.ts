@@ -31,30 +31,38 @@ export const loadPartners = async (userId: string): Promise<PartnerData[]> => {
     .eq('user_id', userId)
     .eq('status', 'active');
 
-  if (error || !data) return [];
-  return data as any[];
+  if (error) {
+    console.error('loadPartners error:', error.message);
+    return [];
+  }
+  return (data as any[]) ?? [];
 };
 
 export const addPartner = async (
   userId: string,
   partnerCalfitId: string
 ): Promise<{ success: boolean; message: string }> => {
-  // Find partner by CalFit ID
+  // ── Step 1: find the partner by CalFit ID ──────────────────
   const { data: partnerProfile, error: findError } = await supabase
     .from('profiles')
     .select('id, full_name, calfit_id')
-    .eq('calfit_id', partnerCalfitId)
-    .single();
+    .eq('calfit_id', partnerCalfitId.toLowerCase().trim())
+    .maybeSingle(); // maybeSingle returns null instead of error when not found
 
-  if (findError || !partnerProfile) {
-    return { success: false, message: 'User not found. Check the CalFit ID and try again.' };
+  if (findError) {
+    console.error('addPartner find error:', findError.message);
+    return { success: false, message: 'Something went wrong. Please try again.' };
+  }
+
+  if (!partnerProfile) {
+    return { success: false, message: 'No user found with that CalFit ID. Check the ID and try again.' };
   }
 
   if (partnerProfile.id === userId) {
     return { success: false, message: 'You cannot add yourself as a partner.' };
   }
 
-  // Check if already partners
+  // ── Step 2: check if already partners ─────────────────────
   const { data: existing } = await supabase
     .from('partners')
     .select('id')
@@ -63,24 +71,37 @@ export const addPartner = async (
     .maybeSingle();
 
   if (existing) {
-    return { success: false, message: 'You are already partners with this user.' };
+    return { success: false, message: `You are already partners with ${partnerProfile.full_name}.` };
   }
 
-  // Add partnership both ways
-  const { error } = await supabase
+  // ── Step 3: insert both directions separately ──────────────
+  // Inserting both rows in one .insert([...]) call can fail silently
+  // if one row already exists. Doing them separately lets us catch
+  // each failure independently.
+  const { error: err1 } = await supabase
     .from('partners')
-    .insert([
-      { user_id: userId, partner_id: partnerProfile.id, status: 'active' },
-      { user_id: partnerProfile.id, partner_id: userId, status: 'active' },
-    ]);
+    .insert({ user_id: userId, partner_id: partnerProfile.id, status: 'active' });
 
-  if (error) {
-    return { success: false, message: 'Could not add partner. Please try again.' };
+  if (err1) {
+    // Unique constraint violation (code 23505) means row already exists — not a real error
+    if (err1.code !== '23505') {
+      console.error('addPartner insert row 1 error:', err1.message, err1.code);
+      return { success: false, message: 'Could not add partner. Please try again.' };
+    }
+  }
+
+  const { error: err2 } = await supabase
+    .from('partners')
+    .insert({ user_id: partnerProfile.id, partner_id: userId, status: 'active' });
+
+  if (err2 && err2.code !== '23505') {
+    console.error('addPartner insert row 2 error:', err2.message, err2.code);
+    // Row 1 inserted fine — partial success still works for the current user
   }
 
   return {
     success: true,
-    message: `${partnerProfile.full_name} added as your accountability partner!`,
+    message: `${partnerProfile.full_name} added as your accountability partner! 🎉`,
   };
 };
 
@@ -88,14 +109,20 @@ export const removePartner = async (
   userId: string,
   partnerId: string
 ): Promise<boolean> => {
-  const { error } = await supabase
+  // Remove both directions
+  const { error: e1 } = await supabase
     .from('partners')
     .delete()
-    .or(
-      `and(user_id.eq.${userId},partner_id.eq.${partnerId}),` +
-      `and(user_id.eq.${partnerId},partner_id.eq.${userId})`
-    );
-  return !error;
+    .eq('user_id', userId)
+    .eq('partner_id', partnerId);
+
+  const { error: e2 } = await supabase
+    .from('partners')
+    .delete()
+    .eq('user_id', partnerId)
+    .eq('partner_id', userId);
+
+  return !e1 && !e2;
 };
 
 export const updateSharedGoal = async (

@@ -25,8 +25,6 @@ export function useGroup(userId: string, userTier: string) {
   const groupLimit = getGroupLimit();
   const canCreate = ownedCount < groupLimit;
 
-  // Only load once on mount — not on every focus
-  // useFocusEffect was causing reload after delete which brought groups back
   useEffect(() => {
     if (userId) reload();
   }, [userId]);
@@ -44,66 +42,88 @@ export function useGroup(userId: string, userTier: string) {
     setIsLoading(false);
   };
 
- // Function to create a new group
- const create = async (
-  name: string,
-  description: string,
-  category: string
-): Promise<GroupData | null> => {
-  if (!canCreate) return null;
-  const group = await createGroup(userId, name, description, category);
-  if (group) {
-    const newGroup: GroupData = {
-      ...group,
-      emoji: '✨',
-      is_joined: true,
-      is_owner: true,
-    };
-    // Add to both My Groups and Discover simultaneously
-    setMyGroups((prev) => [newGroup, ...prev]);
-    setDiscoverGroups((prev) => [newGroup, ...prev]);
-    setOwnedCount((prev) => prev + 1);
-  }
-  return group;
-};
-
-// Function to join a Group
-  const join = async (groupId: string) => {
-    await joinGroup(userId, groupId);
-    const group = discoverGroups.find((g) => g.id === groupId);
+  const create = async (
+    name: string,
+    description: string,
+    category: string
+  ): Promise<GroupData | null> => {
+    if (!canCreate) return null;
+    const group = await createGroup(userId, name, description, category);
     if (group) {
-      setMyGroups((prev) => [...prev, { ...group, is_joined: true }]);
-      setDiscoverGroups((prev) =>
-        prev.map((g) => g.id === groupId ? { ...g, is_joined: true } : g)
-      );
+      const newGroup: GroupData = {
+        ...group,
+        emoji: '✨',
+        is_joined: true,
+        is_owner: true,
+      };
+      setMyGroups((prev) => [newGroup, ...prev]);
+      setDiscoverGroups((prev) => [newGroup, ...prev]);
+      setOwnedCount((prev) => prev + 1);
     }
+    return group;
   };
 
-  // Function to Leave a Group
+  const join = async (groupId: string) => {
+    // Optimistic update — increment member count immediately in both lists
+    // This is what was missing before — is_joined was set but count stayed stale
+    const updateCount = (groups: GroupData[]) =>
+      groups.map((g) =>
+        g.id === groupId
+          ? { ...g, is_joined: true, member_count: g.member_count + 1 }
+          : g
+      );
+
+    setDiscoverGroups((prev) => updateCount(prev));
+    setMyGroups((prev) => {
+      // Add to My Groups if not already there
+      const exists = prev.find((g) => g.id === groupId);
+      if (exists) return updateCount(prev);
+      const group = discoverGroups.find((g) => g.id === groupId);
+      if (group) return [...prev, { ...group, is_joined: true, member_count: group.member_count + 1 }];
+      return prev;
+    });
+
+    const success = await joinGroup(userId, groupId);
+
+    // If Supabase call failed, revert
+    if (!success) {
+      const revert = (groups: GroupData[]) =>
+        groups.map((g) =>
+          g.id === groupId
+            ? { ...g, is_joined: false, member_count: Math.max(g.member_count - 1, 0) }
+            : g
+        );
+      setDiscoverGroups((prev) => revert(prev));
+      setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
+    }
+  };
 
   const leave = async (groupId: string) => {
-    await leaveGroup(userId, groupId);
+    // Optimistic update — decrement count and remove from My Groups
     setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
     setDiscoverGroups((prev) =>
-      prev.map((g) => g.id === groupId ? { ...g, is_joined: false } : g)
+      prev.map((g) =>
+        g.id === groupId
+          ? { ...g, is_joined: false, member_count: Math.max(g.member_count - 1, 0) }
+          : g
+      )
     );
+
+    const success = await leaveGroup(userId, groupId);
+
+    // Revert if failed
+    if (!success) {
+      reload();
+    }
   };
 
-  // Function to Remove a Group (only for owners)
   const remove = async (groupId: string): Promise<{ success: boolean; error?: string }> => {
-    // Remove from UI immediately before Supabase call
-    // This prevents useFocusEffect from re-fetching it before delete completes
-    setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
-    setDiscoverGroups((prev) => prev.filter((g) => g.id !== groupId));
-    setOwnedCount((prev) => Math.max(prev - 1, 0));
-
     const result = await deleteGroup(userId, groupId);
-
-    if (!result.success) {
-      // Delete failed — restore correct state from Supabase
-      await reload();
+    if (result.success) {
+      setMyGroups((prev) => prev.filter((g) => g.id !== groupId));
+      setDiscoverGroups((prev) => prev.filter((g) => g.id !== groupId));
+      setOwnedCount((prev) => Math.max(prev - 1, 0));
     }
-
     return result;
   };
 

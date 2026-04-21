@@ -249,18 +249,16 @@ export default function CommunityScreen() {
 
       {/* Group Detail Sheet */}
       <GroupDetailSheet
-        theme={theme}
-        group={selectedGroup}
-        visible={showGroupDetail}
-        currentUserId={user?.id ?? ''}
-        onClose={() => {
-          setShowGroupDetail(false);
-          setSelectedGroup(null);
-        }}
-        onDeleteGroup={() => {
-          if (selectedGroup) handleDelete(selectedGroup.id);
-        }}
-      />
+  theme={theme}
+  group={selectedGroup!}
+  visible={showGroupDetail && selectedGroup !== null}
+  currentUserId={user?.id ?? ''}
+  currentUserName={profile?.full_name ?? 'User'}
+  onClose={() => {
+    setShowGroupDetail(false);
+    setSelectedGroup(null);
+  }}
+/>
     </AndroidSafeView>
   );
 }

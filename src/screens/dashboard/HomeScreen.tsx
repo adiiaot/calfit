@@ -7,8 +7,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useEffect, useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';

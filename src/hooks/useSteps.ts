@@ -18,6 +18,30 @@ export function useSteps(goalSteps = 10000) {
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const goalNotifiedRef = useRef(false);
+
+// Inside subscribeToSteps callback:
+unsubscribeRef.current = subscribeToSteps(async (newSteps) => {
+  setSteps(newSteps);
+  
+  // Notify once when goal is crossed
+  if (
+    user?.id &&
+    !goalNotifiedRef.current &&
+    newSteps >= goalSteps
+  ) {
+    goalNotifiedRef.current = true;
+    const { sendNotification } = await import('../services/notificationService');
+    await sendNotification(
+      user.id,
+      'goal',
+      `Step goal reached! 🎉`,
+      `You've hit ${goalSteps.toLocaleString()} steps today. Amazing work!`,
+      'View History'
+    );
+  }
+});
+
   const trackingEnabled =
     (profile as any)?.tracking_preferences?.includes('Steps') ?? false;
 

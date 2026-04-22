@@ -513,14 +513,14 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
                 </View>
               </View>
             )}
+    <ExercisePickerModal theme={theme} visible={showPicker}
+              groupId={group.id} currentUserId={currentUserId}
+              onClose={() => setShowPicker(false)}
+              onAdded={workout => { setWorkouts(prev => [...prev, workout]); setShowPicker(false); }} />
+
           </KeyboardAvoidingView>
         </View>
       </Modal>
-
-      <ExercisePickerModal theme={theme} visible={showPicker}
-        groupId={group.id} currentUserId={currentUserId}
-        onClose={() => setShowPicker(false)}
-        onAdded={workout => { setWorkouts(prev => [...prev, workout]); setShowPicker(false); }} />
     </>
   );
 }

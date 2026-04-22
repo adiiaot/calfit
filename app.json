@@ -15,7 +15,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bigcutstore.calfit",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+  "NSMotionUsageDescription": "CalFit uses motion data to count your steps automatically."
+}
+      
     },
     "android": {
       "package": "com.bigcutstore.calfit",
@@ -23,6 +27,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080A0F"
       },
+      "permissions": ["ACTIVITY_RECOGNITION"],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },

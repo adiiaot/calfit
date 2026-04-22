@@ -23,6 +23,7 @@ import CreditsScreen from '../screens/earnings/CreditsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProgressScreen from '../screens/progress/ProgressScreen';
 import StreaksScreen from '../screens/streaks/StreaksScreen';
+import SleepScreen from '../screens/sleep/SleepScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import DownloadDataScreen from '../screens/settings/DownloadDataScreen';
@@ -58,6 +59,7 @@ import AccountabilityScreen from '../modules/accountability/screens/Accountabili
 
 // ── LIVE MODULE ───────────────────────────────────────────────
 import LiveScreen from '../modules/live/screens/LiveScreen';
+
 
 
 
@@ -187,6 +189,7 @@ export default function AppNavigator() {
             <RootStack.Screen name="DownloadData"    component={DownloadDataScreen} />
             <RootStack.Screen name="Recap" component={RecapScreen} />
             <RootStack.Screen name="IntermittentFasting" component={IntermittentFastingScreen} />
+            <RootStack.Screen name="Sleep" component={SleepScreen} />
 
 
             {/* Social module */}

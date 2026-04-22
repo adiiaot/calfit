@@ -1,5 +1,5 @@
 import {
-  View, Text, StyleSheet,
+  View, Text, StyleSheet, Alert,
   ScrollView, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useState, useCallback } from 'react';
@@ -11,6 +11,7 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { PostData, sharePost } from '../../modules/social/services/postService';
 import { supabase } from '../../services/supabase';
+import { pickStoryImage, uploadStoryImage, createManualStory } from '../../modules/social/services/storyService';
 
 import { PostCard } from '../../modules/social/components/postCard';
 import { ComposeBox } from '../../modules/social/components/composeBox';
@@ -45,6 +46,54 @@ export default function CalFitSocialScreen() {
   const [showImageSheet, setShowImageSheet] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [discoverUsers, setDiscoverUsers] = useState<DiscoverUser[]>([]);
+  const [uploadingStory, setUploadingStory] = useState(false);
+
+
+const handleAddStory = async () => {
+  const imageUri = await pickStoryImage();
+  if (!imageUri || !user?.id) return;
+
+  setUploadingStory(true);
+
+  // ── Moderate with Claude Vision before uploading ──────────
+  // Reuse the same moderation service used for post images.
+  // This scans for nudity, inappropriate content, violence etc.
+  try {
+    const { moderateImage } = await import(
+      '../../modules/social/services/moderationService'
+    );
+    const modResult = await moderateImage(imageUri);
+    if (!modResult.safe) {
+      setUploadingStory(false);
+      Alert.alert(
+        'Image not allowed',
+        modResult.reason ?? 'This image violates CalFit community guidelines. Please choose a different image.'
+      );
+      return;
+    }
+  } catch (_) {
+    // If moderation fails (e.g. no API key yet), block the upload
+    // rather than allowing unmoderated content through
+    setUploadingStory(false);
+    Alert.alert(
+      'Moderation unavailable',
+      'Image moderation is currently unavailable. Story upload requires the Anthropic API key to be configured by BigCut.'
+    );
+    return;
+  }
+
+  // ── Upload only if moderation passed ─────────────────────
+  const imageUrl = await uploadStoryImage(imageUri, user.id);
+  if (!imageUrl) {
+    setUploadingStory(false);
+    Alert.alert('Upload failed', 'Could not upload your story. Please try again.');
+    return;
+  }
+
+  await createManualStory(user.id, imageUrl);
+  setUploadingStory(false);
+  Alert.alert('Story posted! 📸', 'Your story is live for 24 hours.');
+};
 
   const handleDeletePost = (postId: string) => {
   removePost(postId);
@@ -249,12 +298,13 @@ const handleEditPost = (postId: string, newContent: string) => {
           />
         }
       >
-        <StoryRow
-          theme={theme}
-          stories={[]}
-          currentUserName={name}
-          currentUserAvatar={avatar}
-        />
+      <StoryRow
+  theme={theme}
+  stories={[]}
+  currentUserName={name}
+  currentUserAvatar={avatar}
+  onAddStory={handleAddStory}  
+/>
 
         {activeTab === 'Following' ? (
           <>

@@ -1,22 +1,5 @@
 import { supabase } from '../../../services/supabase';
 
-export interface ConversationData {
-  id: string;
-  participant_1: string;
-  participant_2: string;
-  last_message: string | null;
-  last_message_at: string;
-  other_user: {
-    id: string;
-    full_name: string;
-    calfit_id: string;
-    avatar_url: string | null;
-    goal: string;
-    streak_count: number;
-  } | null;
-  unread_count: number;
-}
-
 export interface MessageData {
   id: string;
   conversation_id: string;
@@ -30,6 +13,7 @@ export const getOrCreateConversation = async (
   userId: string,
   otherUserId: string
 ): Promise<string | null> => {
+  // Check if conversation already exists between these two users
   const { data: existing } = await supabase
     .from('conversations')
     .select('id')
@@ -41,17 +25,21 @@ export const getOrCreateConversation = async (
 
   if (existing) return existing.id;
 
+  // Create new conversation
   const { data, error } = await supabase
     .from('conversations')
     .insert({ participant_1: userId, participant_2: otherUserId })
     .select('id')
     .single();
 
-  if (error) return null;
+  if (error) {
+    console.error('getOrCreateConversation error:', error.message);
+    return null;
+  }
   return data.id;
 };
 
-export const loadConversations = async (userId: string): Promise<ConversationData[]> => {
+export const loadConversations = async (userId: string) => {
   const { data, error } = await supabase
     .from('conversations')
     .select('id, participant_1, participant_2, last_message, last_message_at')
@@ -60,7 +48,7 @@ export const loadConversations = async (userId: string): Promise<ConversationDat
 
   if (error || !data) return [];
 
-  const result: ConversationData[] = await Promise.all(
+  const result = await Promise.all(
     (data as any[]).map(async (conv) => {
       const otherUserId =
         conv.participant_1 === userId ? conv.participant_2 : conv.participant_1;
@@ -111,8 +99,12 @@ export const sendMessage = async (
     .select('id, conversation_id, sender_id, content, read, created_at')
     .single();
 
-  if (error) return null;
+  if (error) {
+    console.error('sendMessage error:', error.message);
+    return null;
+  }
 
+  // Update conversation last_message
   await supabase
     .from('conversations')
     .update({
@@ -120,6 +112,52 @@ export const sendMessage = async (
       last_message_at: new Date().toISOString(),
     })
     .eq('id', conversationId);
+
+  // ── Notify the recipient ───────────────────────────────────
+  // Find the other participant and notify them of the new message.
+  // Skip if the sender is somehow the only participant.
+  try {
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('participant_1, participant_2')
+      .eq('id', conversationId)
+      .single();
+
+    if (conv) {
+      const recipientId =
+        conv.participant_1 === senderId ? conv.participant_2 : conv.participant_1;
+
+      if (recipientId && recipientId !== senderId) {
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('full_name, calfit_id')
+          .eq('id', senderId)
+          .single();
+
+        const senderName =
+          senderProfile?.full_name ??
+          senderProfile?.calfit_id ??
+          'Someone';
+
+        const preview = content.length > 40
+          ? content.slice(0, 40) + '...'
+          : content;
+
+        const { sendNotification } = await import(
+          '../../../services/notificationService'
+        );
+        await sendNotification(
+          recipientId,
+          'social',
+          `${senderName} sent you a message`,
+          `"${preview}"`,
+          'Reply'
+        );
+      }
+    }
+  } catch (e) {
+    // Silent fail — notification is non-critical
+  }
 
   return data as MessageData;
 };

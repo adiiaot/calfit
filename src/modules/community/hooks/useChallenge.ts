@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   AUTO_CHALLENGES,
   ChallengeEntry,
@@ -12,12 +13,14 @@ export function useChallenge(userId: string) {
   const [challenges, setChallenges] = useState<ChallengeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // useEffect instead of useFocusEffect — only loads once on mount
-  // useFocusEffect was re-fetching data every time the tab was switched
-  // which overwrote the optimistic participant count update
-  useEffect(() => {
-    if (userId) load();
-  }, [userId]);
+  // useFocusEffect instead of useEffect so counts refresh every time
+  // the Community screen comes into focus — fixes stale participant counts
+  // when a second device joins and the first device returns to the screen.
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) load();
+    }, [userId])
+  );
 
   const load = async () => {
     setIsLoading(true);
@@ -40,9 +43,7 @@ export function useChallenge(userId: string) {
   };
 
   const toggle = async (challengeId: string, isJoined: boolean) => {
-    // Update UI immediately — optimistic update
-    // Do this BEFORE the Supabase call so the count stays correct
-    // if the user switches tabs before the call completes
+    // Optimistic update
     setChallenges((prev) =>
       prev.map((c) =>
         c.id === challengeId
@@ -57,12 +58,11 @@ export function useChallenge(userId: string) {
       )
     );
 
-    // Then persist to Supabase
     const success = isJoined
       ? await leaveChallenge(userId, challengeId)
       : await joinChallenge(userId, challengeId);
 
-    // If Supabase call failed, revert the optimistic update
+    // Revert if failed
     if (!success) {
       setChallenges((prev) =>
         prev.map((c) =>

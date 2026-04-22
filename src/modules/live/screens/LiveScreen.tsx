@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet,
-  ScrollView, TouchableOpacity, ActivityIndicator,
+  ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
 import { useState } from 'react';
 import { AndroidSafeView } from '../../shared/AndriodSafeView';
@@ -12,7 +12,6 @@ import { colors, spacing, radius, fontSize } from '../../../theme';
 import { LiveStreamCard, LiveStreamData } from '../components/LiveStreamCard';
 import { EmptyState } from '../../shared/EmptyState';
 
-// Mock live streams — will be replaced when Agora account is ready
 const MOCK_STREAMS: LiveStreamData[] = [
   {
     id: '1',
@@ -48,10 +47,37 @@ export default function LiveScreen() {
   const liveStreams = MOCK_STREAMS.filter((s) => s.isLive);
   const scheduled = MOCK_STREAMS.filter((s) => !s.isLive);
 
-  return (
+  const handleGoLive = () => {
+    Alert.alert(
+      'Go Live — Coming Soon',
+      'Live streaming activates once the Agora account is connected by BigCut. You will be able to start live workout sessions, meal prep streams and Q&As with your followers.',
+      [{ text: 'Got it', style: 'default' }]
+    );
+  };
 
-          <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-              <View style={styles.header}>
+  const handleSetReminder = (stream: LiveStreamData) => {
+    Alert.alert(
+      'Reminder Set ✓',
+      `We'll notify you before "${stream.title}" goes live${stream.scheduledFor ? ` at ${stream.scheduledFor}` : ''}.`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleWatchStream = (stream: LiveStreamData) => {
+    if (stream.isLive) {
+      Alert.alert(
+        'Live Streaming — Coming Soon',
+        'Joining live streams activates once the Agora account is connected by BigCut.',
+        [{ text: 'OK' }]
+      );
+    } else {
+      handleSetReminder(stream);
+    }
+  };
+
+  return (
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+      <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -62,17 +88,14 @@ export default function LiveScreen() {
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Live</Text>
         <TouchableOpacity
-          style={[styles.goLiveBtn, { backgroundColor: theme.red }]}
-          onPress={() =>
-            navigation.navigate('ScheduleLive')
-          }
+          style={[styles.goLiveBtn, { backgroundColor: (theme as any).red }]}
+          onPress={handleGoLive}
         >
           <View style={styles.liveDot} />
           <Text style={styles.goLiveText}>Go Live</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Tab toggle */}
       <View style={[styles.tabToggle, {
         backgroundColor: theme.card,
         borderColor: theme.border,
@@ -98,7 +121,6 @@ export default function LiveScreen() {
         ))}
       </View>
 
-      {/* Agora notice */}
       <View style={[styles.notice, {
         backgroundColor: theme.accentDim as string,
         borderColor: theme.accent,
@@ -127,7 +149,7 @@ export default function LiveScreen() {
                 key={stream.id}
                 stream={stream}
                 theme={theme}
-                onPress={() => {}}
+                onPress={() => handleWatchStream(stream)}
               />
             ))
           )
@@ -145,13 +167,13 @@ export default function LiveScreen() {
                 key={stream.id}
                 stream={stream}
                 theme={theme}
-                onPress={() => {}}
+                onPress={() => handleSetReminder(stream)}
               />
             ))
           )
         )}
       </ScrollView>
-          </AndroidSafeView>
+    </AndroidSafeView>
   );
 }
 
@@ -177,10 +199,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: radius.md,
   },
-  liveDot: {
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: '#fff',
-  },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
   goLiveText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '700' },
   tabToggle: {
     flexDirection: 'row',

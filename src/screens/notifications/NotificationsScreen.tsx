@@ -208,26 +208,29 @@ const handleMarkRead = async (id: string) => {
   setTimeout(() => {
     // Tab screens must be navigated to via Main → screen
     // Root stack screens can be navigated to directly
-    const actionMap: Record<string, () => void> = {
-      'View Streaks':     () => navigation.navigate('Streaks'),
-      'Check In':         () => navigation.navigate('Streaks'),
-      'View Progress':    () => navigation.navigate('Progress'),
-      'View Fasting': () => navigation.navigate('IntermittentFasting'),
+const actionMap: Record<string, () => void> = {
+  'View Streaks':     () => navigation.navigate('Streaks'),
+  'Check In':         () => navigation.navigate('Streaks'),
+  'View Progress':    () => navigation.navigate('Progress'),
+  'View Fasting':     () => navigation.navigate('IntermittentFasting'),
+  'View Sleep':       () => navigation.navigate('Sleep'),
 
-      // These are tab screens — navigate to Main first then switch tab
-      'View Calories':    () => navigation.navigate('Main', { screen: 'Calorie' }),
-      'View History':     () => navigation.navigate('Main', { screen: 'Activity' }),
-      'View Plan':        () => navigation.navigate('Main', { screen: 'Meals' }),
-      'Open Coach':       () => navigation.navigate('Main', { screen: 'Coach' }),
-      'Reply':            () => navigation.navigate('Main', { screen: 'Social' }),
-      'View Post':        () => navigation.navigate('Main', { screen: 'Social' }),
+  // Tab screens
+  'View Calories':    () => navigation.navigate('Main', { screen: 'Calorie' }),
+  'View History':     () => navigation.navigate('Main', { screen: 'Activity' }),
+  'View Plan':        () => navigation.navigate('Main', { screen: 'Meals' }),
+  'Open Coach':       () => navigation.navigate('Main', { screen: 'Coach' }),
+  'View Post':        () => navigation.navigate('Main', { screen: 'Social' }),
 
-      // Root stack screens
-      'View Group':       () => navigation.navigate('Community'),
-      'View Earnings':    () => navigation.navigate('Main', { screen: 'Credits' }),
-      'View Plans':       () => navigation.navigate('Subscription'),
-      'Complete Profile': () => navigation.navigate('Settings'),
-    };
+  // DM notification — goes to Messages list, not Social feed
+  'Reply':            () => navigation.navigate('Messages'),
+
+  // Root stack screens
+  'View Group':       () => navigation.navigate('Community'),
+  'View Earnings':    () => navigation.navigate('Main', { screen: 'Credits' }),
+  'View Plans':       () => navigation.navigate('Subscription'),
+  'Complete Profile': () => navigation.navigate('Settings'),
+};
 
     const navigate = actionMap[notif.action_label!];
     if (navigate) navigate();

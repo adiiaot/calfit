@@ -46,10 +46,18 @@ export default function CalFitSocialScreen() {
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [discoverUsers, setDiscoverUsers] = useState<DiscoverUser[]>([]);
 
+  const handleDeletePost = (postId: string) => {
+  removePost(postId);
+};
+
+const handleEditPost = (postId: string, newContent: string) => {
+  updatePost(postId, { content: newContent });
+};
+
   const name = profile?.full_name || user?.email?.split('@')[0] || 'User';
   const avatar = profile?.avatar_url ?? null;
 
-  const { posts, isRefreshing, refresh, updatePost, prependPost } = useFeed(user?.id ?? '');
+  const { posts, isRefreshing, refresh, updatePost, prependPost, removePost } = useFeed(user?.id ?? '');
   const { toggle: toggleFollow } = useFollow(user?.id ?? '');
   const {
     post: createPost,
@@ -273,21 +281,20 @@ export default function CalFitSocialScreen() {
             ) : (
               posts.map((post) => (
                 <PostCard
-                  key={post.id}
-                  post={post}
-                  theme={theme}
-                  currentUserId={user?.id}
-                  currentUserName={name}
-                  onLike={handleLike}
-                  onComment={(p) => {
-                    setSelectedPost(p);
-                    setShowComments(true);
-                  }}
-                  onShare={handleShare}
-                  onProfilePress={(userId) =>
-                    navigation.navigate('Profile' as never, { userId } as never)
-                  }
-                />
+  key={post.id}
+  post={post}
+  theme={theme}
+  currentUserId={user?.id}
+  currentUserName={name}
+  onLike={handleLike}
+  onComment={(p) => { setSelectedPost(p); setShowComments(true); }}
+  onShare={handleShare}
+  onDelete={handleDeletePost}
+  onEditComplete={handleEditPost}
+  onProfilePress={(userId) =>
+    navigation.navigate('Profile' as never, { userId } as never)
+  }
+/>
               ))
             )}
           </>

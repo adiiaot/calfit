@@ -8,83 +8,52 @@ export function useFeed(userId: string) {
   const [discoverPosts, setDiscoverPosts] = useState<PostData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Reload feed every time the screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (userId) load();
     }, [userId])
   );
 
-  // Subscribe to real-time post updates (likes_count, comments_count)
-  // This means when another user likes or comments on a post,
-  // the count updates live on screen without needing a manual pull-to-refresh.
+  // All .on() listeners MUST be chained before .subscribe() is called once.
+  // Adding listeners after subscribe() causes the "cannot add callbacks" error.
   useEffect(() => {
     if (!userId) return;
 
-    // Clean up any existing channel first
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
 
-    const channel = supabase
-      .channel(`posts_realtime_${userId}`)
+   const channel = supabase
+  .channel(`posts_feed_${userId.slice(0, 8)}_${Date.now()}`)
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'posts',
-        },
+        { event: 'UPDATE', schema: 'public', table: 'posts' },
         (payload) => {
           const updated = payload.new as any;
-          // Update the post in both feeds if it exists
-          setPosts((prev) =>
+          const patcher = (prev: PostData[]) =>
             prev.map((p) =>
               p.id === updated.id
-                ? {
-                    ...p,
-                    likes_count: updated.likes_count,
-                    comments_count: updated.comments_count,
-                  }
+                ? { ...p, likes_count: updated.likes_count, comments_count: updated.comments_count }
                 : p
-            )
-          );
-          setDiscoverPosts((prev) =>
-            prev.map((p) =>
-              p.id === updated.id
-                ? {
-                    ...p,
-                    likes_count: updated.likes_count,
-                    comments_count: updated.comments_count,
-                  }
-                : p
-            )
-          );
+            );
+          setPosts(patcher);
+          setDiscoverPosts(patcher);
         }
       )
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'posts',
-        },
-        async (payload) => {
-          // A new post was created — only add to feed if it's from
-          // someone the current user follows, or the user themselves
-          const newPost = payload.new as any;
-          if (newPost.user_id === userId) {
-            // Own post — already prepended optimistically, skip
-            return;
-          }
-          // Reload feed to get the new post with full profile data
-          const feed = await loadFeed(userId);
-          setPosts(feed);
+        { event: 'DELETE', schema: 'public', table: 'posts' },
+        (payload) => {
+          const deleted = payload.old as any;
+          const remover = (prev: PostData[]) => prev.filter((p) => p.id !== deleted.id);
+          setPosts(remover);
+          setDiscoverPosts(remover);
         }
       )
-      .subscribe();
+      .subscribe(); // ← called once, after all listeners are registered
 
     channelRef.current = channel;
 
@@ -119,6 +88,11 @@ export function useFeed(userId: string) {
     );
   };
 
+  const removePost = (postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    setDiscoverPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
   const prependPost = (post: PostData) => {
     setPosts((prev) => [post, ...prev]);
   };
@@ -130,6 +104,7 @@ export function useFeed(userId: string) {
     isRefreshing,
     refresh,
     updatePost,
+    removePost,
     prependPost,
   };
 }

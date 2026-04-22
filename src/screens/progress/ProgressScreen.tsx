@@ -14,6 +14,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { BodyMeasurements } from './BodyMeasurementScreen';
+
+
 
 // ── TYPE DEFINITIONS ─────────────────────────────────────────
 type WorkoutSession = {
@@ -284,27 +287,6 @@ function WorkoutSummary({ theme, sessions }: {
 }
 
 // ── BODY MEASUREMENTS ────────────────────────────────────────
-function BodyMeasurements({ theme }: { theme: typeof colors.dark }) {
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={styles.measureHeader}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-          Body Measurements
-        </Text>
-        <TouchableOpacity style={[styles.addMeasureBtn, { borderColor: theme.accent }]}>
-          <Ionicons name="add" size={14} color={theme.accent} />
-          <Text style={[styles.addMeasureText, { color: theme.accent }]}>Log</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.emptyState}>
-        <Ionicons name="body-outline" size={32} color={theme.textMuted} />
-        <Text style={[styles.emptyStateText, { color: theme.textMuted }]}>
-          No measurements logged yet. Tap Log to add your first body measurement.
-        </Text>
-      </View>
-    </View>
-  );
-}
 
 // ── MAIN SCREEN ──────────────────────────────────────────────
 export default function ProgressScreen() {
@@ -468,7 +450,7 @@ export default function ProgressScreen() {
 
         <WorkoutSummary theme={theme} sessions={workoutSessions} />
 
-        <BodyMeasurements theme={theme} />
+<BodyMeasurements theme={theme} userId={user?.id ?? ''} />
       </ScrollView>
     </AndroidSafeView>
   );

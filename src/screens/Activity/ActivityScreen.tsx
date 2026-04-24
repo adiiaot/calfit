@@ -965,22 +965,34 @@ export default function WorkoutScreen() {
       console.error('Failed to save session:', error);
     }
 
-    Alert.alert(
-      '🎉 Workout Complete!',
-      `Great work!\n\nWorkout: ${sessionName}\nTime: ${timeStr}\nCalories burned: ${totalCal} kcal\nExercises: ${workoutExercises.length}`,
-      [{
-        text: 'Awesome!',
-        onPress: () => {
-          setSessions((prev) => [{ id: Date.now().toString(), ...sessionData }, ...prev]);
-          setTotalCaloriesBurned((prev) => prev + totalCal);
-          setWorkoutExercises([]);
-          setWorkoutSeconds(0);
-          setWorkoutStarted(false);
-          setActiveExerciseIndex(-1);
-          setActiveTab('History');
-        },
-      }]
-    );
+   // ── Post-workout meal suggestion ──────────────────────────
+try {
+  const { getPostWorkoutMealSuggestion } = await import(
+    '../../services/postWorkoutmealService'
+  );
+  // Determine dominant category from exercises
+  const category = workoutExercises?.[0]?.category ?? 'default';
+  const meal = await getPostWorkoutMealSuggestion(
+    category,
+    totalCal,
+    workoutSeconds
+  );
+
+  Alert.alert(
+    '🎉 Workout Complete!',
+    `Great work!\n\nWorkout: ${sessionName}\nTime: ${timeStr}\nCalories burned: ${totalCal} kcal\n\n` +
+    `🍽️ Recovery Meal Suggestion\n${meal.name}\n${meal.description}\n\n` +
+    `Protein: ${meal.protein}g · Carbs: ${meal.carbs}g · ${meal.calories} kcal\n⏰ ${meal.timing}`,
+    [{ text: 'Awesome!', onPress: () => navigation.goBack() }]
+  );
+} catch (_) {
+  // Fallback to plain alert if suggestion fails
+  Alert.alert(
+    '🎉 Workout Complete!',
+    `Great work!\n\nTime: ${timeStr}\nCalories burned: ${totalCal} kcal\nExercises: ${workoutExercises.length}`,
+    [{ text: 'Awesome!', onPress: () => navigation.goBack() }]
+  );
+}
   };
 
   return (

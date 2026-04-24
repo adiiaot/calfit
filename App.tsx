@@ -143,6 +143,10 @@ import {
   endIAP,
   setupPurchaseListeners,
 } from './src/services/iapService';
+import { setupNotificationHandler } from './src/services/reminderService';
+
+// At the top of the App() function, before the return:
+setupNotificationHandler();
 
 export default function App() {
   const { setSession, user } = useAuthStore();

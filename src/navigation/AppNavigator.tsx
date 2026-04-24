@@ -41,10 +41,13 @@ import RecapScreen from '../screens/progress/RecapScreen';
 import IntermittentFastingScreen from '../screens/meals/IntermittentFastingScreen';
 
 // ── SOCIAL MODULE ─────────────────────────────────────────────
+// CalfitSocialScreen now handles Feed, Discover AND Communities as 3 tabs
 import SocialScreen from '../screens/social/CalfitSocialScreen';
 import ProfileScreen from '../modules/social/screens/ProfileScreen';
 
 // ── COMMUNITY MODULE ──────────────────────────────────────────
+// CommunityScreen is now embedded inside SocialScreen (Communities tab)
+// It remains in the root stack for direct navigation (e.g. from notifications)
 import CommunityScreen from '../modules/community/screens/CommunityScreen';
 
 // LEADERBOARD MODULE
@@ -59,8 +62,6 @@ import AccountabilityScreen from '../modules/accountability/screens/Accountabili
 
 // ── LIVE MODULE ───────────────────────────────────────────────
 import LiveScreen from '../modules/live/screens/LiveScreen';
-
-
 
 
 const Tab = createBottomTabNavigator();
@@ -78,14 +79,16 @@ function TabIcon({
   activeColor: string;
   inactiveColor: string;
 }) {
+  // CHANGED: Removed Coach and Credits tabs.
+  // Community removed from tabs — now a tab inside SocialScreen.
+  // Messages icon replaces the old community icon.
   const icons: Record<string, { active: any; inactive: any }> = {
-    Home:     { active: 'home',                inactive: 'home-outline' },
-    Calorie:  { active: 'nutrition',           inactive: 'nutrition-outline' },
-    Meals:    { active: 'restaurant',          inactive: 'restaurant-outline' },
-    Activity: { active: 'barbell',             inactive: 'barbell-outline' },
-    Social:   { active: 'people',              inactive: 'people-outline' },
-    Coach:    { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' },
-    Credits:  { active: 'star',                inactive: 'star-outline' },
+    Home:     { active: 'home',              inactive: 'home-outline' },
+    Calorie:  { active: 'nutrition',         inactive: 'nutrition-outline' },
+    Meals:    { active: 'restaurant',        inactive: 'restaurant-outline' },
+    Activity: { active: 'barbell',           inactive: 'barbell-outline' },
+    Social:   { active: 'people',            inactive: 'people-outline' },
+    Messages: { active: 'chatbubbles',       inactive: 'chatbubbles-outline' },
   };
 
   const icon = icons[label];
@@ -101,6 +104,9 @@ function TabIcon({
 }
 
 // ── TAB NAVIGATOR ─────────────────────────────────────────────
+// CHANGED: 6 tabs → 5 tabs + Messages replaces old community slot
+// Coach → accessible from HomeScreen (modal/sheet)
+// Credits → accessible from ProfileScreen
 function TabNavigator() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
@@ -110,23 +116,22 @@ function TabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-  backgroundColor: theme.tabBar,
-  borderTopColor: theme.border,
-  borderTopWidth: 0.5,       // hairline — Apple uses 0.5px not 1px
-  height: 80,
-  paddingBottom: 12,
-  paddingTop: 8,
-  // Glass shadow on tab bar
-  ...Platform.select({
-    ios: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-    },
-    android: { elevation: 8 },
-  }),
-},
+          backgroundColor: theme.tabBar,
+          borderTopColor: theme.border,
+          borderTopWidth: 0.5,
+          height: 80,
+          paddingBottom: 12,
+          paddingTop: 8,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+            },
+            android: { elevation: 8 },
+          }),
+        },
         tabBarActiveTintColor: theme.tabBarActive,
         tabBarInactiveTintColor: theme.tabBarInactive,
         tabBarLabelStyle: {
@@ -148,9 +153,10 @@ function TabNavigator() {
       <Tab.Screen name="Calorie"  component={CalorieScreen} />
       <Tab.Screen name="Meals"    component={MealsScreen} />
       <Tab.Screen name="Activity" component={WorkoutScreen} />
+      {/* Social now contains Feed, Discover, Communities as inner tabs */}
       <Tab.Screen name="Social"   component={SocialScreen} />
-      <Tab.Screen name="Coach"    component={CoachScreen} />
-      <Tab.Screen name="Credits"  component={CreditsScreen} />
+      {/* Messages replaces old community tab icon — correction #chat */}
+      <Tab.Screen name="Messages" component={MessagesScreen} />
     </Tab.Navigator>
   );
 }
@@ -183,24 +189,26 @@ export default function AppNavigator() {
             <RootStack.Screen name="Goals"           component={GoalsScreen} />
             <RootStack.Screen name="QuickStart"      component={QuickStartScreen} />
             <RootStack.Screen name="Subscription"    component={SubscriptionScreen} />
+            {/* Credits now accessed from Profile — kept in stack for direct nav */}
+            <RootStack.Screen name="Credits"         component={CreditsScreen} />
             <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
             <RootStack.Screen name="Language"        component={LanguageScreen} />
             <RootStack.Screen name="Privacy"         component={PrivacyScreen} />
             <RootStack.Screen name="DownloadData"    component={DownloadDataScreen} />
-            <RootStack.Screen name="Recap" component={RecapScreen} />
+            <RootStack.Screen name="Recap"           component={RecapScreen} />
             <RootStack.Screen name="IntermittentFasting" component={IntermittentFastingScreen} />
-            <RootStack.Screen name="Sleep" component={SleepScreen} />
-
+            <RootStack.Screen name="Sleep"           component={SleepScreen} />
+            {/* Coach accessible as full screen from Home — kept in stack */}
+            <RootStack.Screen name="Coach"           component={CoachScreen} />
 
             {/* Social module */}
             <RootStack.Screen name="Profile"         component={ProfileScreen} />
             <RootStack.Screen name="Leaderboard"     component={LeaderboardScreen} />
 
-            {/* Community module */}
+            {/* Community — accessible from Social Communities tab OR direct nav */}
             <RootStack.Screen name="Community"       component={CommunityScreen} />
 
             {/* Chat module */}
-            <RootStack.Screen name="Messages"        component={MessagesScreen} />
             <RootStack.Screen name="Chat"            component={ChatScreen} />
 
             {/* Accountability module */}

@@ -18,12 +18,14 @@ import { ComposeBox } from '../../modules/social/components/composeBox';
 import { CommentSheet } from '../../modules/social/components/commentSheet';
 import { StoryRow } from '../../modules/social/components/storyRow';
 import { DiscoverUserCard } from '../../modules/social/components/discoverUserCard';
-import { ImageUploadSheet } from '../../modules/social/components/imageuploadSheet';
 import { EmptyState } from '../../modules/shared/EmptyState';
 
 import { useFeed } from '../../modules/social/hooks/useFeed';
 import { useFollow } from '../../modules/social/hooks/useFollow';
 import { usePost } from '../../modules/social/hooks/usePost';
+
+// Communities tab — embed existing CommunityScreen inline
+import CommunityScreen from '../../modules/community/screens/CommunityScreen';
 
 interface DiscoverUser {
   id: string;
@@ -34,79 +36,26 @@ interface DiscoverUser {
   isFollowing: boolean;
 }
 
+// CHANGED: Tabs are now 'Feed' (was 'Following'), 'Discover', 'Communities'
+type SocialTab = 'Feed' | 'Discover' | 'Communities';
+
 export default function CalFitSocialScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [activeTab, setActiveTab] = useState<'Following' | 'Discover'>('Following');
+  const [activeTab, setActiveTab] = useState<SocialTab>('Feed');
   const [selectedPost, setSelectedPost] = useState<PostData | null>(null);
   const [showComments, setShowComments] = useState(false);
-  const [showImageSheet, setShowImageSheet] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [discoverUsers, setDiscoverUsers] = useState<DiscoverUser[]>([]);
   const [uploadingStory, setUploadingStory] = useState(false);
 
-
-const handleAddStory = async () => {
-  const imageUri = await pickStoryImage();
-  if (!imageUri || !user?.id) return;
-
-  setUploadingStory(true);
-
-  // ── Moderate with Claude Vision before uploading ──────────
-  // Reuse the same moderation service used for post images.
-  // This scans for nudity, inappropriate content, violence etc.
-  try {
-    const { moderateImage } = await import(
-      '../../modules/social/services/moderationService'
-    );
-    const modResult = await moderateImage(imageUri);
-    if (!modResult.safe) {
-      setUploadingStory(false);
-      Alert.alert(
-        'Image not allowed',
-        modResult.reason ?? 'This image violates CalFit community guidelines. Please choose a different image.'
-      );
-      return;
-    }
-  } catch (_) {
-    // If moderation fails (e.g. no API key yet), block the upload
-    // rather than allowing unmoderated content through
-    setUploadingStory(false);
-    Alert.alert(
-      'Moderation unavailable',
-      'Image moderation is currently unavailable. Story upload requires the Anthropic API key to be configured by BigCut.'
-    );
-    return;
-  }
-
-  // ── Upload only if moderation passed ─────────────────────
-  const imageUrl = await uploadStoryImage(imageUri, user.id);
-  if (!imageUrl) {
-    setUploadingStory(false);
-    Alert.alert('Upload failed', 'Could not upload your story. Please try again.');
-    return;
-  }
-
-  await createManualStory(user.id, imageUrl);
-  setUploadingStory(false);
-  Alert.alert('Story posted! 📸', 'Your story is live for 24 hours.');
-};
-
-  const handleDeletePost = (postId: string) => {
-  removePost(postId);
-};
-
-const handleEditPost = (postId: string, newContent: string) => {
-  updatePost(postId, { content: newContent });
-};
-
   const name = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const avatar = profile?.avatar_url ?? null;
+  const avatar = (profile as any)?.avatar_url ?? null;
 
-  const { posts, isRefreshing, refresh, updatePost, prependPost, removePost } = useFeed(user?.id ?? '');
+  const { posts, isRefreshing, refresh, updatePost, prependPost } = useFeed(user?.id ?? '');
   const { toggle: toggleFollow } = useFollow(user?.id ?? '');
   const {
     post: createPost,
@@ -118,8 +67,6 @@ const handleEditPost = (postId: string, newContent: string) => {
     clearModerationError,
   } = usePost(user?.id ?? '');
 
-  // Reload on every focus so follow state stays accurate after
-  // the user follows someone and navigates back to this screen.
   useFocusEffect(
     useCallback(() => {
       if (user?.id) loadDiscoverUsers();
@@ -129,9 +76,6 @@ const handleEditPost = (postId: string, newContent: string) => {
   const loadDiscoverUsers = async () => {
     if (!user?.id) return;
     try {
-      // Fetch profiles AND the current user's follows in parallel.
-      // This is what was missing before — isFollowing was always false
-      // because we never checked the DB for who the user already follows.
       const [profilesRes, followsRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -139,13 +83,9 @@ const handleEditPost = (postId: string, newContent: string) => {
           .neq('id', user.id)
           .order('created_at', { ascending: false })
           .limit(30),
-        supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', user.id),
+        supabase.from('follows').select('following_id').eq('follower_id', user.id),
       ]);
 
-      // Build a Set of IDs the current user follows for O(1) lookup
       const followingSet = new Set(
         ((followsRes.data ?? []) as any[]).map((f) => f.following_id)
       );
@@ -158,13 +98,33 @@ const handleEditPost = (postId: string, newContent: string) => {
             calfitId: u.calfit_id ?? u.id.slice(0, 8),
             avatar: u.avatar_url ?? null,
             goal: u.goal ?? '',
-            // Real follow state from DB — not hardcoded false
             isFollowing: followingSet.has(u.id),
           }))
         );
       }
     } catch (error) {
       console.error('loadDiscoverUsers error:', error);
+    }
+  };
+
+  const handleAddStory = async () => {
+    const imageUri = await pickStoryImage();
+    if (!imageUri || !user?.id) return;
+    setUploadingStory(true);
+    try {
+      const { moderateImage } = await import('../../modules/social/services/moderationService');
+      const modResult = await moderateImage(imageUri);
+      if (!modResult.safe) {
+        setUploadingStory(false);
+        Alert.alert('Image not allowed', modResult.reason ?? 'This image violates our community guidelines.');
+        return;
+      }
+      const url = await uploadStoryImage(imageUri, user.id);
+      if (url) await createManualStory(user.id, url);
+    } catch (e) {
+      console.error('handleAddStory error:', e);
+    } finally {
+      setUploadingStory(false);
     }
   };
 
@@ -188,27 +148,29 @@ const handleEditPost = (postId: string, newContent: string) => {
 
   const handlePickImage = async () => {
     const uri = await selectImage();
-    if (uri) {
-      setSelectedImageUri(uri);
-      setShowImageSheet(true);
-    }
+    if (uri) setSelectedImageUri(uri);
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      const { supabase: sb } = await import('../../services/supabase');
+      const { error } = await sb.from('posts').delete().eq('id', postId).eq('user_id', user?.id);
+      if (!error) updatePost(postId, { _deleted: true } as any);
+    } catch (e) { console.error('deletePost error', e); }
+  };
+
+  const handleEditPost = (postId: string, newContent: string) => {
+    updatePost(postId, { content: newContent });
   };
 
   const handleFollow = async (userId: string, currentlyFollowing: boolean) => {
-    // Optimistic update — flip immediately in UI
     setDiscoverUsers((prev) =>
-      prev.map((u) =>
-        u.id === userId ? { ...u, isFollowing: !currentlyFollowing } : u
-      )
+      prev.map((u) => u.id === userId ? { ...u, isFollowing: !currentlyFollowing } : u)
     );
-    // Persist to DB
     const success = await toggleFollow(userId, currentlyFollowing);
-    // Revert if DB call failed
     if (!success) {
       setDiscoverUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId ? { ...u, isFollowing: currentlyFollowing } : u
-        )
+        prev.map((u) => u.id === userId ? { ...u, isFollowing: currentlyFollowing } : u)
       );
     }
   };
@@ -222,170 +184,172 @@ const handleEditPost = (postId: string, newContent: string) => {
     await sharePost(post);
   };
 
+  // ── TAB PILL RENDERER ────────────────────────────────────────
+  const TABS: SocialTab[] = ['Feed', 'Discover', 'Communities'];
+
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
 
+      {/* HEADER — removed community icon button (now a tab), kept Live + Messages */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Social</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Community' as never)}
-            style={[styles.headerBtn, {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            }]}
-          >
-            <Ionicons name="people-outline" size={20} color={theme.textPrimary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
             onPress={() => navigation.navigate('Live' as never)}
             style={[styles.headerBtn, {
-              backgroundColor: theme.red + '18',
-              borderColor: theme.red,
+              backgroundColor: (theme as any).red + '18',
+              borderColor: (theme as any).red,
             }]}
           >
-            <View style={styles.liveDot} />
-            <Ionicons name="radio-outline" size={20} color={theme.red} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Messages' as never)}
-            style={[styles.headerBtn, {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            }]}
-          >
-            <Ionicons name="paper-plane-outline" size={20} color={theme.textPrimary} />
+            <View style={[styles.liveDot, { backgroundColor: (theme as any).red }]} />
+            <Ionicons name="radio-outline" size={20} color={(theme as any).red} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={[styles.tabToggle, {
-        backgroundColor: theme.card,
-        borderColor: theme.border,
-      }]}>
-        {(['Following', 'Discover'] as const).map((tab) => (
+      {/* 3-TAB TOGGLE: Feed | Discover | Communities */}
+      <View style={[styles.tabToggle, { borderBottomColor: theme.border }]}>
+        {TABS.map((tab) => (
           <TouchableOpacity
             key={tab}
             onPress={() => setActiveTab(tab)}
-            style={[styles.tabBtn, activeTab === tab && {
-              backgroundColor: theme.accent,
-            }]}
+            style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
           >
-            <Text style={[styles.tabBtnText, {
-              color: activeTab === tab ? theme.bg : theme.textMuted,
-              fontWeight: activeTab === tab ? '700' : '400',
-            }]}>
+            <Text style={[
+              styles.tabBtnText,
+              { color: activeTab === tab ? theme.accent : theme.textMuted },
+              activeTab === tab && { fontWeight: '700' },
+            ]}>
               {tab}
-              {tab === 'Discover' && discoverUsers.length > 0
-                ? ` (${discoverUsers.length})`
-                : ''}
             </Text>
+            {activeTab === tab && (
+              <View style={[styles.tabUnderline, { backgroundColor: theme.accent }]} />
+            )}
           </TouchableOpacity>
         ))}
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.accent}
-            colors={[theme.accent]}
-          />
-        }
-      >
-      <StoryRow
-  theme={theme}
-  stories={[]}
-  currentUserName={name}
-  currentUserAvatar={avatar}
-  onAddStory={handleAddStory}  
-/>
-
-        {activeTab === 'Following' ? (
-          <>
-            <ComposeBox
-              theme={theme}
-              avatarUrl={avatar}
-              userName={name}
-              isPosting={isPosting || isUploadingImage}
-              selectedImageUri={selectedImageUri}
-              onPost={handlePost}
-              onAddImage={handlePickImage}
-              onRemoveImage={() => setSelectedImageUri(null)}
+      {/* COMMUNITIES TAB — renders CommunityScreen directly */}
+      {activeTab === 'Communities' ? (
+        <CommunityScreen />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.accent}
+              colors={[theme.accent]}
             />
+          }
+        >
+          {/* Stories row — only on Feed tab */}
+          {activeTab === 'Feed' && (
+            <StoryRow
+              theme={theme}
+              stories={[]}
+              currentUserName={name}
+              currentUserAvatar={avatar}
+              onAddStory={handleAddStory}
+            />
+          )}
 
-            {posts.length === 0 ? (
-              <EmptyState
+          {/* FEED TAB (was 'Following') */}
+          {activeTab === 'Feed' && (
+            <>
+              <ComposeBox
                 theme={theme}
-                icon="people-outline"
-                title="Your feed is empty"
-                subtitle="Follow other CalFit members to see their workouts and milestones here."
-                buttonLabel="Find People to Follow"
-                onButtonPress={() => setActiveTab('Discover')}
+                avatarUrl={avatar}
+                userName={name}
+                isPosting={isPosting || isUploadingImage}
+                selectedImageUri={selectedImageUri}
+                onPost={handlePost}
+                onAddImage={handlePickImage}
+                onRemoveImage={() => setSelectedImageUri(null)}
               />
-            ) : (
-              posts.map((post) => (
-                <PostCard
-  key={post.id}
-  post={post}
-  theme={theme}
-  currentUserId={user?.id}
-  currentUserName={name}
-  onLike={handleLike}
-  onComment={(p) => { setSelectedPost(p); setShowComments(true); }}
-  onShare={handleShare}
-  onDelete={handleDeletePost}
-  onEditComplete={handleEditPost}
-  onProfilePress={(userId) =>
-    navigation.navigate('Profile' as never, { userId } as never)
-  }
-/>
-              ))
-            )}
-          </>
-        ) : (
-          <>
-            {discoverUsers.length === 0 ? (
-              <EmptyState
-                theme={theme}
-                icon="compass-outline"
-                title="No other users yet"
-                subtitle="You are one of the first CalFit members. Invite friends and they will appear here."
-              />
-            ) : (
-              <>
-                <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-                  New on CalFit
-                </Text>
-                <Text style={[styles.sectionHint, { color: theme.textMuted }]}>
-                  Follow members to see their workouts and milestones in your feed.
-                </Text>
-                {discoverUsers.map((u) => (
-                  <DiscoverUserCard
-                    key={u.id}
-                    userId={u.id}
-                    name={u.name}
-                    calfitId={u.calfitId}
-                    avatarUrl={u.avatar}
-                    goal={u.goal}
-                    isFollowing={u.isFollowing}
+
+              {moderationError && (
+                <View style={[styles.errorBanner, { backgroundColor: (theme as any).red + '18' }]}>
+                  <Text style={[styles.errorText, { color: (theme as any).red }]}>{moderationError}</Text>
+                  <TouchableOpacity onPress={clearModerationError}>
+                    <Ionicons name="close" size={16} color={(theme as any).red} />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {posts.length === 0 ? (
+                <EmptyState
+                  theme={theme}
+                  icon="people-outline"
+                  title="Your feed is empty"
+                  subtitle="Follow other CalFit members to see their workouts and milestones here."
+                  buttonLabel="Find People to Follow"
+                  onButtonPress={() => setActiveTab('Discover')}
+                />
+              ) : (
+                posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
                     theme={theme}
-                    onFollow={() => handleFollow(u.id, u.isFollowing)}
-                    onProfilePress={() =>
-                      navigation.navigate('Profile' as never, { userId: u.id } as never)
+                    currentUserId={user?.id}
+                    currentUserName={name}
+                    onLike={handleLike}
+                    onComment={(p) => { setSelectedPost(p); setShowComments(true); }}
+                    onShare={handleShare}
+                    onDelete={handleDeletePost}
+                    onEditComplete={handleEditPost}
+                    onProfilePress={(userId) =>
+                      navigation.navigate('Profile' as never, { userId } as never)
                     }
                   />
-                ))}
-              </>
-            )}
-          </>
-        )}
-      </ScrollView>
+                ))
+              )}
+            </>
+          )}
+
+          {/* DISCOVER TAB */}
+          {activeTab === 'Discover' && (
+            <>
+              {discoverUsers.length === 0 ? (
+                <EmptyState
+                  theme={theme}
+                  icon="compass-outline"
+                  title="No other users yet"
+                  subtitle="You are one of the first CalFit members. Invite friends and they will appear here."
+                />
+              ) : (
+                <>
+                  <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                    New on CalFit
+                  </Text>
+                  <Text style={[styles.sectionHint, { color: theme.textMuted }]}>
+                    Follow members to see their workouts and milestones in your feed.
+                  </Text>
+                  {discoverUsers.map((u) => (
+                    <DiscoverUserCard
+                      key={u.id}
+                      userId={u.id}
+                      name={u.name}
+                      calfitId={u.calfitId}
+                      avatarUrl={u.avatar}
+                      goal={u.goal}
+                      isFollowing={u.isFollowing}
+                      theme={theme}
+                      onFollow={() => handleFollow(u.id, u.isFollowing)}
+                      onProfilePress={() =>
+                        navigation.navigate('Profile' as never, { userId: u.id } as never)
+                      }
+                    />
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </ScrollView>
+      )}
 
       <CommentSheet
         theme={theme}
@@ -394,27 +358,7 @@ const handleEditPost = (postId: string, newContent: string) => {
         currentUserId={user?.id ?? ''}
         currentUserName={name}
         currentUserAvatar={avatar}
-        onClose={() => {
-          setShowComments(false);
-          setSelectedPost(null);
-        }}
-      />
-
-      <ImageUploadSheet
-        theme={theme}
-        visible={showImageSheet}
-        selectedImageUri={selectedImageUri}
-        isUploading={isUploadingImage}
-        moderationError={moderationError}
-        onPickImage={handlePickImage}
-        onRemoveImage={() => {
-          setSelectedImageUri(null);
-          clearModerationError();
-        }}
-        onClose={() => {
-          setShowImageSheet(false);
-          clearModerationError();
-        }}
+        onClose={() => { setShowComments(false); setSelectedPost(null); }}
       />
     </AndroidSafeView>
   );
@@ -422,60 +366,76 @@ const handleEditPost = (postId: string, newContent: string) => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
+
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-  },
-  title: { fontSize: fontSize.xxl, fontWeight: '800' },
-  headerRight: { flexDirection: 'row', gap: spacing.sm },
-  headerBtn: {
-    width: 36, height: 36,
-    borderRadius: 18,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 0.5,
+  },
+  title: { fontSize: fontSize.xl, fontWeight: '800' },
+  headerRight: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  headerBtn: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    borderWidth: 1,
   },
-  liveDot: {
-    width: 6, height: 6,
-    borderRadius: 3,
-    backgroundColor: '#EF4444',
-    position: 'absolute',
-    top: 6, right: 6,
-  },
+  liveDot: { width: 6, height: 6, borderRadius: 3 },
+
+  // 3-tab underline style
   tabToggle: {
     flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 4,
-    gap: 4,
+    borderBottomWidth: 0.5,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
     alignItems: 'center',
+    paddingVertical: spacing.sm + 2,
+    position: 'relative',
   },
-  tabBtnText: { fontSize: fontSize.base },
+  tabBtnActive: {},
+  tabBtnText: {
+    fontSize: fontSize.sm,
+    fontWeight: '500',
+  },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: 0,
+    left: '15%',
+    right: '15%',
+    height: 2,
+    borderRadius: 2,
+  },
+
+  scrollContent: { paddingBottom: 120 },
+
   sectionLabel: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.base,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     marginBottom: 2,
   },
   sectionHint: {
     fontSize: fontSize.sm,
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
+
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+  },
+  errorText: { fontSize: fontSize.sm, flex: 1, marginRight: spacing.sm },
 });

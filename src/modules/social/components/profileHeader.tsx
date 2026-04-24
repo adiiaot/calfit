@@ -21,6 +21,11 @@ interface Props {
   onEditPress?: () => void;
 }
 
+// CHANGED: Returns singular label when count === 1, plural otherwise
+function statLabel(count: number, singular: string, plural: string): string {
+  return count === 1 ? singular : plural;
+}
+
 export function ProfileHeader({
   theme,
   name,
@@ -44,10 +49,20 @@ export function ProfileHeader({
       <View style={styles.topRow}>
         <UserAvatar uri={avatarUrl} name={name} size={72} theme={theme} />
         <View style={styles.statsRow}>
+          {/* CHANGED: each stat uses singular/plural helper */}
           {[
-            { label: 'Posts', value: postsCount },
-            { label: 'Followers', value: followersCount },
-            { label: 'Following', value: followingCount },
+            {
+              value: postsCount,
+              label: statLabel(postsCount, 'Post', 'Posts'),
+            },
+            {
+              value: followersCount,
+              label: statLabel(followersCount, 'Follower', 'Followers'),
+            },
+            {
+              value: followingCount,
+              label: 'Following', // "Following" is always the same word
+            },
           ].map((s) => (
             <View key={s.label} style={styles.stat}>
               <Text style={[styles.statValue, { color: theme.textPrimary }]}>
@@ -61,7 +76,7 @@ export function ProfileHeader({
         </View>
       </View>
 
-      {/* Name + ID + bio */}
+      {/* Name + ID + goal + bio */}
       <Text style={[styles.name, { color: theme.textPrimary }]}>{name}</Text>
       <Text style={[styles.handle, { color: theme.textMuted }]}>@{calfitId}</Text>
       {goal && (
@@ -74,9 +89,9 @@ export function ProfileHeader({
       )}
 
       {/* Streak */}
-      <View style={[styles.streakRow, { backgroundColor: theme.orange + '18' }]}>
-        <Text style={[styles.streakText, { color: theme.orange }]}>
-          🔥 {streakCount} day streak
+      <View style={[styles.streakRow, { backgroundColor: (theme as any).orange + '18' }]}>
+        <Text style={[styles.streakText, { color: (theme as any).orange }]}>
+          🔥 {streakCount} {statLabel(streakCount, 'day streak', 'day streak')}
         </Text>
       </View>
 
@@ -84,38 +99,37 @@ export function ProfileHeader({
       {isCurrentUser ? (
         <TouchableOpacity
           onPress={onEditPress}
-          style={[styles.editBtn, { borderColor: theme.border, backgroundColor: theme.bg }]}
+          style={[styles.editBtn, { borderColor: theme.border }]}
         >
-          <Text style={[styles.editBtnText, { color: theme.textPrimary }]}>
-            Edit Profile
-          </Text>
+          <Text style={[styles.editBtnText, { color: theme.textPrimary }]}>Edit Profile</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.actionRow}>
           <TouchableOpacity
             onPress={onFollowPress}
-            style={[styles.followBtn, {
-              backgroundColor: isFollowing ? theme.card : theme.accent,
-              borderColor: isFollowing ? theme.border : theme.accent,
-              borderWidth: 1,
-              flex: 1,
-            }]}
+            style={[
+              styles.followBtn,
+              {
+                backgroundColor: isFollowing ? theme.card : theme.accent,
+                borderColor: isFollowing ? theme.border : theme.accent,
+              },
+            ]}
           >
-            <Text style={[styles.followBtnText, {
-              color: isFollowing ? theme.textPrimary : theme.bg,
-            }]}>
+            <Text style={[
+              styles.followBtnText,
+              { color: isFollowing ? theme.textPrimary : theme.bg },
+            ]}>
               {isFollowing ? 'Following' : 'Follow'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onMessagePress}
-            style={[styles.messageBtn, {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            }]}
-          >
-            <Ionicons name="paper-plane-outline" size={18} color={theme.textPrimary} />
-          </TouchableOpacity>
+          {onMessagePress && (
+            <TouchableOpacity
+              onPress={onMessagePress}
+              style={[styles.msgBtn, { borderColor: theme.border }]}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color={theme.textPrimary} />
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -124,54 +138,64 @@ export function ProfileHeader({
 
 const styles = StyleSheet.create({
   container: {
+    margin: spacing.lg,
     padding: spacing.lg,
-    borderBottomWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     gap: spacing.sm,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
+    marginBottom: spacing.sm,
   },
   statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
-  stat: { alignItems: 'center' },
-  statValue: { fontSize: fontSize.xl, fontWeight: '800' },
-  statLabel: { fontSize: fontSize.xs, marginTop: 2 },
-  name: { fontSize: fontSize.xl, fontWeight: '800' },
+  stat: { alignItems: 'center', gap: 2 },
+  statValue: { fontSize: fontSize.lg, fontWeight: '800' },
+  statLabel: { fontSize: fontSize.xs, textAlign: 'center' },
+
+  name: { fontSize: fontSize.lg, fontWeight: '800' },
   handle: { fontSize: fontSize.sm },
   goalPill: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
   },
   goalText: { fontSize: fontSize.xs, fontWeight: '600' },
-  bio: { fontSize: fontSize.base, lineHeight: 20 },
+  bio: { fontSize: fontSize.sm, lineHeight: 18 },
+
   streakRow: {
-    alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radius.sm,
+    alignSelf: 'flex-start',
   },
   streakText: { fontSize: fontSize.sm, fontWeight: '700' },
+
   editBtn: {
-    padding: spacing.sm,
-    borderRadius: radius.md,
     borderWidth: 1,
-    alignItems: 'center',
-  },
-  editBtnText: { fontSize: fontSize.base, fontWeight: '700' },
-  actionRow: { flexDirection: 'row', gap: spacing.sm },
-  followBtn: {
-    padding: spacing.sm,
     borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  editBtnText: { fontSize: fontSize.base, fontWeight: '600' },
+
+  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  followBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
     alignItems: 'center',
   },
   followBtnText: { fontSize: fontSize.base, fontWeight: '700' },
-  messageBtn: {
-    width: 44, height: 44,
-    borderRadius: radius.md,
+  msgBtn: {
+    width: 42, height: 42,
     borderWidth: 1,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

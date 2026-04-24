@@ -24,19 +24,24 @@ export function MyRankCard({
   activeCategory,
   onRefresh,
 }: Props) {
-  const primaryValue = {
-    overall:   `#${rank}`,
-    streaks:   `${streakCount}🔥`,
-    workouts:  `${totalWorkouts}`,
-    referrals: `${referralCount}`,
-  }[activeCategory];
+  // CHANGED: All 6 categories mapped — no undefined risk
+  const primaryValue: Record<LeaderboardCategory, string> = {
+    overall:             `#${rank}`,
+    streaks:             `${streakCount}🔥`,
+    workouts:            `${totalWorkouts}`,
+    referrals:           `${referralCount}`,
+    steps:               `#${rank}`,
+    calorie_consistency: `#${rank}`,
+  };
 
-  const primaryLabel = {
-    overall:   'Your Rank',
-    streaks:   'Your Streak',
-    workouts:  'Your Workouts',
-    referrals: 'Your Referrals',
-  }[activeCategory];
+  const primaryLabel: Record<LeaderboardCategory, string> = {
+    overall:             'Your Rank',
+    streaks:             'Your Streak',
+    workouts:            'Your Workouts',
+    referrals:           'Your Referrals',
+    steps:               'Your Steps Rank',
+    calorie_consistency: 'Your Consistency Rank',
+  };
 
   return (
     <View style={[styles.container, {
@@ -45,15 +50,19 @@ export function MyRankCard({
     }]}>
       <View style={styles.left}>
         <Text style={[styles.label, { color: theme.accent }]}>Your Position</Text>
-        <Text style={[styles.rank, { color: theme.textPrimary }]}>{primaryValue}</Text>
-        <Text style={[styles.sublabel, { color: theme.textMuted }]}>{primaryLabel}</Text>
+        <Text style={[styles.rank, { color: theme.textPrimary }]}>
+          {primaryValue[activeCategory]}
+        </Text>
+        <Text style={[styles.sublabel, { color: theme.textMuted }]}>
+          {primaryLabel[activeCategory]}
+        </Text>
       </View>
 
       <View style={styles.stats}>
         {[
-          { icon: 'flame-outline',    value: streakCount,    label: 'Streak',   color: theme.orange },
-          { icon: 'barbell-outline',  value: totalWorkouts,  label: 'Workouts', color: theme.accentSecond },
-          { icon: 'people-outline',   value: referralCount,  label: 'Referrals',color: theme.gold },
+          { icon: 'flame-outline',   value: streakCount,   label: 'Streak',    color: (theme as any).orange },
+          { icon: 'barbell-outline', value: totalWorkouts, label: 'Workouts',  color: theme.accentSecond },
+          { icon: 'people-outline',  value: referralCount, label: 'Referrals', color: (theme as any).gold },
         ].map((s) => (
           <View key={s.label} style={styles.statItem}>
             <Ionicons name={s.icon as any} size={14} color={s.color} />

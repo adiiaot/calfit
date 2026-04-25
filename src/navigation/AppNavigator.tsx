@@ -41,16 +41,13 @@ import RecapScreen from '../screens/progress/RecapScreen';
 import IntermittentFastingScreen from '../screens/meals/IntermittentFastingScreen';
 
 // ── SOCIAL MODULE ─────────────────────────────────────────────
-// CalfitSocialScreen now handles Feed, Discover AND Communities as 3 tabs
 import SocialScreen from '../screens/social/CalfitSocialScreen';
 import ProfileScreen from '../modules/social/screens/ProfileScreen';
 
 // ── COMMUNITY MODULE ──────────────────────────────────────────
-// CommunityScreen is now embedded inside SocialScreen (Communities tab)
-// It remains in the root stack for direct navigation (e.g. from notifications)
 import CommunityScreen from '../modules/community/screens/CommunityScreen';
 
-// LEADERBOARD MODULE
+// ── LEADERBOARD MODULE ────────────────────────────────────────
 import LeaderboardScreen from '../modules/leaderboard/screens/LeaderboardScreen';
 
 // ── CHAT MODULE ───────────────────────────────────────────────
@@ -63,37 +60,23 @@ import AccountabilityScreen from '../modules/accountability/screens/Accountabili
 // ── LIVE MODULE ───────────────────────────────────────────────
 import LiveScreen from '../modules/live/screens/LiveScreen';
 
-
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
 
 // ── TAB ICON ──────────────────────────────────────────────────
-function TabIcon({
-  label,
-  focused,
-  activeColor,
-  inactiveColor,
-}: {
-  label: string;
-  focused: boolean;
-  activeColor: string;
-  inactiveColor: string;
+function TabIcon({ label, focused, activeColor, inactiveColor }: {
+  label: string; focused: boolean; activeColor: string; inactiveColor: string;
 }) {
-  // CHANGED: Removed Coach and Credits tabs.
-  // Community removed from tabs — now a tab inside SocialScreen.
-  // Messages icon replaces the old community icon.
   const icons: Record<string, { active: any; inactive: any }> = {
-    Home:     { active: 'home',              inactive: 'home-outline' },
-    Calorie:  { active: 'nutrition',         inactive: 'nutrition-outline' },
-    Meals:    { active: 'restaurant',        inactive: 'restaurant-outline' },
-    Activity: { active: 'barbell',           inactive: 'barbell-outline' },
-    Social:   { active: 'people',            inactive: 'people-outline' },
-    Messages: { active: 'chatbubbles',       inactive: 'chatbubbles-outline' },
+    Home:     { active: 'home',         inactive: 'home-outline' },
+    Calorie:  { active: 'nutrition',    inactive: 'nutrition-outline' },
+    Meals:    { active: 'restaurant',   inactive: 'restaurant-outline' },
+    Activity: { active: 'barbell',      inactive: 'barbell-outline' },
+    Social:   { active: 'people',       inactive: 'people-outline' },
+    Messages: { active: 'chatbubbles',  inactive: 'chatbubbles-outline' },
   };
-
   const icon = icons[label];
   if (!icon) return null;
-
   return (
     <Ionicons
       name={focused ? icon.active : icon.inactive}
@@ -104,9 +87,6 @@ function TabIcon({
 }
 
 // ── TAB NAVIGATOR ─────────────────────────────────────────────
-// CHANGED: 6 tabs → 5 tabs + Messages replaces old community slot
-// Coach → accessible from HomeScreen (modal/sheet)
-// Credits → accessible from ProfileScreen
 function TabNavigator() {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
@@ -134,11 +114,7 @@ function TabNavigator() {
         },
         tabBarActiveTintColor: theme.tabBarActive,
         tabBarInactiveTintColor: theme.tabBarInactive,
-        tabBarLabelStyle: {
-          fontSize: 9,
-          fontWeight: '600',
-          marginTop: 2,
-        },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', marginTop: 2 },
         tabBarIcon: ({ focused }) => (
           <TabIcon
             label={route.name}
@@ -153,69 +129,64 @@ function TabNavigator() {
       <Tab.Screen name="Calorie"  component={CalorieScreen} />
       <Tab.Screen name="Meals"    component={MealsScreen} />
       <Tab.Screen name="Activity" component={WorkoutScreen} />
-      {/* Social now contains Feed, Discover, Communities as inner tabs */}
       <Tab.Screen name="Social"   component={SocialScreen} />
-      {/* Messages replaces old community tab icon — correction #chat */}
       <Tab.Screen name="Messages" component={MessagesScreen} />
     </Tab.Navigator>
   );
 }
 
 // ── ROOT NAVIGATOR ────────────────────────────────────────────
+// KEY FIX: showAuth = !user OR isOnboarding
+// When a new user signs up, isOnboarding=true keeps them on the
+// onboarding stack even though user is now set. The paywall sets
+// isOnboarding=false when the user makes their plan choice,
+// which then releases them into the main app stack.
 export default function AppNavigator() {
-  const { user } = useAuthStore();
+  const { user, isOnboarding } = useAuthStore();
+
+  // Show auth stack if no user, OR if user is mid-onboarding
+  const showAuth = !user || isOnboarding;
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!user ? (
-          // ── AUTH FLOW ─────────────────────────────────────
+        {showAuth ? (
+          // ── AUTH / ONBOARDING FLOW ────────────────────────
           <>
-            <RootStack.Screen name="Welcome"    component={WelcomeScreen} />
-            <RootStack.Screen name="Login"      component={LoginScreen} />
-            <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+            <RootStack.Screen name="Welcome"      component={WelcomeScreen} />
+            <RootStack.Screen name="Login"        component={LoginScreen} />
+            <RootStack.Screen name="Onboarding"   component={OnboardingScreen} />
+            {/* Subscription registered here so paywall can navigate to it */}
+            <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
           </>
         ) : (
           // ── MAIN APP ──────────────────────────────────────
           <>
-            {/* Core */}
-            <RootStack.Screen name="Main"            component={TabNavigator} />
-            <RootStack.Screen name="Settings"        component={SettingsScreen} />
-            <RootStack.Screen name="Progress"        component={ProgressScreen} />
-            <RootStack.Screen name="Streaks"         component={StreaksScreen} />
-            <RootStack.Screen name="FoodScanner"     component={FoodScannerScreen} />
-            <RootStack.Screen name="Notifications"   component={NotificationsScreen} />
-            <RootStack.Screen name="EditProfile"     component={EditProfileScreen} />
-            <RootStack.Screen name="Goals"           component={GoalsScreen} />
-            <RootStack.Screen name="QuickStart"      component={QuickStartScreen} />
-            <RootStack.Screen name="Subscription"    component={SubscriptionScreen} />
-            {/* Credits now accessed from Profile — kept in stack for direct nav */}
-            <RootStack.Screen name="Credits"         component={CreditsScreen} />
-            <RootStack.Screen name="PurchaseCredits" component={PurchaseCreditsScreen} />
-            <RootStack.Screen name="Language"        component={LanguageScreen} />
-            <RootStack.Screen name="Privacy"         component={PrivacyScreen} />
-            <RootStack.Screen name="DownloadData"    component={DownloadDataScreen} />
-            <RootStack.Screen name="Recap"           component={RecapScreen} />
+            <RootStack.Screen name="Main"                component={TabNavigator} />
+            <RootStack.Screen name="Settings"            component={SettingsScreen} />
+            <RootStack.Screen name="Progress"            component={ProgressScreen} />
+            <RootStack.Screen name="Streaks"             component={StreaksScreen} />
+            <RootStack.Screen name="FoodScanner"         component={FoodScannerScreen} />
+            <RootStack.Screen name="Notifications"       component={NotificationsScreen} />
+            <RootStack.Screen name="EditProfile"         component={EditProfileScreen} />
+            <RootStack.Screen name="Goals"               component={GoalsScreen} />
+            <RootStack.Screen name="QuickStart"          component={QuickStartScreen} />
+            <RootStack.Screen name="Subscription"        component={SubscriptionScreen} />
+            <RootStack.Screen name="Credits"             component={CreditsScreen} />
+            <RootStack.Screen name="PurchaseCredits"     component={PurchaseCreditsScreen} />
+            <RootStack.Screen name="Language"            component={LanguageScreen} />
+            <RootStack.Screen name="Privacy"             component={PrivacyScreen} />
+            <RootStack.Screen name="DownloadData"        component={DownloadDataScreen} />
+            <RootStack.Screen name="Recap"               component={RecapScreen} />
             <RootStack.Screen name="IntermittentFasting" component={IntermittentFastingScreen} />
-            <RootStack.Screen name="Sleep"           component={SleepScreen} />
-            {/* Coach accessible as full screen from Home — kept in stack */}
-            <RootStack.Screen name="Coach"           component={CoachScreen} />
-
-            {/* Social module */}
-            <RootStack.Screen name="Profile"         component={ProfileScreen} />
-            <RootStack.Screen name="Leaderboard"     component={LeaderboardScreen} />
-
-            {/* Community — accessible from Social Communities tab OR direct nav */}
-            <RootStack.Screen name="Community"       component={CommunityScreen} />
-
-            {/* Chat module */}
-            <RootStack.Screen name="Chat"            component={ChatScreen} />
-
-            {/* Accountability module */}
-            <RootStack.Screen name="Accountability"  component={AccountabilityScreen} />
-
-            {/* Live module */}
-            <RootStack.Screen name="Live"            component={LiveScreen} />
+            <RootStack.Screen name="Sleep"               component={SleepScreen} />
+            <RootStack.Screen name="Coach"               component={CoachScreen} />
+            <RootStack.Screen name="Profile"             component={ProfileScreen} />
+            <RootStack.Screen name="Leaderboard"         component={LeaderboardScreen} />
+            <RootStack.Screen name="Community"           component={CommunityScreen} />
+            <RootStack.Screen name="Chat"                component={ChatScreen} />
+            <RootStack.Screen name="Accountability"      component={AccountabilityScreen} />
+            <RootStack.Screen name="Live"                component={LiveScreen} />
           </>
         )}
       </RootStack.Navigator>

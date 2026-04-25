@@ -3,6 +3,7 @@ import { colors, spacing, radius, fontSize } from '../../../theme';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { RankBadge } from './RankBadge';
 import { LeaderboardEntry, LeaderboardCategory } from '../services/LeaderboardService';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
   entry: LeaderboardEntry;

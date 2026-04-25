@@ -10,9 +10,11 @@ interface AuthState {
   profile: Profile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isOnboarding: boolean;
   userTier: 'free' | 'pro' | 'premium';
   coachPersonality: CoachPersonality;
   setSession: (session: Session | null) => void;
+  setOnboarding: (v: boolean) => void;
   loadProfile: (userId: string) => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => void;
   setCoachPersonality: (personality: CoachPersonality) => void;
@@ -27,8 +29,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   isLoading: false,
   isAuthenticated: false,
+  isOnboarding: false,
   userTier: 'free',
   coachPersonality: 'balanced',
+
+  setOnboarding: (v) => set({ isOnboarding: v }),
 
   setCoachPersonality: (personality) => set({ coachPersonality: personality }),
 
@@ -89,6 +94,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       session: null,
       profile: null,
+      isOnboarding: false,
       userTier: 'free',
       coachPersonality: 'balanced',
     });

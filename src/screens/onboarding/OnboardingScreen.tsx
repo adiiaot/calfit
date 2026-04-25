@@ -20,7 +20,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── USERNAME VALIDATION ───────────────────────────────────────
 const validateUsername = (v: string): string | null => {
@@ -117,43 +117,100 @@ function GridTile({ label, selected, onPress, theme, emoji }: {
   );
 }
 
-// ── STEPS ─────────────────────────────────────────────────────
-
+// ── STEP 1 — WELCOME (matches client image) ───────────────────
+// Dark bg, large CALFIT title, 2x3 feature cards, CTA button
 function Step1Welcome({ theme }: { theme: typeof colors.light }) {
+  const cards = [
+    { icon: 'camera-outline',       title: 'Track Calories',         sub: 'Scan food, log meals,\ntrack macros & stay hydrated.' },
+    { icon: 'chatbubble-ellipses-outline', title: 'CalFit Coach',    sub: 'Personalized guidance\nwhenever you need it.' },
+    { icon: 'barbell-outline',      title: 'Workouts & Sleep',       sub: 'Track workouts, sleep\nquality & daily steps.' },
+    { icon: 'timer-outline',        title: 'Intermittent Fasting',   sub: 'Plan, track & optimize\nyour fasting windows.' },
+    { icon: 'people-outline',       title: 'Social & Accountability',sub: 'Connect, share progress\n& stay accountable.' },
+    { icon: 'star-outline',         title: 'Rewards & Referrals',    sub: 'Earn CalFit Points & unlock\nexciting rewards.' },
+  ];
+
   return (
-    <StepWrap>
-      <View style={styles.splashWrap}>
-        <LinearGradient colors={[theme.heroCard, theme.accent + '33'] as [string, string]} style={styles.splashHero}>
-          <View style={styles.splashLogoCircle}><Text style={styles.splashLogoText}>CF</Text></View>
-          <View style={styles.splashIconsRow}>
-            {[{ name: 'flame', color: '#FF6B35' }, { name: 'barbell', color: theme.accent }, { name: 'nutrition', color: '#2BBCB0' }].map((ic) => (
-              <View key={ic.name} style={[styles.splashIconBubble, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
-                <Ionicons name={ic.name as any} size={22} color={ic.color} />
-              </View>
-            ))}
-          </View>
-          <View style={styles.splashIconsRow}>
-            {[{ name: 'water', color: '#4A90E2' }, { name: 'heart', color: '#F0427C' }].map((ic) => (
-              <View key={ic.name} style={[styles.splashIconBubble, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
-                <Ionicons name={ic.name as any} size={20} color={ic.color} />
-              </View>
-            ))}
-          </View>
-        </LinearGradient>
-        <Text style={[styles.splashTitle, { color: theme.textPrimary }]}>Your fitness,{'\n'}<Text style={{ color: theme.accent }}>personalised.</Text></Text>
-        <Text style={[styles.splashSub, { color: theme.textSecondary }]}>Answer a few questions and CalFit builds a plan made just for you — calories, macros, meals and workouts.</Text>
-        <View style={[styles.statsRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {[{ num: '2M+', label: 'Members' }, { num: '98%', label: 'Hit goals' }, { num: '4.9★', label: 'Rating' }].map((s) => (
-            <View key={s.label} style={styles.statItem}>
-              <Text style={[styles.statNum, { color: theme.accent }]}>{s.num}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>{s.label}</Text>
+    // Dark background regardless of theme — matches client image exactly
+    <View style={styles.welcomeWrap}>
+      {/* Subtle teal glow behind title */}
+      <View style={styles.welcomeGlow} />
+
+      {/* Logo */}
+      <Text style={styles.welcomeLogo}>CALFIT</Text>
+      <Text style={styles.welcomeTagline}>
+        Your <Text style={{ color: theme.accent }}>personal</Text> fitness and{' '}
+        <Text style={{ color: theme.accent }}>nutrition</Text> coach
+      </Text>
+
+      {/* 2x3 Feature cards */}
+      <View style={styles.featureGrid}>
+        {cards.map((c, i) => (
+          <View key={c.title} style={[styles.featureCard, i === 0 && styles.featureCardActive]}>
+            {/* Active card (first) has teal border glow */}
+            <View style={[styles.featureIconWrap, { borderColor: i === 0 ? theme.accent : 'rgba(45,220,140,0.25)' }]}>
+              <Ionicons name={c.icon as any} size={26} color={theme.accent} />
             </View>
-          ))}
-        </View>
+            <Text style={styles.featureCardTitle}>{c.title}</Text>
+            <Text style={styles.featureCardSub}>{c.sub}</Text>
+            {/* Bottom accent line */}
+            <View style={[styles.featureCardLine, { backgroundColor: i === 0 ? theme.accent : 'rgba(45,220,140,0.30)' }]} />
+          </View>
+        ))}
       </View>
-    </StepWrap>
+    </View>
   );
 }
+
+// ── FACT SCREEN — "Did you know?" inserts ─────────────────────
+// Shown 3 times during onboarding like Oppy's motivational inserts
+function FactScreen({ theme, factIndex }: { theme: typeof colors.light; factIndex: number }) {
+  const facts = [
+    {
+      emoji: '🔥',
+      headline: 'Did you know?',
+      stat: 'People who track calories lose\n2x more weight',
+      body: 'Studies show that consistent calorie logging doubles fat loss results compared to dieting without tracking. CalFit makes it instant.',
+      source: 'Journal of the Academy of Nutrition and Dietetics',
+    },
+    {
+      emoji: '💪',
+      headline: 'Did you know?',
+      stat: '80% of fitness results\ncome from nutrition',
+      body: 'Exercise matters — but what you eat drives most of your body composition changes. CalFit tracks both so you never miss the full picture.',
+      source: 'American Council on Exercise',
+    },
+    {
+      emoji: '⏱️',
+      headline: 'Did you know?',
+      stat: 'Intermittent fasting can boost\nmetabolism by up to 14%',
+      body: 'Short-term fasting increases norepinephrine levels, accelerating fat burning. CalFit will integrate your fasting window into your daily plan.',
+      source: 'National Institutes of Health',
+    },
+  ];
+
+  const fact = facts[factIndex % facts.length];
+
+  return (
+    <View style={[styles.factWrap, { backgroundColor: theme.heroCard }]}>
+      <View style={styles.factGlow} />
+      <Text style={styles.factEmoji}>{fact.emoji}</Text>
+      <Text style={[styles.factHeadline, { color: theme.accent }]}>{fact.headline}</Text>
+      <Text style={styles.factStat}>{fact.stat}</Text>
+      <Text style={[styles.factBody, { color: 'rgba(255,255,255,0.70)' }]}>{fact.body}</Text>
+      <View style={[styles.factSourceRow, { borderColor: 'rgba(255,255,255,0.12)' }]}>
+        <Ionicons name="document-text-outline" size={12} color="rgba(255,255,255,0.40)" />
+        <Text style={styles.factSource}>{fact.source}</Text>
+      </View>
+      <View style={[styles.factContinueHint, { borderColor: 'rgba(45,220,140,0.30)' }]}>
+        <Text style={[styles.factContinueText, { color: theme.accent }]}>
+          We're building your plan as you answer ✨
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ── QUESTION STEPS ────────────────────────────────────────────
 
 function Step2Goal({ theme, selected, onSelect }: { theme: typeof colors.light; selected: string; onSelect: (g: string) => void }) {
   const goals = [{ label: 'Lose Weight', emoji: '🔥' }, { label: 'Build Muscle', emoji: '💪' }, { label: 'Get Fit', emoji: '⚡' }, { label: 'Maintain Weight', emoji: '⚖️' }, { label: 'Gain Weight', emoji: '📈' }, { label: 'Improve Diet', emoji: '🥗' }];
@@ -309,31 +366,19 @@ function Step15Account({ theme, email, setEmail, password, setPassword }: {
   );
 }
 
-// ── STEP 16 — GENERATING ──────────────────────────────────────
-function Step16Generating({ theme, onComplete }: { theme: typeof colors.light; onComplete: () => void }) {
+// ── GENERATING ────────────────────────────────────────────────
+function StepGenerating({ theme, onComplete }: { theme: typeof colors.light; onComplete: () => void }) {
   const spinAnim = useRef(new Animated.Value(0)).current;
   const [currentCheck, setCurrentCheck] = useState(0);
-  const checks = [
-    'Analysing your goals',
-    'Calculating calorie targets',
-    'Building your macro split',
-    'Personalising your meal plan',
-    'Creating your workout programme',
-    'Finalising your plan',
-  ];
+  const checks = ['Analysing your goals', 'Calculating calorie targets', 'Building your macro split', 'Personalising your meal plan', 'Creating your workout programme', 'Finalising your plan'];
 
   useEffect(() => {
-    Animated.loop(
-      Animated.timing(spinAnim, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true })
-    ).start();
+    Animated.loop(Animated.timing(spinAnim, { toValue: 1, duration: 1000, easing: Easing.linear, useNativeDriver: true })).start();
     let i = 0;
     const interval = setInterval(() => {
       i += 1;
       setCurrentCheck(i);
-      if (i >= checks.length) {
-        clearInterval(interval);
-        setTimeout(onComplete, 800);
-      }
+      if (i >= checks.length) { clearInterval(interval); setTimeout(onComplete, 800); }
     }, 500);
     return () => clearInterval(interval);
   }, []);
@@ -344,30 +389,19 @@ function Step16Generating({ theme, onComplete }: { theme: typeof colors.light; o
     <View style={styles.generatingWrap}>
       <View style={styles.spinnerWrap}>
         <Animated.View style={[styles.spinnerOuter, { transform: [{ rotate: spin }] }]}>
-          <LinearGradient
-            colors={[theme.gradStart, theme.gradMid, theme.accent] as [string, string, string]}
-            style={styles.spinnerGradient}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          />
+          <LinearGradient colors={[theme.gradStart, theme.gradMid, theme.accent] as [string, string, string]} style={styles.spinnerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
         </Animated.View>
         <View style={[styles.spinnerInner, { backgroundColor: theme.bg }]}>
           <Text style={styles.spinnerEmoji}>⚡</Text>
         </View>
       </View>
       <Text style={[styles.generatingTitle, { color: theme.textPrimary }]}>Building your plan...</Text>
-      <Text style={[styles.generatingSub, { color: theme.textSecondary }]}>
-        Calculating your calorie targets, macro split, meal plan and workout programme.
-      </Text>
+      <Text style={[styles.generatingSub, { color: theme.textSecondary }]}>Calculating your calorie targets, macro split, meal plan and workout programme.</Text>
       <View style={styles.checkList}>
         {checks.map((c, i) => (
           <View key={c} style={styles.checkRow}>
-            {i < currentCheck
-              ? <Ionicons name="checkmark-circle" size={20} color={theme.accent} />
-              : <View style={[styles.checkEmpty, { borderColor: theme.border }]} />}
-            <Text style={[styles.checkText, {
-              color: i < currentCheck ? theme.textPrimary : theme.textMuted,
-              fontWeight: i < currentCheck ? '600' : '400',
-            }]}>{c}</Text>
+            {i < currentCheck ? <Ionicons name="checkmark-circle" size={20} color={theme.accent} /> : <View style={[styles.checkEmpty, { borderColor: theme.border }]} />}
+            <Text style={[styles.checkText, { color: i < currentCheck ? theme.textPrimary : theme.textMuted, fontWeight: i < currentCheck ? '600' : '400' }]}>{c}</Text>
           </View>
         ))}
       </View>
@@ -375,25 +409,14 @@ function Step16Generating({ theme, onComplete }: { theme: typeof colors.light; o
   );
 }
 
-// ── STEP 17 — PAYWALL ─────────────────────────────────────────
-function Step17Paywall({ theme, calorieGoal, onPayNow, onTrial, onSkip }: {
-  theme: typeof colors.light; calorieGoal: number;
-  onPayNow: () => void; onTrial: () => void; onSkip: () => void;
+// ── PAYWALL ───────────────────────────────────────────────────
+function StepPaywall({ theme, calorieGoal, onPayNow, onTrial, onSkip }: {
+  theme: typeof colors.light; calorieGoal: number; onPayNow: () => void; onTrial: () => void; onSkip: () => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-  }, []);
+  useEffect(() => { Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start(); }, []);
 
-  const features = [
-    'Full personalised meal plan',
-    'CalFit AI Coach (unlimited)',
-    'Advanced macro & calorie tracking',
-    'Workout programme & routines',
-    'Intermittent fasting integration',
-    'Leaderboard & accountability features',
-    'Priority support',
-  ];
+  const features = ['Full personalised meal plan', 'CalFit AI Coach (unlimited)', 'Advanced macro & calorie tracking', 'Workout programme & routines', 'Intermittent fasting integration', 'Leaderboard & accountability features', 'Priority support'];
 
   return (
     <Animated.View style={{ opacity: fadeAnim }}>
@@ -416,58 +439,38 @@ function Step17Paywall({ theme, calorieGoal, onPayNow, onTrial, onSkip }: {
           </View>
         </View>
 
-        <Text style={[styles.paywallHeading, { color: theme.textPrimary }]}>
-          We want you to experience CalFit Pro for free
-        </Text>
-        <Text style={[styles.paywallSub, { color: theme.textSecondary }]}>
-          Unlock everything — meals, workouts, AI coach, and more. No charge for 3 full days.
-        </Text>
+        <Text style={[styles.paywallHeading, { color: theme.textPrimary }]}>We want you to experience CalFit Pro for free</Text>
+        <Text style={[styles.paywallSub, { color: theme.textSecondary }]}>Unlock everything — meals, workouts, AI coach, and more. No charge for 3 full days.</Text>
 
         {features.map((f) => (
           <View key={f} style={styles.featureRow}>
-            <View style={[styles.featureCheck, { backgroundColor: theme.accent }]}>
-              <Ionicons name="checkmark" size={12} color="#fff" />
-            </View>
+            <View style={[styles.featureCheck, { backgroundColor: theme.accent }]}><Ionicons name="checkmark" size={12} color="#fff" /></View>
             <Text style={[styles.featureText, { color: theme.textPrimary }]}>{f}</Text>
           </View>
         ))}
 
-        {/* OPTION 1 — 3-Day Free Trial */}
         <TouchableOpacity onPress={onTrial} activeOpacity={0.85} style={[styles.trialBtnWrap, { marginTop: 28 }]}>
-          <LinearGradient
-            colors={[theme.gradStart, theme.gradMid] as [string, string]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.trialBtn}
-          >
+          <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.trialBtn}>
             <Text style={styles.trialBtnLabel}>Start 3-Day Free Trial</Text>
             <Text style={styles.trialBtnNote}>Then ₦4,999/month · Cancel anytime</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* OPTION 2 — Subscribe Now */}
-        <TouchableOpacity onPress={onPayNow} activeOpacity={0.85}
-          style={[styles.payNowBtn, { borderColor: theme.accent }]}>
+        <TouchableOpacity onPress={onPayNow} activeOpacity={0.85} style={[styles.payNowBtn, { borderColor: theme.accent }]}>
           <Text style={[styles.payNowText, { color: theme.accent }]}>Subscribe Now — ₦4,999/month</Text>
           <Text style={[styles.payNowNote, { color: theme.textMuted }]}>No trial, start immediately</Text>
         </TouchableOpacity>
 
-        {/* OPTION 3 — Do Later */}
         <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={styles.skipBtn}>
-          <Text style={[styles.skipText, { color: theme.textMuted }]}>
-            Continue with Free plan — I'll upgrade later
-          </Text>
+          <Text style={[styles.skipText, { color: theme.textMuted }]}>Continue with Free plan — I'll upgrade later</Text>
         </TouchableOpacity>
 
         <View style={[styles.freeNoteCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Ionicons name="information-circle-outline" size={16} color={theme.textMuted} />
-          <Text style={[styles.freeNoteText, { color: theme.textSecondary }]}>
-            Free plan includes basic calorie tracking, water logging, and community access. Pro features will show a subscription prompt when tapped.
-          </Text>
+          <Text style={[styles.freeNoteText, { color: theme.textSecondary }]}>Free plan includes basic calorie tracking, water logging, and community access. Pro features will show a subscription prompt when tapped.</Text>
         </View>
 
-        <Text style={[styles.paywallDisclaimer, { color: theme.textMuted }]}>
-          Free trial requires payment details. You will not be charged until day 4. Cancel anytime in Settings or your App Store account.
-        </Text>
+        <Text style={[styles.paywallDisclaimer, { color: theme.textMuted }]}>Free trial requires payment details. You will not be charged until day 4. Cancel anytime in Settings or your App Store account.</Text>
         <View style={{ height: 40 }} />
       </StepWrap>
     </Animated.View>
@@ -475,13 +478,48 @@ function Step17Paywall({ theme, calorieGoal, onPayNow, onTrial, onSkip }: {
 }
 
 // ── MAIN ──────────────────────────────────────────────────────
+// Step map:
+// 1  = Welcome splash (dark, matches client image)
+// 2  = Goal
+// 3  = Gender
+// 4  = Age
+// F1 = Fact screen 1 (calorie tracking fact) — inserted after step 4
+// 5  = Height & Weight
+// 6  = Target Weight
+// 7  = Activity
+// 8  = Experience
+// F2 = Fact screen 2 (nutrition fact) — inserted after step 8
+// 9  = Equipment
+// 10 = What to Track
+// 11 = Diet
+// 12 = Fasting
+// 12b= IF Protocol (conditional)
+// F3 = Fact screen 3 (IF fact) — inserted after fasting
+// 13 = Sleep
+// 14 = CalFit ID
+// 15 = Account (or 16 if IF)
+// G  = Generating
+// P  = Paywall
+
 export default function OnboardingScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { setOnboarding } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [step, setStep]                       = useState(1);
+  // We use a string-based step system to handle fact screens cleanly
+  type StepKey = 'welcome' | 'goal' | 'gender' | 'age' | 'fact1' | 'stats' | 'target'
+    | 'activity' | 'experience' | 'fact2' | 'equipment' | 'track' | 'diet'
+    | 'fasting' | 'ifprotocol' | 'fact3' | 'sleep' | 'calfitid' | 'account'
+    | 'generating' | 'paywall';
+
+  const baseFlow: StepKey[] = [
+    'welcome', 'goal', 'gender', 'age', 'fact1',
+    'stats', 'target', 'activity', 'experience', 'fact2',
+    'equipment', 'track', 'diet', 'fasting',
+  ];
+
+  const [step, setStep]                       = useState<StepKey>('welcome');
   const [goal, setGoal]                       = useState('');
   const [gender, setGender]                   = useState('');
   const [age, setAge]                         = useState('');
@@ -503,84 +541,98 @@ export default function OnboardingScreen() {
   const [isLoading, setIsLoading]             = useState(false);
 
   const showIfProtocol = fasting === 'Yes, guide me' || fasting === 'I already do it';
-  const accountStep    = showIfProtocol ? 16 : 15;
-  const generatingStep = showIfProtocol ? 17 : 16;
-  const paywallStep    = showIfProtocol ? 18 : 17;
+
+  // Build the full flow dynamically
+  const getFullFlow = (): StepKey[] => {
+    const flow: StepKey[] = [...baseFlow];
+    if (showIfProtocol) flow.push('ifprotocol');
+    flow.push('fact3', 'sleep', 'calfitid', 'account', 'generating', 'paywall');
+    return flow;
+  };
+
+  const fullFlow = getFullFlow();
+  const currentIndex = fullFlow.indexOf(step);
+  const totalQuestionSteps = fullFlow.filter(s => !['welcome', 'fact1', 'fact2', 'fact3', 'generating', 'paywall'].includes(s)).length;
+  const questionStepsSoFar = fullFlow.slice(0, currentIndex + 1).filter(s => !['welcome', 'fact1', 'fact2', 'fact3', 'generating', 'paywall'].includes(s)).length;
+
+  const isWelcome    = step === 'welcome';
+  const isGenerating = step === 'generating';
+  const isPaywall    = step === 'paywall';
+  const isFact       = step === 'fact1' || step === 'fact2' || step === 'fact3';
+  const factIndex    = step === 'fact1' ? 0 : step === 'fact2' ? 1 : 2;
+
+  const showHeader = !isWelcome && !isGenerating && !isPaywall;
+  const showDots   = !isWelcome && !isGenerating && !isPaywall && !isFact;
+  const showNudge  = !isWelcome && !isGenerating && !isPaywall && !isFact;
+  const showCTA    = !isGenerating && !isPaywall;
 
   const estimatedCalories = (() => {
     const w = parseFloat(weight) || 75;
     const h = parseFloat(height) || 175;
     const a = parseInt(age) || 25;
-    const bmr = gender === 'Female'
-      ? 10 * w + 6.25 * h - 5 * a - 161
-      : 10 * w + 6.25 * h - 5 * a + 5;
-    const mult = activity === 'Sedentary' ? 1.2
-      : activity === 'Lightly Active' ? 1.375
-      : activity === 'Moderately Active' ? 1.55
-      : activity === 'Very Active' ? 1.725 : 1.9;
+    const bmr = gender === 'Female' ? 10 * w + 6.25 * h - 5 * a - 161 : 10 * w + 6.25 * h - 5 * a + 5;
+    const mult = activity === 'Sedentary' ? 1.2 : activity === 'Lightly Active' ? 1.375 : activity === 'Moderately Active' ? 1.55 : activity === 'Very Active' ? 1.725 : 1.9;
     return Math.round(bmr * mult);
   })();
 
+  const goNext = () => {
+    const next = fullFlow[currentIndex + 1];
+    if (next) setStep(next);
+  };
+
+  const goPrev = () => {
+    if (isGenerating || isPaywall) return;
+    const prev = fullFlow[currentIndex - 1];
+    if (prev) setStep(prev);
+    else navigation.goBack();
+  };
+
   const getStepComponent = () => {
     switch (step) {
-      case 1:  return <Step1Welcome theme={theme} />;
-      case 2:  return <Step2Goal theme={theme} selected={goal} onSelect={setGoal} />;
-      case 3:  return <Step3Gender theme={theme} selected={gender} onSelect={setGender} />;
-      case 4:  return <Step4Age theme={theme} value={age} onChange={setAge} />;
-      case 5:  return <Step5Stats theme={theme} height={height} setHeight={setHeight} weight={weight} setWeight={setWeight} />;
-      case 6:  return <Step6Target theme={theme} value={targetWeight} onChange={setTargetWeight} />;
-      case 7:  return <Step7Activity theme={theme} selected={activity} onSelect={setActivity} />;
-      case 8:  return <Step8Experience theme={theme} selected={experience} onSelect={setExperience} />;
-      case 9:  return <Step9Equipment theme={theme} selected={equipment} onSelect={setEquipment} />;
-      case 10: return <Step10Track theme={theme} selected={tracking} onToggle={(i) => setTracking((p) => p.includes(i) ? p.filter((x) => x !== i) : [...p, i])} />;
-      case 11: return <Step11Diet theme={theme} selected={diet} onToggle={(i) => setDiet((p) => p.includes(i) ? p.filter((x) => x !== i) : [...p, i])} other={dietOther} setOther={setDietOther} />;
-      case 12: return <Step12Fasting theme={theme} selected={fasting} onSelect={setFasting} />;
-      case 13: return showIfProtocol
-        ? <Step12bProtocol theme={theme} selected={fastingProtocol} onSelect={setFastingProtocol} />
-        : <Step13Sleep theme={theme} selected={sleepGoal} onSelect={setSleepGoal} />;
-      case 14: return showIfProtocol
-        ? <Step13Sleep theme={theme} selected={sleepGoal} onSelect={setSleepGoal} />
-        : <Step14CalfitId theme={theme} value={calfitId} onChange={setCalfitId} />;
-      case 15: return showIfProtocol
-        ? <Step14CalfitId theme={theme} value={calfitId} onChange={setCalfitId} />
-        : <Step15Account theme={theme} email={email} setEmail={setEmail} password={password} setPassword={setPassword} />;
-      case 16: return showIfProtocol
-        ? <Step15Account theme={theme} email={email} setEmail={setEmail} password={password} setPassword={setPassword} />
-        : <Step16Generating theme={theme} onComplete={() => setStep(paywallStep)} />;
-      case 17: return showIfProtocol
-        ? <Step16Generating theme={theme} onComplete={() => setStep(paywallStep)} />
-        : <Step17Paywall theme={theme} calorieGoal={estimatedCalories} onPayNow={handlePayNow} onTrial={handleTrial} onSkip={handleSkip} />;
-      case 18: return <Step17Paywall theme={theme} calorieGoal={estimatedCalories} onPayNow={handlePayNow} onTrial={handleTrial} onSkip={handleSkip} />;
+      case 'welcome':    return <Step1Welcome theme={theme} />;
+      case 'goal':       return <Step2Goal theme={theme} selected={goal} onSelect={setGoal} />;
+      case 'gender':     return <Step3Gender theme={theme} selected={gender} onSelect={setGender} />;
+      case 'age':        return <Step4Age theme={theme} value={age} onChange={setAge} />;
+      case 'fact1':      return <FactScreen theme={theme} factIndex={0} />;
+      case 'stats':      return <Step5Stats theme={theme} height={height} setHeight={setHeight} weight={weight} setWeight={setWeight} />;
+      case 'target':     return <Step6Target theme={theme} value={targetWeight} onChange={setTargetWeight} />;
+      case 'activity':   return <Step7Activity theme={theme} selected={activity} onSelect={setActivity} />;
+      case 'experience': return <Step8Experience theme={theme} selected={experience} onSelect={setExperience} />;
+      case 'fact2':      return <FactScreen theme={theme} factIndex={1} />;
+      case 'equipment':  return <Step9Equipment theme={theme} selected={equipment} onSelect={setEquipment} />;
+      case 'track':      return <Step10Track theme={theme} selected={tracking} onToggle={(i) => setTracking((p) => p.includes(i) ? p.filter((x) => x !== i) : [...p, i])} />;
+      case 'diet':       return <Step11Diet theme={theme} selected={diet} onToggle={(i) => setDiet((p) => p.includes(i) ? p.filter((x) => x !== i) : [...p, i])} other={dietOther} setOther={setDietOther} />;
+      case 'fasting':    return <Step12Fasting theme={theme} selected={fasting} onSelect={setFasting} />;
+      case 'ifprotocol': return <Step12bProtocol theme={theme} selected={fastingProtocol} onSelect={setFastingProtocol} />;
+      case 'fact3':      return <FactScreen theme={theme} factIndex={2} />;
+      case 'sleep':      return <Step13Sleep theme={theme} selected={sleepGoal} onSelect={setSleepGoal} />;
+      case 'calfitid':   return <Step14CalfitId theme={theme} value={calfitId} onChange={setCalfitId} />;
+      case 'account':    return <Step15Account theme={theme} email={email} setEmail={setEmail} password={password} setPassword={setPassword} />;
+      case 'generating': return <StepGenerating theme={theme} onComplete={() => setStep('paywall')} />;
+      case 'paywall':    return <StepPaywall theme={theme} calorieGoal={estimatedCalories} onPayNow={handlePayNow} onTrial={handleTrial} onSkip={handleSkip} />;
       default: return null;
     }
   };
 
-  const isGenerating = step === generatingStep;
-  const isPaywall    = step === paywallStep;
-  const showHeader   = !isGenerating && !isPaywall;
-  const showDots     = step > 1 && !isGenerating && !isPaywall;
-  const showNudge    = step > 1 && !isGenerating && !isPaywall;
-  const showCTA      = !isGenerating && !isPaywall;
-
   const handleNext = async () => {
-    if (step === 2 && !goal)                { Alert.alert('Pick a goal', 'Select your primary goal to continue.'); return; }
-    if (step === 3 && !gender)              { Alert.alert('Required', 'Please select an option.'); return; }
-    if (step === 4 && !age)                 { Alert.alert('Required', 'Please enter your age.'); return; }
-    if (step === 5 && (!height || !weight)) { Alert.alert('Required', 'Please enter your height and weight.'); return; }
+    if (step === 'goal' && !goal)               { Alert.alert('Pick a goal', 'Select your primary goal to continue.'); return; }
+    if (step === 'gender' && !gender)           { Alert.alert('Required', 'Please select an option.'); return; }
+    if (step === 'age' && !age)                 { Alert.alert('Required', 'Please enter your age.'); return; }
+    if (step === 'stats' && (!height || !weight)) { Alert.alert('Required', 'Please enter your height and weight.'); return; }
 
-    if (step === accountStep) {
+    if (step === 'account') {
       if (!email || !password) { Alert.alert('Almost there!', 'Please enter your email and password.'); return; }
       if (password.length < 8) { Alert.alert('Weak password', 'Password must be at least 8 characters.'); return; }
       try {
         setIsLoading(true);
         const { supabase } = await import('../../services/supabase');
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data.user) {
-          // KEY FIX: Set isOnboarding=true BEFORE profile upsert
-          // This prevents the auth listener from redirecting to main app
-          setOnboarding(true);
 
+        // KEY: set isOnboarding BEFORE signUp so auth listener can't redirect
+        setOnboarding(true);
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) { setOnboarding(false); throw error; }
+
+        if (data.user) {
           await supabase.from('profiles').upsert({
             id: data.user.id,
             calfit_id: calfitId || null,
@@ -600,10 +652,9 @@ export default function OnboardingScreen() {
             target_weight_kg: parseFloat(targetWeight) || null,
           });
         }
-        // Advance to generating animation
-        setStep(generatingStep);
+        setStep('generating');
       } catch (err: any) {
-        setOnboarding(false); // reset if signup fails
+        setOnboarding(false);
         Alert.alert('Sign Up Failed', err.message);
       } finally {
         setIsLoading(false);
@@ -611,73 +662,62 @@ export default function OnboardingScreen() {
       return;
     }
 
-    setStep((s) => s + 1);
+    goNext();
   };
 
-  // All three paywall exits must call setOnboarding(false)
-  // so AppNavigator releases to the main app stack
-  const handleTrial = () => {
-    setOnboarding(false);
-    navigation.navigate('Subscription', { plan: 'pro', trial: true });
-  };
+  // AFTER (correct — keep lock until user decides on subscription screen):
+const handleTrial = () => {
+  navigation.navigate('Subscription', { plan: 'pro', trial: true, fromOnboarding: true });
+};
 
-  const handlePayNow = () => {
-    setOnboarding(false);
-    navigation.navigate('Subscription', { plan: 'pro', trial: false });
-  };
-
-  const handleSkip = () => {
-    // Release to main app on free plan
-    // Auth listener already has the session — setting isOnboarding=false
-    // causes AppNavigator to switch to the main stack automatically
-    setOnboarding(false);
-  };
-
-  const handleBack = () => {
-    if (isGenerating || isPaywall) return;
-    if (step > 1) setStep((s) => s - 1);
-    else navigation.goBack();
-  };
+const handlePayNow = () => {
+  navigation.navigate('Subscription', { plan: 'pro', trial: false, fromOnboarding: true });
+};
+  const handleSkip   = () => { setOnboarding(false); };
 
   const btnLabel = isLoading ? ''
-    : step === 1 ? "Let's get started →"
-    : step === accountStep ? 'Create My Account'
+    : step === 'welcome' ? "Start Your Journey  →"
+    : isFact ? 'Got it, let\'s go! 🚀'
+    : step === 'account' ? 'Create My Account'
     : 'Continue →';
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+    <AndroidSafeView
+      backgroundColor={isWelcome ? '#080A0F' : theme.bg}
+      style={styles.safe}
+    >
       {showHeader && (
         <View style={styles.header}>
-          {step > 1
-            ? <TouchableOpacity onPress={handleBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-              </TouchableOpacity>
-            : <View style={{ width: 26 }} />}
+          <TouchableOpacity onPress={goPrev} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+          </TouchableOpacity>
           <Text style={[styles.logo, { color: theme.accent }]}>CalFit</Text>
-          {step > 1
-            ? <Text style={[styles.stepCounter, { color: theme.textMuted }]}>{step - 1}/{accountStep - 1}</Text>
+          {!isFact
+            ? <Text style={[styles.stepCounter, { color: theme.textMuted }]}>{questionStepsSoFar}/{totalQuestionSteps}</Text>
             : <View style={{ width: 40 }} />}
         </View>
       )}
 
-      {showDots && <ProgressDots step={step - 1} total={accountStep - 1} theme={theme} />}
-      {showNudge && <PlanNudge theme={theme} step={step} />}
+      {showDots && <ProgressDots step={questionStepsSoFar} total={totalQuestionSteps} theme={theme} />}
+      {showNudge && <PlanNudge theme={theme} step={questionStepsSoFar + 1} />}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, isGenerating && styles.scrollCenter]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          (isGenerating || isWelcome) && styles.scrollCenter,
+          isFact && styles.scrollFact,
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         {getStepComponent()}
       </ScrollView>
 
       {showCTA && (
-        <View style={[styles.bottomBar, { backgroundColor: theme.bg }]}>
+        <View style={[styles.bottomBar, { backgroundColor: isWelcome ? '#080A0F' : theme.bg }]}>
           <TouchableOpacity onPress={handleNext} disabled={isLoading} activeOpacity={0.85} style={styles.ctaBtnWrap}>
             <LinearGradient
-              colors={step === 1
-                ? [theme.accent, theme.accent] as [string, string]
-                : [theme.gradStart, theme.gradMid] as [string, string]}
+              colors={[theme.accent, '#0DAE6C'] as [string, string]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.ctaBtn}
             >
@@ -686,9 +726,9 @@ export default function OnboardingScreen() {
                 : <Text style={styles.ctaBtnText}>{btnLabel}</Text>}
             </LinearGradient>
           </TouchableOpacity>
-          {step === 1 && (
+          {step === 'welcome' && (
             <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.signInRow}>
-              <Text style={[styles.signInText, { color: theme.textMuted }]}>
+              <Text style={[styles.signInText, { color: 'rgba(255,255,255,0.50)' }]}>
                 Already have an account?{' '}
                 <Text style={{ color: theme.accent, fontWeight: '700' }}>Sign in</Text>
               </Text>
@@ -705,29 +745,86 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: { paddingBottom: 140 },
   scrollCenter: { flexGrow: 1, justifyContent: 'center' },
+  scrollFact: { flexGrow: 1 },
+
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   logo: { fontSize: fontSize.xl, fontWeight: '800' },
   stepCounter: { fontSize: fontSize.sm, fontWeight: '600' },
+
   dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   dot: { height: 6, borderRadius: 3 },
+
   nudgeBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: 99 },
   nudgeDot: { width: 6, height: 6, borderRadius: 3 },
   nudgeText: { fontSize: fontSize.xs, fontWeight: '600' },
+
+  // ── WELCOME SCREEN ──
+  welcomeWrap: {
+    flex: 1, backgroundColor: '#080A0F',
+    paddingHorizontal: spacing.lg, paddingTop: 48, paddingBottom: 20,
+    alignItems: 'center',
+  },
+  welcomeGlow: {
+    position: 'absolute', top: 20, width: 280, height: 120,
+    backgroundColor: 'rgba(45,220,140,0.08)',
+    borderRadius: 140,
+    // glow effect via shadow
+  },
+  welcomeLogo: {
+    fontSize: 52, fontWeight: '900', color: '#2DDC8C',
+    letterSpacing: 10, marginBottom: 12, textAlign: 'center',
+  },
+  welcomeTagline: {
+    fontSize: fontSize.base, color: 'rgba(255,255,255,0.60)',
+    textAlign: 'center', marginBottom: 32, lineHeight: 22,
+  },
+  featureGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%',
+  },
+  featureCard: {
+    width: (SCREEN_W - spacing.lg * 2 - 12) / 2,
+    backgroundColor: '#111318',
+    borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: 'rgba(45,220,140,0.15)',
+  },
+  featureCardActive: {
+    borderColor: 'rgba(45,220,140,0.50)',
+    backgroundColor: '#131a15',
+  },
+  featureIconWrap: {
+    width: 48, height: 48, borderRadius: 14,
+    borderWidth: 1.5, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12, backgroundColor: 'rgba(45,220,140,0.08)',
+  },
+  featureCardTitle: { fontSize: 13, fontWeight: '800', color: '#fff', marginBottom: 6 },
+  featureCardSub: { fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 15 },
+  featureCardLine: { height: 2, width: 24, borderRadius: 1, marginTop: 12 },
+
+  // ── FACT SCREEN ──
+  factWrap: {
+    flex: 1, minHeight: SCREEN_H * 0.7,
+    margin: spacing.lg, borderRadius: 24,
+    padding: 28, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  factGlow: {
+    position: 'absolute', top: -60, width: 200, height: 200,
+    backgroundColor: 'rgba(45,220,140,0.08)', borderRadius: 100,
+  },
+  factEmoji: { fontSize: 52, marginBottom: 16 },
+  factHeadline: { fontSize: fontSize.base, fontWeight: '700', marginBottom: 12, letterSpacing: 0.5 },
+  factStat: { fontSize: 26, fontWeight: '900', color: '#fff', textAlign: 'center', lineHeight: 32, marginBottom: 16 },
+  factBody: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 22, marginBottom: 20 },
+  factSourceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderTopWidth: 1, paddingTop: 12, width: '100%', justifyContent: 'center' },
+  factSource: { fontSize: 10, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' },
+  factContinueHint: { marginTop: 20, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 99, borderWidth: 1 },
+  factContinueText: { fontSize: fontSize.xs, fontWeight: '600', textAlign: 'center' },
+
+  // ── QUESTION STEPS ──
   stepContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   stepTitle: { fontSize: 30, fontWeight: '800', marginBottom: spacing.sm, lineHeight: 36 },
   stepSub: { fontSize: fontSize.base, marginBottom: 24, lineHeight: 22 },
-  splashWrap: { alignItems: 'center', paddingTop: spacing.md },
-  splashHero: { width: SCREEN_W - spacing.lg * 2, height: 200, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 24, gap: 12 },
-  splashLogoCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' },
-  splashLogoText: { fontSize: 28, fontWeight: '900', color: '#fff' },
-  splashIconsRow: { flexDirection: 'row', gap: 12 },
-  splashIconBubble: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  splashTitle: { fontSize: 32, fontWeight: '800', textAlign: 'center', marginBottom: 12, lineHeight: 38 },
-  splashSub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 22, marginBottom: 24, paddingHorizontal: 12 },
-  statsRow: { flexDirection: 'row', borderRadius: 16, borderWidth: 1, paddingVertical: 16, width: '100%' },
-  statItem: { flex: 1, alignItems: 'center' },
-  statNum: { fontSize: fontSize.xl, fontWeight: '800' },
-  statLabel: { fontSize: fontSize.xs, marginTop: 2 },
+
   tile: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderRadius: 16, borderWidth: 1.5, marginBottom: spacing.sm },
   tileLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
   tileEmoji: { fontSize: 24, width: 36, textAlign: 'center' },
@@ -735,15 +832,18 @@ const styles = StyleSheet.create({
   tileTextWrap: { flex: 1 },
   tileLabel: { fontSize: fontSize.base, fontWeight: '700' },
   tileSub: { fontSize: fontSize.sm, marginTop: 2 },
+
   gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   gridTile: { width: '47%', padding: spacing.md, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', gap: spacing.sm, minHeight: 90, justifyContent: 'center', position: 'relative' },
   gridEmoji: { fontSize: 28 },
   gridLabel: { fontSize: fontSize.sm, fontWeight: '700', textAlign: 'center' },
   gridCheck: { position: 'absolute', top: 8, right: 8 },
   levelList: { gap: spacing.sm },
+
   bigInputWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
   bigInput: { fontSize: 56, fontWeight: '800', borderBottomWidth: 3, paddingBottom: 8, minWidth: 120, textAlign: 'center' },
   bigInputSuffix: { fontSize: fontSize.xl, fontWeight: '600' },
+
   fieldsWrap: { gap: spacing.md },
   fieldLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: 6 },
   fieldInput: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 12, borderWidth: 1.5, marginBottom: spacing.sm },
@@ -751,13 +851,17 @@ const styles = StyleSheet.create({
   fieldSuffix: { fontSize: fontSize.base, fontWeight: '600' },
   atSign: { fontSize: fontSize.xl, fontWeight: '700' },
   fieldNote: { fontSize: fontSize.sm, marginTop: spacing.sm, lineHeight: 18 },
+
   otherWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 12, borderWidth: 1, marginTop: spacing.sm },
   otherInput: { flex: 1, fontSize: fontSize.base },
+
   ifNote: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 12, marginTop: spacing.md },
   ifNoteText: { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
+
   errorText: { fontSize: fontSize.xs, fontWeight: '600', marginTop: 4 },
   availRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm },
   availText: { fontSize: fontSize.sm, fontWeight: '600' },
+
   socialAuthBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.md, borderRadius: 16, borderWidth: 1.5, marginBottom: spacing.sm },
   socialAuthIcon: { fontSize: 18, fontWeight: '900', color: '#4285F4' },
   socialAuthText: { fontSize: fontSize.base, fontWeight: '600' },
@@ -766,6 +870,8 @@ const styles = StyleSheet.create({
   orText: { fontSize: fontSize.sm, fontWeight: '600' },
   privacyCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: 12, borderWidth: 1, marginTop: spacing.sm },
   privacyText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
+
+  // ── GENERATING ──
   generatingWrap: { alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 48 },
   spinnerWrap: { width: 100, height: 100, alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
   spinnerOuter: { position: 'absolute', width: 100, height: 100, borderRadius: 50 },
@@ -778,6 +884,8 @@ const styles = StyleSheet.create({
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   checkEmpty: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5 },
   checkText: { fontSize: fontSize.base },
+
+  // ── PAYWALL ──
   planReadyCard: { padding: 20, borderRadius: 20, marginBottom: 24 },
   planReadyEmoji: { fontSize: 32, marginBottom: 8 },
   planReadyTitle: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 6 },
@@ -803,6 +911,8 @@ const styles = StyleSheet.create({
   freeNoteCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 12, borderWidth: 1, marginTop: 4 },
   freeNoteText: { fontSize: fontSize.xs, flex: 1, lineHeight: 17 },
   paywallDisclaimer: { fontSize: fontSize.xs, textAlign: 'center', lineHeight: 16, paddingHorizontal: 16, marginTop: 16 },
+
+  // ── BOTTOM BAR ──
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg, paddingBottom: 36 },
   ctaBtnWrap: { borderRadius: 20, overflow: 'hidden' },
   ctaBtn: { padding: 18, alignItems: 'center', borderRadius: 20 },

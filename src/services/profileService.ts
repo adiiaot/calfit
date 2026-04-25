@@ -130,7 +130,8 @@ export const logFood = async (
   return true;
 };
 
-// Fetch today's steps
+// Fetch today's steps — FIXED: maybeSingle() instead of single()
+// single() throws when no row exists; maybeSingle() returns null safely
 export const getTodaySteps = async (userId: string): Promise<number> => {
   const today = new Date().toISOString().split('T')[0];
   const { data, error } = await supabase
@@ -138,7 +139,7 @@ export const getTodaySteps = async (userId: string): Promise<number> => {
     .select('steps')
     .eq('user_id', userId)
     .eq('date', today)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return 0;
   return data.steps || 0;

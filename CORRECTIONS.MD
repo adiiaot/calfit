@@ -233,23 +233,16 @@
 
 ---
 
-## ❌ PENDING — CAN BUILD NOW (no external accounts needed)
+## POST FEATURES
 
-### High Priority
-
-- [DONE] **Sleep tracker screen** — manual sleep logging, daily goal, sleep history, sleep consistency score. Feeds into dashboard sleep card, readiness score, and progress screen (all currently show 0)
-- [ ] **Notification reminder scheduling** — wire the toggle buttons in Settings to actually schedule local Expo Notifications for meal, water, workout, and sleep reminders at set times
-- [ ] **Save favourite meals** in calorie tracker — save a logged meal combination and re-add it in one tap
-- [ ] **Post like notification** — add to `postService.toggleLike` (when liking, not unliking, notify post owner)
-- [ ] **Stories manual upload** — users tap their story bubble to upload their own story (currently only auto-generated from workouts and streaks)
-- [ ] **Group real-time chat** — groups have feed and workouts but no live group chat inside each group
-- [ ] **Post-workout meal suggestions** — after workout completes, suggest a recovery meal via Claude fallback
+- [x] **Sleep tracker screen** — manual sleep logging, daily goal, sleep history, sleep consistency score. Feeds into dashboard sleep card, readiness score, and progress screen (all currently show 0)
+- [Pending] **Notification reminder scheduling** — wire the toggle buttons in Settings to actually schedule local Expo Notifications for meal, water, workout, and sleep reminders at set times
+- [Pending] **Save favourite meals** in calorie tracker — save a logged meal combination and re-add it in one tap
+- [x] **Post like notification** — add to `postService.toggleLike` (when liking, not unliking, notify post owner)
+- [x] **Stories manual upload** — users tap their story bubble to upload their own story (currently only auto-generated from workouts and streaks)
+- [Pending] **Group real-time chat** — groups have feed and workouts but no live group chat inside each group
+- [Pending] **Post-workout meal suggestions** — after workout completes, suggest a recovery meal via Claude fallback
 - [ ] **Personal records tracking** — detect and display PRs (new max weight, longest duration etc) in workout history
-- [ ] **Leaderboard rank-up notification** — notify user when their rank improves
-- [ ] **Privacy policy page** — required by Apple and Google before app approval. Publish at `calfit.tech/privacy`
-- [ ] **App icon and splash screen** — blocking store submission on both platforms
-- [ ] **EAS build configuration** — `eas.json` not yet set up. Needed to generate APK and IPA
-
 - [ ] **Micronutrient tracking** — toggle in Settings to show/hide micronutrients in food log. UI placeholder exists but not wired
 - [ ] **Equipment preferences** — save preferred equipment in Settings, used to filter workout library
 - [ ] **Calorie trend charts** — view by day/week/month with actual chart rendering (currently flat list)
@@ -259,25 +252,25 @@
 - [ ] **Accountability partner streak shared goals** — partners can set a shared goal beyond just streaks
 - [ ] **Linked Instagram on profile** — field exists in onboarding and profile but doesn't actually link/open
 - [ ] **PR showcase on profile** — show personal records section on public profile page
-- [ ] **Withdrawal history in Credits screen** — show past withdrawal records (date, amount, method, status)
-- [ ] **App Store listing copy** — description, keywords, subtitle, age rating answers
-
 - [ ] **Manual meal planning** — drag and drop meal slots, save templates, auto grocery list
 - [ ] **Recipes library** — organised recipe library with ratings, save/submit, step-by-step instructions, import via URL
 - [ ] **Meal plan history** — planned vs actual adherence score
 - [ ] **Workout scheduling** — schedule workouts, set rest days, recurring schedules
-- [ ] **Adaptive recovery system** — auto-adjust workout intensity based on readiness score
 - [ ] **Group/Community streak threshold logic** — admin sets completion threshold (e.g. 4 of 5 members must log)
 - [ ] **Streak Keeper badge** — badge for most consistent group streak member
 - [ ] **Challenge leaderboards** — leaderboard scoped to active challenges
 - [ ] **Milestone celebrations** — in-app celebration animation + shareable milestone card when hitting streak milestones
 - [ ] **Mood trends** — track mood over time from daily check-ins, show trend chart
+- [ ] **Leaderboard rank-up notification** — notify user when their rank improves
+- [ ] **Withdrawal history in Credits screen** — show past withdrawal records (date, amount, method, status)
+- [ ] **App Store listing copy** — description, keywords, subtitle, age rating answers
+- [ ] **Privacy policy page** — required by Apple and Google before app approval. Publish at `calfit.tech/privacy`
+- [ ] **App icon and splash screen** — blocking store submission on both platforms
+- [ ] **EAS build configuration** — `eas.json` not yet set up. Needed to generate APK and IPA
 
 ---
 
-## ⏳ PENDING — WAITING ON BIGCUT LLC
-
-### Requires Anthropic API Key (GOTTEN FROM BIGCUT)
+### Requires Anthropic API Key
 - [ ] AI Coach real responses (currently falls back to static message)
 - [ ] AI Meal Planner generation
 - [ ] Food photo/AI logging (Claude Vision)
@@ -289,8 +282,8 @@
 ### Requires Apple Developer Account ($99/year)
 - [ ] App Store submission
 - [ ] TestFlight beta testing
-- [ ] Apple Sign In (onboarding Step 7)
-- [ ] Apple In-App Purchase products (`com.fabsdevelopment.calfit.pro.monthly`, `com.fabsdevelopment.calfit.premium.monthly`)
+- [ ] Apple Sign In
+- [ ] Apple In-App Purchase products (`store.bigcut.calfit.pro.monthly`, `store.bigcut.calfit.premium.monthly`)
 
 ### Requires Google Play Console ($25 one-time)
 - [ ] Play Store submission
@@ -321,15 +314,15 @@
 
 ---
 
-## 💰 FUNDS NEEDED FROM FABS DEVELOPMENT
+## 💰 FUNDS NEEDED FROM BIGCUT
 
 | Item | Cost | Type | Unblocks |
 |------|------|------|---------|
 | Apple Developer Program | $99/year | One-time (annual) | App Store, TestFlight, Apple Sign In, Apple IAP |
 | Google Play Console | $25 | One-time | Play Store, Google Sign In, Google Play Billing |
-| Hostinger Premium Email ×2 | ~$4/month | Monthly | All platform registrations |
-| Anthropic API credits | ~$50/month | Monthly | AI Coach, Meal Planner, Vision, Food Scanner |
-| **Total first month** | **~$178** | | |
+| Google Workspace | ~$6/month | Monthly | All platform registrations |
+| Anthropic API credits | ~$10/month | Monthly | AI Coach, Meal Planner, Vision, Food Scanner |
+| **Total first month** | **~$175** | | |
 
 ---
 
@@ -379,10 +372,9 @@ CalFit_Payment_Setup_README.md         — Full store setup guide
 1. Sleep tracker screen
 2. Notification reminder scheduling (local Expo Notifications)
 3. Post like notification in postService
-4. Stories manual upload
-5. Privacy policy at calfit.tech/privacy
-6. App icon and splash screen
-7. EAS build configuration (eas.json)
-8. Personal records tracking
-9. Post-workout meal suggestions
-10. Leaderboard rank-up notification
+4. Personal records tracking
+5. Post-workout meal suggestions
+6. Leaderboard rank-up notification
+7. Privacy policy at calfit.tech/privacy
+8. App icon and splash screen
+9. EAS build configuration (eas.json)

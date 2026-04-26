@@ -1,193 +1,347 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Share,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Share, ActivityIndicator, Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useState, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { supabase } from '../../services/supabase';
+import ViewShot from 'react-native-view-shot';
 
-// ── DESIGN STYLES ─────────────────────────────────────────────
-const DESIGNS = [
-  { id: 'minimal',  label: 'Minimal',  bg: '#FFFFFF', text: '#111111', accent: '#0DAE6C' },
-  { id: 'bold',     label: 'Bold',     bg: '#0DAE6C', text: '#FFFFFF', accent: '#FFFFFF' },
-  { id: 'gradient', label: 'Gradient', bg: '#0DAE6C', text: '#FFFFFF', accent: '#FFD700' },
-  { id: 'dark',     label: 'Dark',     bg: '#111111', text: '#FFFFFF', accent: '#0DAE6C' },
+const { width: SCREEN_W } = Dimensions.get('window');
+const CARD_W = SCREEN_W - spacing.lg * 2;
+
+// ── SAFE COLORS ───────────────────────────────────────────────
+const PINK   = '#FF6B9D';
+const ORANGE = '#FFB347';
+const GOLD   = '#FFD133';
+const PURPLE = '#B280FF';
+const BLUE   = '#6699FF';
+const GREEN  = '#2DDC8C';
+
+// ── DESIGN TEMPLATES ─────────────────────────────────────────
+// Each template has a distinct Canva-style personality
+const TEMPLATES = [
+  {
+    id: 'bold',
+    label: 'Bold',
+    // Deep black with neon green accent — gym/performance feel
+    bg1: '#060A0F', bg2: '#0D1A12',
+    accent: GREEN, text: '#FFFFFF', sub: 'rgba(255,255,255,0.55)',
+    statBg: 'rgba(45,220,140,0.12)', statBorder: 'rgba(45,220,140,0.25)',
+    badge: GREEN,
+  },
+  {
+    id: 'gradient',
+    label: 'Gradient',
+    // Pink → Orange → deep purple — energetic/vibrant
+    bg1: PINK, bg2: '#7C3AED',
+    accent: GOLD, text: '#FFFFFF', sub: 'rgba(255,255,255,0.70)',
+    statBg: 'rgba(255,255,255,0.15)', statBorder: 'rgba(255,255,255,0.25)',
+    badge: GOLD,
+  },
+  {
+    id: 'dark',
+    label: 'Dark',
+    // Rich indigo/navy — premium/sleek feel
+    bg1: '#0D0A2E', bg2: '#1A1060',
+    accent: BLUE, text: '#FFFFFF', sub: 'rgba(255,255,255,0.55)',
+    statBg: 'rgba(102,153,255,0.12)', statBorder: 'rgba(102,153,255,0.25)',
+    badge: BLUE,
+  },
+  {
+    id: 'sunrise',
+    label: 'Sunrise',
+    // Warm gold/orange — morning motivation feel
+    bg1: '#FF8C00', bg2: '#FF4500',
+    accent: '#FFFFFF', text: '#FFFFFF', sub: 'rgba(255,255,255,0.75)',
+    statBg: 'rgba(255,255,255,0.18)', statBorder: 'rgba(255,255,255,0.30)',
+    badge: '#FFF176',
+  },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    // Clean white/light — professional share card
+    bg1: '#F8FAFC', bg2: '#EEF2FF',
+    accent: '#0DAE6C', text: '#0F172A', sub: '#64748B',
+    statBg: 'rgba(13,174,108,0.08)', statBorder: 'rgba(13,174,108,0.20)',
+    badge: '#0DAE6C',
+  },
 ];
 
-// ── RECAP TYPES ───────────────────────────────────────────────
 type RecapType = 'daily' | 'weekly' | 'monthly';
 
 interface RecapData {
-  caloriesConsumed: number;
-  calorieGoal: number;
-  waterMl: number;
-  waterGoalMl: number;
-  workoutsDone: number;
-  caloriesBurned: number;
-  streakCount: number;
-  daysTracked: number;
-  foodLogs: number;
-  topWorkout: string | null;
-  periodLabel: string;
+  caloriesConsumed: number; calorieGoal: number;
+  waterMl: number; waterGoalMl: number;
+  workoutsDone: number; caloriesBurned: number;
+  streakCount: number; daysTracked: number;
+  topWorkout: string | null; periodLabel: string;
+  stepsTotal: number; sleepAvg: number;
 }
 
-// ── RECAP CARD VISUAL ─────────────────────────────────────────
-function RecapCard({
-  data,
-  design,
-  recapType,
-  userName,
-}: {
-  data: RecapData;
-  design: typeof DESIGNS[0];
-  recapType: RecapType;
-  userName: string;
-}) {
-  const isGradient = design.id === 'gradient';
+// ── LOAD RECAP DATA ───────────────────────────────────────────
+async function loadRecapData(userId: string, type: RecapType): Promise<RecapData> {
+  const now = new Date();
+  let startDate: string;
+  let periodLabel: string;
 
-  const waterLitres = (data.waterMl / 1000).toFixed(1);
-  const waterGoalLitres = (data.waterGoalMl / 1000).toFixed(1);
-  const caloriesPct = data.calorieGoal > 0
-    ? Math.round((data.caloriesConsumed / data.calorieGoal) * 100)
+  if (type === 'daily') {
+    startDate = now.toISOString().split('T')[0];
+    periodLabel = 'Today';
+  } else if (type === 'weekly') {
+    const d = new Date(now); d.setDate(d.getDate() - 7);
+    startDate = d.toISOString().split('T')[0];
+    periodLabel = 'This Week';
+  } else {
+    const d = new Date(now); d.setDate(d.getDate() - 30);
+    startDate = d.toISOString().split('T')[0];
+    periodLabel = 'This Month';
+  }
+
+  const [foodRes, waterRes, workoutRes, profileRes, stepsRes, sleepRes] = await Promise.all([
+    supabase.from('food_logs').select('calories').eq('user_id', userId).gte('logged_at', startDate),
+    supabase.from('water_logs').select('amount_ml').eq('user_id', userId).gte('logged_at', startDate),
+    supabase.from('workout_logs').select('calories_burned, exercise_name').eq('user_id', userId).gte('completed_at', startDate),
+    supabase.from('profiles').select('daily_calorie_goal, water_goal_ml, streak_count').eq('id', userId).single(),
+    supabase.from('step_logs').select('steps').eq('user_id', userId).gte('date', startDate),
+    supabase.from('sleep_logs').select('duration_hours').eq('user_id', userId).gte('date', startDate),
+  ]);
+
+  const foods    = (foodRes.data ?? []) as any[];
+  const waters   = (waterRes.data ?? []) as any[];
+  const workouts = (workoutRes.data ?? []) as any[];
+  const profile  = profileRes.data as any;
+  const steps    = (stepsRes.data ?? []) as any[];
+  const sleeps   = (sleepRes.data ?? []) as any[];
+
+  const caloriesConsumed = foods.reduce((s: number, r: any) => s + (r.calories ?? 0), 0);
+  const waterMl          = waters.reduce((s: number, r: any) => s + (r.amount_ml ?? 0), 0);
+  const caloriesBurned   = workouts.reduce((s: number, r: any) => s + (r.calories_burned ?? 0), 0);
+  const stepsTotal       = steps.reduce((s: number, r: any) => s + (r.steps ?? 0), 0);
+  const sleepAvg         = sleeps.length > 0
+    ? sleeps.reduce((s: number, r: any) => s + (r.duration_hours ?? 0), 0) / sleeps.length
     : 0;
 
-  const getMessage = () => {
-    if (recapType === 'daily') {
-      if (caloriesPct >= 90 && data.workoutsDone > 0) return 'Crushed it today! 💪';
-      if (caloriesPct >= 80) return 'Great nutrition day! 🥗';
-      if (data.workoutsDone > 0) return 'Workout done! Keep going 🔥';
-      return 'Every day counts. Keep going! 🎯';
-    }
-    if (recapType === 'weekly') {
-      if (data.workoutsDone >= 5) return 'Elite week! You showed up 💪';
-      if (data.workoutsDone >= 3) return 'Solid week of consistency 🔥';
-      return 'Every step counts. Build the habit! 🎯';
-    }
-    if (data.daysTracked >= 25) return 'Incredible month of consistency 🏆';
-    if (data.workoutsDone >= 12) return 'Strong month. Keep building! 💪';
-    return 'Progress over perfection! 🎯';
+  // Find most common workout
+  const wCounts: Record<string, number> = {};
+  workouts.forEach((w: any) => { if (w.exercise_name) wCounts[w.exercise_name] = (wCounts[w.exercise_name] ?? 0) + 1; });
+  const topWorkout = Object.keys(wCounts).sort((a, b) => wCounts[b] - wCounts[a])[0] ?? null;
+
+  return {
+    caloriesConsumed, calorieGoal: profile?.daily_calorie_goal ?? 2000,
+    waterMl, waterGoalMl: profile?.water_goal_ml ?? 2500,
+    workoutsDone: workouts.length, caloriesBurned,
+    streakCount: profile?.streak_count ?? 0,
+    daysTracked: type === 'daily' ? 1 : type === 'weekly' ? 7 : 30,
+    topWorkout, periodLabel, stepsTotal,
+    sleepAvg: Math.round(sleepAvg * 10) / 10,
   };
+}
 
+// ── MOTIVATIONAL MESSAGE ──────────────────────────────────────
+function getMessage(data: RecapData, type: RecapType): string {
+  const pct = data.calorieGoal > 0 ? (data.caloriesConsumed / data.calorieGoal) * 100 : 0;
+  if (type === 'daily') {
+    if (pct >= 90 && data.workoutsDone > 0) return 'Absolutely crushed it today 💪';
+    if (data.workoutsDone > 0) return 'Workout done. Keep the streak alive 🔥';
+    if (pct >= 80) return 'Solid nutrition day 🥗';
+    return 'Every day is progress. Keep going! 🎯';
+  }
+  if (type === 'weekly') {
+    if (data.workoutsDone >= 5) return 'Elite week. You showed up every day 🏆';
+    if (data.workoutsDone >= 3) return 'Consistency is your superpower 🔥';
+    return 'Build the habit. Small steps, big results 🎯';
+  }
+  if (data.workoutsDone >= 12) return 'Monster month. Absolutely unstoppable 🏆';
+  if (data.streakCount >= 20) return `${data.streakCount}-day streak. Legendary 🔥`;
+  return 'Progress over perfection. Every rep counts 💪';
+}
+
+// ── STAT TILE ─────────────────────────────────────────────────
+function StatTile({
+  icon, value, label, t, small,
+}: {
+  icon: string; value: string; label: string;
+  t: typeof TEMPLATES[0]; small?: boolean;
+}) {
   return (
-    <View style={[
-      styles.recapCard,
-      { backgroundColor: design.bg },
-      isGradient && styles.gradientCard,
-    ]}>
-      {/* CalFit branding */}
-      <View style={styles.cardBrand}>
-        <View style={[styles.brandDot, { backgroundColor: design.accent }]} />
-        <Text style={[styles.brandText, { color: design.accent }]}>
-          CalFit
-        </Text>
-      </View>
-
-      {/* Period label */}
-      <Text style={[styles.cardPeriod, { color: design.text + '99' }]}>
-        {data.periodLabel}
-      </Text>
-
-      {/* Main message */}
-      <Text style={[styles.cardMessage, { color: design.text }]}>
-        {getMessage()}
-      </Text>
-
-      {/* User name */}
-      <Text style={[styles.cardUser, { color: design.text + 'BB' }]}>
-        {userName}
-      </Text>
-
-      {/* Stats grid */}
-      <View style={styles.cardStatsGrid}>
-        <View style={[styles.cardStat, { borderColor: design.text + '22' }]}>
-          <Text style={[styles.cardStatValue, { color: design.accent }]}>
-            {data.caloriesConsumed}
-          </Text>
-          <Text style={[styles.cardStatLabel, { color: design.text + '99' }]}>
-            kcal eaten
-          </Text>
-        </View>
-
-        <View style={[styles.cardStat, { borderColor: design.text + '22' }]}>
-          <Text style={[styles.cardStatValue, { color: design.accent }]}>
-            {data.caloriesBurned}
-          </Text>
-          <Text style={[styles.cardStatLabel, { color: design.text + '99' }]}>
-            kcal burned
-          </Text>
-        </View>
-
-        <View style={[styles.cardStat, { borderColor: design.text + '22' }]}>
-          <Text style={[styles.cardStatValue, { color: design.accent }]}>
-            {data.workoutsDone}
-          </Text>
-          <Text style={[styles.cardStatLabel, { color: design.text + '99' }]}>
-            {recapType === 'daily' ? 'workouts' : 'workouts done'}
-          </Text>
-        </View>
-
-        <View style={[styles.cardStat, { borderColor: design.text + '22' }]}>
-          <Text style={[styles.cardStatValue, { color: design.accent }]}>
-            {waterLitres}L
-          </Text>
-          <Text style={[styles.cardStatLabel, { color: design.text + '99' }]}>
-            water
-          </Text>
-        </View>
-
-        <View style={[styles.cardStat, { borderColor: design.text + '22' }]}>
-          <Text style={[styles.cardStatValue, { color: design.accent }]}>
-            {data.streakCount}🔥
-          </Text>
-          <Text style={[styles.cardStatLabel, { color: design.text + '99' }]}>
-            day streak
-          </Text>
-        </View>
-
-        <View style={[styles.cardStat, { borderColor: design.text + '22' }]}>
-          <Text style={[styles.cardStatValue, { color: design.accent }]}>
-            {recapType === 'daily' ? `${caloriesPct}%` : `${data.daysTracked}d`}
-          </Text>
-          <Text style={[styles.cardStatLabel, { color: design.text + '99' }]}>
-            {recapType === 'daily' ? 'of goal' : 'tracked'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Progress bar — daily only */}
-      {recapType === 'daily' && data.calorieGoal > 0 && (
-        <View style={styles.cardProgressSection}>
-          <View style={[styles.cardProgressBg, { backgroundColor: design.text + '22' }]}>
-            <View style={[
-              styles.cardProgressFill,
-              {
-                backgroundColor: design.accent,
-                width: `${Math.min(caloriesPct, 100)}%` as any,
-              },
-            ]} />
-          </View>
-          <Text style={[styles.cardProgressText, { color: design.text + '99' }]}>
-            {data.caloriesConsumed} / {data.calorieGoal} kcal daily goal
-          </Text>
-        </View>
-      )}
-
-      {/* Footer */}
-      <Text style={[styles.cardFooter, { color: design.text + '55' }]}>
-        Track. Train. Thrive.
-      </Text>
+    <View style={[st.tile, {
+      backgroundColor: t.statBg,
+      borderColor: t.statBorder,
+      flex: small ? undefined : 1,
+      minWidth: small ? 90 : undefined,
+    }]}>
+      <Text style={[st.icon, { color: t.accent }]}>{icon}</Text>
+      <Text style={[st.value, { color: t.text, fontSize: small ? 18 : 22 }]}>{value}</Text>
+      <Text style={[st.label, { color: t.sub }]}>{label}</Text>
     </View>
   );
 }
+const st = StyleSheet.create({
+  tile:  { alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: 2 },
+  icon:  { fontSize: 20, marginBottom: 2 },
+  value: { fontWeight: '800', lineHeight: 24 },
+  label: { fontSize: 10, fontWeight: '600', textAlign: 'center' },
+});
+
+// ── RECAP CARD ────────────────────────────────────────────────
+function RecapCard({
+  data, template, recapType, userName, cardRef,
+}: {
+  data: RecapData; template: typeof TEMPLATES[0];
+  recapType: RecapType; userName: string; cardRef?: any;
+}) {
+  const t = template;
+  const message = getMessage(data, recapType);
+  const waterL   = (data.waterMl / 1000).toFixed(1);
+  const goalWaterL = (data.waterGoalMl / 1000).toFixed(1);
+  const caloriePct = data.calorieGoal > 0
+    ? Math.min(Math.round((data.caloriesConsumed / data.calorieGoal) * 100), 100)
+    : 0;
+
+  return (
+    <ViewShot ref={cardRef} options={{ format: 'jpg', quality: 0.95 }}>
+      <LinearGradient
+        colors={[t.bg1, t.bg2] as [string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[rc.card, { width: CARD_W }]}
+      >
+        {/* ── TOP BAR ── */}
+        <View style={rc.topBar}>
+          <View style={[rc.brandPill, { backgroundColor: t.statBg, borderColor: t.statBorder }]}>
+            <Text style={[rc.brandText, { color: t.accent }]}>🏋️ CalFit</Text>
+          </View>
+          <View style={[rc.periodPill, { backgroundColor: t.statBg, borderColor: t.statBorder }]}>
+            <Text style={[rc.periodText, { color: t.sub }]}>{data.periodLabel}</Text>
+          </View>
+        </View>
+
+        {/* ── MOTIVATIONAL MESSAGE ── */}
+        <Text style={[rc.message, { color: t.text }]}>{message}</Text>
+        <Text style={[rc.userName, { color: t.sub }]}>@{userName}</Text>
+
+        {/* ── CALORIE RING BAR ── */}
+        <View style={[rc.calorieBlock, { backgroundColor: t.statBg, borderColor: t.statBorder }]}>
+          <View style={rc.calorieRow}>
+            <Text style={rc.calorieIcon}>🔥</Text>
+            <View style={{ flex: 1 }}>
+              <View style={rc.calorieTopRow}>
+                <Text style={[rc.calorieVal, { color: t.text }]}>
+                  {data.caloriesConsumed.toLocaleString()}
+                </Text>
+                <Text style={[rc.calorieGoal, { color: t.sub }]}>
+                  / {data.calorieGoal.toLocaleString()} kcal
+                </Text>
+              </View>
+              {/* Progress bar */}
+              <View style={[rc.bar, { backgroundColor: t.statBorder }]}>
+                <View style={[rc.barFill, {
+                  width: `${caloriePct}%`,
+                  backgroundColor: t.accent,
+                }]} />
+              </View>
+              <Text style={[rc.barLabel, { color: t.sub }]}>{caloriePct}% of goal</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── STAT GRID ── */}
+        <View style={rc.grid}>
+          <StatTile icon="💧" value={`${waterL}L`}       label="Water"    t={t} />
+          <StatTile icon="🏋️" value={`${data.workoutsDone}`} label="Workouts" t={t} />
+          <StatTile icon="⚡" value={`${data.caloriesBurned}`} label="Burned"  t={t} />
+        </View>
+        <View style={[rc.grid, { marginTop: spacing.sm }]}>
+          <StatTile icon="👟" value={data.stepsTotal > 0 ? data.stepsTotal.toLocaleString() : '—'} label="Steps"  t={t} />
+          <StatTile icon="😴" value={data.sleepAvg > 0 ? `${data.sleepAvg}h` : '—'}               label="Sleep"  t={t} />
+          <StatTile icon="🔥" value={`${data.streakCount}d`} label="Streak"  t={t} />
+        </View>
+
+        {/* ── TOP WORKOUT ── */}
+        {data.topWorkout && (
+          <View style={[rc.topWorkoutRow, { backgroundColor: t.statBg, borderColor: t.statBorder }]}>
+            <Text style={[rc.topWorkoutLabel, { color: t.sub }]}>Top workout</Text>
+            <Text style={[rc.topWorkoutName, { color: t.text }]}>{data.topWorkout}</Text>
+          </View>
+        )}
+
+        {/* ── FOOTER ── */}
+        <View style={[rc.footer, { borderTopColor: t.statBorder }]}>
+          <Text style={[rc.footerText, { color: t.sub }]}>calfit.tech · Track. Grow. Win.</Text>
+          <View style={[rc.streak, { backgroundColor: t.badge + '22' }]}>
+            <Text style={[rc.streakText, { color: t.badge }]}>🔥 {data.streakCount} day streak</Text>
+          </View>
+        </View>
+      </LinearGradient>
+    </ViewShot>
+  );
+}
+
+const rc = StyleSheet.create({
+  card:         { borderRadius: 24, padding: spacing.lg, gap: spacing.md, overflow: 'hidden' },
+  topBar:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  brandPill:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
+  brandText:    { fontSize: 12, fontWeight: '800' },
+  periodPill:   { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
+  periodText:   { fontSize: 11, fontWeight: '600' },
+  message:      { fontSize: 22, fontWeight: '900', lineHeight: 28, letterSpacing: -0.5 },
+  userName:     { fontSize: 13, fontWeight: '600', marginTop: -spacing.sm },
+  calorieBlock: { borderRadius: radius.md, padding: spacing.md, borderWidth: 1 },
+  calorieRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  calorieIcon:  { fontSize: 28 },
+  calorieTopRow:{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  calorieVal:   { fontSize: 28, fontWeight: '900' },
+  calorieGoal:  { fontSize: 13, fontWeight: '600' },
+  bar:          { height: 6, borderRadius: 3, marginTop: 6, overflow: 'hidden' },
+  barFill:      { height: '100%', borderRadius: 3 },
+  barLabel:     { fontSize: 10, fontWeight: '600', marginTop: 3 },
+  grid:         { flexDirection: 'row', gap: spacing.sm },
+  topWorkoutRow:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
+  topWorkoutLabel:{ fontSize: 11, fontWeight: '600' },
+  topWorkoutName: { fontSize: 13, fontWeight: '800' },
+  footer:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing.md, borderTopWidth: 1, marginTop: spacing.xs },
+  footerText:   { fontSize: 10, fontWeight: '600' },
+  streak:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
+  streakText:   { fontSize: 10, fontWeight: '800' },
+});
+
+// ── TEMPLATE PICKER ───────────────────────────────────────────
+function TemplatePicker({
+  active, onChange, theme,
+}: {
+  active: number; onChange: (i: number) => void; theme: typeof colors.dark;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tp.row}>
+      {TEMPLATES.map((t, i) => (
+        <TouchableOpacity
+          key={t.id}
+          onPress={() => onChange(i)}
+          style={[tp.swatch, { borderColor: i === active ? theme.accent : theme.border, borderWidth: i === active ? 2 : 1 }]}
+        >
+          <LinearGradient
+            colors={[t.bg1, t.bg2] as [string, string]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={tp.swatchGrad}
+          />
+          <Text style={[tp.label, { color: i === active ? theme.accent : theme.textMuted }]}>{t.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+const tp = StyleSheet.create({
+  row:       { paddingHorizontal: spacing.lg, gap: spacing.md, paddingVertical: spacing.sm },
+  swatch:    { alignItems: 'center', gap: 4, borderRadius: radius.md, overflow: 'hidden', paddingBottom: 4 },
+  swatchGrad:{ width: 64, height: 40, borderRadius: radius.sm },
+  label:     { fontSize: fontSize.xs, fontWeight: '600' },
+});
 
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function RecapScreen() {
@@ -196,205 +350,89 @@ export default function RecapScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [recapType, setRecapType] = useState<RecapType>('daily');
-  const [activeDesign, setActiveDesign] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSharing, setIsSharing] = useState(false);
-  const [data, setData] = useState<RecapData>({
-    caloriesConsumed: 0,
-    calorieGoal: (profile as any)?.daily_calorie_goal ?? 2000,
-    waterMl: 0,
-    waterGoalMl: 2500,
-    workoutsDone: 0,
-    caloriesBurned: 0,
-    streakCount: (profile as any)?.streak_count ?? 0,
-    daysTracked: 0,
-    foodLogs: 0,
-    topWorkout: null,
-    periodLabel: "Today's Recap",
-  });
+  const [recapType, setRecapType]     = useState<RecapType>('daily');
+  const [activeTemplate, setTemplate] = useState(0);
+  const [data, setData]               = useState<RecapData | null>(null);
+  const [isLoading, setIsLoading]     = useState(true);
+  const [isSharing, setIsSharing]     = useState(false);
+  const cardRef = useRef<any>(null);
 
-  const userName = profile?.full_name
-    ?? user?.email?.split('@')[0]
-    ?? 'CalFit User';
+  const userName = profile?.calfit_id
+    || profile?.full_name?.toLowerCase().replace(/\s+/g, '') || 'calfit_user';
 
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) loadRecapData(recapType);
-    }, [user?.id, recapType])
-  );
+  useFocusEffect(useCallback(() => { load(); }, [recapType]));
 
-  const getDaysBack = (type: RecapType) => {
-    if (type === 'daily') return 1;
-    if (type === 'weekly') return 7;
-    return 30;
-  };
-
-  const getPeriodLabel = (type: RecapType) => {
-    if (type === 'daily') {
-      const today = new Date();
-      return `${today.toLocaleDateString('en-GB', {
-        weekday: 'long', day: 'numeric', month: 'long',
-      })} Recap`;
-    }
-    if (type === 'weekly') return 'Weekly Recap';
-    return 'Monthly Recap';
-  };
-
-  const loadRecapData = async (type: RecapType) => {
+  const load = async () => {
     if (!user?.id) return;
     setIsLoading(true);
-
-    try {
-      const { supabase } = await import('../../services/supabase');
-      const daysBack = getDaysBack(type);
-      const fromDate = new Date();
-      fromDate.setDate(fromDate.getDate() - daysBack);
-      const fromISO = fromDate.toISOString();
-      const todayStr = new Date().toISOString().split('T')[0];
-
-      const [workoutsRes, foodRes, waterRes] = await Promise.all([
-        supabase
-          .from('workout_sessions')
-          .select('name, calories_burned')
-          .eq('user_id', user.id)
-          .eq('status', 'completed')
-          .gte('completed_at', fromISO),
-
-        supabase
-          .from('food_logs')
-          .select('calories, date')
-          .eq('user_id', user.id)
-          .gte(type === 'daily' ? 'date' : 'logged_at', type === 'daily' ? todayStr : fromISO),
-
-        supabase
-          .from('water_logs')
-          .select('amount_ml')
-          .eq('user_id', user.id)
-          .gte('logged_at', fromISO),
-      ]);
-
-      const workouts = workoutsRes.data ?? [];
-      const foods = foodRes.data ?? [];
-      const waters = waterRes.data ?? [];
-
-      const caloriesConsumed = foods.reduce(
-        (sum: number, f: any) => sum + (f.calories ?? 0), 0
-      );
-      const caloriesBurned = workouts.reduce(
-        (sum: number, w: any) => sum + (w.calories_burned ?? 0), 0
-      );
-      const waterMl = waters.reduce(
-        (sum: number, w: any) => sum + (w.amount_ml ?? 0), 0
-      );
-
-      // Unique days with food logs
-      const foodDates = new Set(foods.map((f: any) => f.date));
-
-      // Top workout this period
-      const topWorkout = workouts.length > 0
-        ? workouts.reduce((best: any, w: any) =>
-            (w.calories_burned ?? 0) > (best.calories_burned ?? 0) ? w : best
-          ).name
-        : null;
-
-      setData({
-        caloriesConsumed: Math.round(caloriesConsumed),
-        calorieGoal: (profile as any)?.daily_calorie_goal ?? 2000,
-        waterMl,
-        waterGoalMl: 2500,
-        workoutsDone: workouts.length,
-        caloriesBurned: Math.round(caloriesBurned),
-        streakCount: (profile as any)?.streak_count ?? 0,
-        daysTracked: foodDates.size,
-        foodLogs: foods.length,
-        topWorkout,
-        periodLabel: getPeriodLabel(type),
-      });
-    } catch (error) {
-      console.error('loadRecapData error:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    try { setData(await loadRecapData(user.id, recapType)); }
+    catch {}
+    finally { setIsLoading(false); }
   };
 
   const handleShare = async () => {
+    if (!data) return;
     setIsSharing(true);
     try {
-      const design = DESIGNS[activeDesign];
-      const userName2 = profile?.full_name ?? 'A CalFit member';
-      const waterLitres = (data.waterMl / 1000).toFixed(1);
-
-      let message = `${data.periodLabel} — ${userName2} on CalFit\n\n`;
-      message += `🔥 Streak: ${data.streakCount} days\n`;
-      message += `🍽️ Calories: ${data.caloriesConsumed} kcal eaten\n`;
-      message += `💧 Water: ${waterLitres}L\n`;
-      message += `💪 Workouts: ${data.workoutsDone}\n`;
-      message += `🔥 Burned: ${data.caloriesBurned} kcal\n`;
-      if (data.topWorkout) message += `⭐ Best workout: ${data.topWorkout}\n`;
-      message += `\nTrack yours on CalFit 👉 https://calfit.tech`;
-
-      await Share.share({
-        message,
-        title: `My CalFit ${data.periodLabel}`,
-      });
-    } catch (error: any) {
-      if (error?.message !== 'User did not share') {
-        console.error('share error:', error);
+      // Try to capture the card as an image first
+      if (cardRef.current?.capture) {
+        const uri = await cardRef.current.capture();
+        await Share.share({ url: uri, message: `My ${data.periodLabel} CalFit recap 🏋️\n\nTrack yours at calfit.tech` });
+      } else {
+        // Fallback to text share
+        await Share.share({
+          message: `My ${data.periodLabel} CalFit Recap 🏋️\n\n` +
+            `🔥 ${data.caloriesConsumed} kcal consumed\n` +
+            `💧 ${(data.waterMl / 1000).toFixed(1)}L water\n` +
+            `🏋️ ${data.workoutsDone} workouts\n` +
+            `🔥 ${data.streakCount} day streak\n\n` +
+            `Track yours at calfit.tech`,
+        });
       }
-    } finally {
-      setIsSharing(false);
-    }
+    } catch {}
+    finally { setIsSharing(false); }
   };
 
-  const design = DESIGNS[activeDesign];
+  const TYPE_TABS: RecapType[] = ['daily', 'weekly', 'monthly'];
+  const TYPE_COLORS = [BLUE, ORANGE, PINK];
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>Back</Text>
+
+      {/* ── GRADIENT HEADER ── */}
+      <LinearGradient
+        colors={[PURPLE + 'CC', PINK + 'CC'] as [string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>My Recap</Text>
+        <Text style={styles.headerTitle}>My Recap</Text>
         <TouchableOpacity
           onPress={handleShare}
-          disabled={isSharing || isLoading}
-          style={[styles.shareHeaderBtn, { backgroundColor: theme.accent }]}
+          disabled={isSharing || isLoading || !data}
+          style={styles.shareBtn}
         >
-          {isSharing ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name="share-social-outline" size={18} color="#fff" />
-          )}
+          {isSharing
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Ionicons name="share-social-outline" size={20} color="#fff" />}
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Recap type selector */}
-        <View style={[styles.typeToggle, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
-          {(['daily', 'weekly', 'monthly'] as RecapType[]).map((t) => (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+        {/* ── PERIOD TABS ── */}
+        <View style={[styles.typeTabs, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          {TYPE_TABS.map((t, i) => (
             <TouchableOpacity
               key={t}
               onPress={() => setRecapType(t)}
-              style={[styles.typeBtn, recapType === t && {
-                backgroundColor: theme.accent,
-              }]}
+              style={[styles.typeTab, recapType === t && { backgroundColor: TYPE_COLORS[i] }]}
             >
-              <Text style={[styles.typeBtnText, {
-                color: recapType === t ? theme.bg : theme.textMuted,
-                fontWeight: recapType === t ? '700' : '400',
+              <Text style={[styles.typeTabText, {
+                color: recapType === t ? '#fff' : theme.textMuted,
+                fontWeight: recapType === t ? '700' : '500',
               }]}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </Text>
@@ -402,306 +440,110 @@ export default function RecapScreen() {
           ))}
         </View>
 
-        {/* Design style selector */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.designRow}
-        >
-          {DESIGNS.map((d, i) => (
-            <TouchableOpacity
-              key={d.id}
-              onPress={() => setActiveDesign(i)}
-              style={[styles.designPill, {
-                backgroundColor: d.bg,
-                borderColor: i === activeDesign ? theme.accent : theme.border,
-                borderWidth: i === activeDesign ? 2 : 1,
-              }]}
-            >
-              <Text style={[styles.designPillText, { color: d.text }]}>
-                {d.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* ── TEMPLATE PICKER ── */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Choose Style</Text>
+        </View>
+        <TemplatePicker active={activeTemplate} onChange={setTemplate} theme={theme} />
 
-        {/* Recap card */}
-        {isLoading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator color={theme.accent} size="large" />
-            <Text style={[styles.loadingText, { color: theme.textMuted }]}>
-              Building your recap...
-            </Text>
-          </View>
-        ) : (
-          <RecapCard
-            data={data}
-            design={design}
-            recapType={recapType}
-            userName={userName}
-          />
-        )}
+        {/* ── RECAP CARD ── */}
+        <View style={styles.cardWrap}>
+          {isLoading || !data ? (
+            <View style={[styles.loadingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <ActivityIndicator color={theme.accent} size="large" />
+              <Text style={[styles.loadingText, { color: theme.textMuted }]}>Building your recap…</Text>
+            </View>
+          ) : (
+            <RecapCard
+              data={data}
+              template={TEMPLATES[activeTemplate]}
+              recapType={recapType}
+              userName={userName}
+              cardRef={cardRef}
+            />
+          )}
+        </View>
 
-        {/* Share button */}
+        {/* ── SHARE BUTTON ── */}
         <TouchableOpacity
           onPress={handleShare}
-          disabled={isSharing || isLoading}
-          style={[styles.shareBtn, { backgroundColor: theme.accent }]}
+          disabled={isSharing || isLoading || !data}
+          style={[styles.shareFullBtn, { opacity: isLoading ? 0.5 : 1 }]}
         >
-          {isSharing ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="share-social-outline" size={20} color="#fff" />
-              <Text style={styles.shareBtnText}>
-                Share
-              </Text>
-            </>
-          )}
+          <LinearGradient
+            colors={[PINK, PURPLE] as [string, string]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.shareGrad}
+          >
+            {isSharing
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Ionicons name="share-social-outline" size={20} color="#fff" />}
+            <Text style={styles.shareBtnText}>
+              {isSharing ? 'Preparing…' : 'Share Recap'}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
 
-        {/* Stats breakdown */}
-        {!isLoading && (
-          <View style={[styles.breakdownCard, {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          }]}>
+        {/* ── BREAKDOWN LIST ── */}
+        {data && (
+          <View style={[styles.breakdown, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Text style={[styles.breakdownTitle, { color: theme.textPrimary }]}>
-              {data.periodLabel} breakdown
+              Full Breakdown
             </Text>
-
             {[
-              {
-                icon: 'restaurant-outline',
-                label: 'Calories consumed',
-                value: `${data.caloriesConsumed} kcal`,
-                sub: `Goal: ${data.calorieGoal} kcal`,
-                color: theme.accent,
-              },
-              {
-                icon: 'water-outline',
-                label: 'Water intake',
-                value: `${(data.waterMl / 1000).toFixed(1)}L`,
-                sub: `Goal: ${(data.waterGoalMl / 1000).toFixed(1)}L`,
-                color: theme.accentSecond,
-              },
-              {
-                icon: 'barbell-outline',
-                label: 'Workouts completed',
-                value: `${data.workoutsDone}`,
-                sub: data.topWorkout ? `Best: ${data.topWorkout}` : 'No workouts yet',
-                color: (theme as any).orange,
-              },
-              {
-                icon: 'flame-outline',
-                label: 'Calories burned',
-                value: `${data.caloriesBurned} kcal`,
-                sub: 'From workouts',
-                color: (theme as any).orange,
-              },
-              {
-                icon: 'calendar-outline',
-                label: 'Days tracked',
-                value: `${data.daysTracked}`,
-                sub: recapType === 'daily' ? 'Today' : `In this ${recapType}`,
-                color: theme.accent,
-              },
-              {
-                icon: 'bonfire-outline',
-                label: 'Current streak',
-                value: `${data.streakCount} days 🔥`,
-                sub: 'Keep it going!',
-                color: (theme as any).gold,
-              },
-            ].map((item) => (
-              <View key={item.label} style={[styles.breakdownRow, {
-                borderBottomColor: theme.border,
-              }]}>
-                <View style={[styles.breakdownIcon, {
-                  backgroundColor: item.color + '22',
-                }]}>
-                  <Ionicons name={item.icon as any} size={18} color={item.color} />
+              { icon: 'flame-outline',    label: 'Calories consumed', value: `${data.caloriesConsumed.toLocaleString()} / ${data.calorieGoal.toLocaleString()} kcal`, color: ORANGE },
+              { icon: 'water-outline',    label: 'Water',             value: `${(data.waterMl/1000).toFixed(1)} / ${(data.waterGoalMl/1000).toFixed(1)} L`, color: BLUE },
+              { icon: 'barbell-outline',  label: 'Workouts',          value: `${data.workoutsDone} sessions`, color: PINK },
+              { icon: 'flash-outline',    label: 'Calories burned',   value: `${data.caloriesBurned} kcal`, color: '#FF5959' },
+              { icon: 'footsteps-outline',label: 'Steps',             value: data.stepsTotal > 0 ? data.stepsTotal.toLocaleString() : '—', color: GREEN },
+              { icon: 'moon-outline',     label: 'Avg sleep',         value: data.sleepAvg > 0 ? `${data.sleepAvg}h` : '—', color: PURPLE },
+              { icon: 'bonfire-outline',  label: 'Streak',            value: `${data.streakCount} days 🔥`, color: GOLD },
+            ].map((row) => (
+              <View key={row.label} style={[styles.breakdownRow, { borderBottomColor: theme.border }]}>
+                <View style={[styles.breakdownIconWrap, { backgroundColor: row.color + '18' }]}>
+                  <Ionicons name={row.icon as any} size={16} color={row.color} />
                 </View>
-                <View style={styles.breakdownInfo}>
-                  <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>
-                    {item.label}
-                  </Text>
-                  <Text style={[styles.breakdownValue, { color: theme.textPrimary }]}>
-                    {item.value}
-                  </Text>
-                </View>
-                <Text style={[styles.breakdownSub, { color: theme.textMuted }]}>
-                  {item.sub}
-                </Text>
+                <Text style={[styles.breakdownLabel, { color: theme.textSecondary }]}>{row.label}</Text>
+                <Text style={[styles.breakdownValue, { color: theme.textPrimary }]}>{row.value}</Text>
               </View>
             ))}
           </View>
         )}
+
+        <View style={{ height: 80 }} />
       </ScrollView>
     </AndroidSafeView>
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
+  safe:   { flex: 1 },
+  scroll: { paddingBottom: 40 },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backText: { fontSize: fontSize.lg, fontWeight: '400' },
-  pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
-  shareHeaderBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 2 },
+  backBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: fontSize.lg, fontWeight: '800', color: '#fff' },
+  shareBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
 
-  typeToggle: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 4,
-    gap: 4,
-  },
-  typeBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-  },
-  typeBtnText: { fontSize: fontSize.base },
+  typeTabs: { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.lg, padding: 4, borderWidth: 1 },
+  typeTab:  { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md },
+  typeTabText: { fontSize: fontSize.sm },
 
-  designRow: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  designPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    borderWidth: 1,
-  },
-  designPillText: { fontSize: fontSize.sm, fontWeight: '600' },
+  section:      { paddingHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.xs },
+  sectionLabel: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  loadingCard: {
-    marginHorizontal: spacing.lg,
-    height: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  loadingText: { fontSize: fontSize.base },
+  cardWrap:    { paddingHorizontal: spacing.lg, marginTop: spacing.sm },
+  loadingCard: { height: 360, borderRadius: 24, alignItems: 'center', justifyContent: 'center', gap: spacing.md, borderWidth: 1 },
+  loadingText: { fontSize: fontSize.sm },
 
-  // Recap card
-  recapCard: {
-    marginHorizontal: spacing.lg,
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    gap: spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  gradientCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  cardBrand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  brandDot: {
-    width: 8, height: 8, borderRadius: 4,
-  },
-  brandText: { fontSize: fontSize.xs, fontWeight: '800', letterSpacing: 1 },
-  cardPeriod: { fontSize: fontSize.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
-  cardMessage: { fontSize: fontSize.xxl, fontWeight: '800', lineHeight: 28 },
-  cardUser: { fontSize: fontSize.sm, marginBottom: spacing.sm },
+  shareFullBtn: { marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.lg, overflow: 'hidden' },
+  shareGrad:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md + 2 },
+  shareBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '800' },
 
-  cardStatsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
-  cardStat: {
-    width: '30.5%',
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  cardStatValue: { fontSize: fontSize.lg, fontWeight: '800' },
-  cardStatLabel: { fontSize: 9, marginTop: 2, textAlign: 'center' },
-
-  cardProgressSection: { marginTop: spacing.sm, gap: 4 },
-  cardProgressBg: {
-    height: 5, borderRadius: 3, overflow: 'hidden',
-  },
-  cardProgressFill: { height: '100%', borderRadius: 3 },
-  cardProgressText: { fontSize: fontSize.xs, textAlign: 'right' },
-
-  cardFooter: { fontSize: 9, marginTop: spacing.sm, textAlign: 'center' },
-
-  // Share button
-  shareBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-  },
-  shareBtnText: {
-    color: '#fff',
-    fontSize: fontSize.base,
-    fontWeight: '700',
-  },
-
-  // Breakdown card
-  breakdownCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  breakdownTitle: {
-    fontSize: fontSize.base,
-    fontWeight: '700',
-    padding: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-  },
-  breakdownIcon: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  breakdownInfo: { flex: 1 },
-  breakdownLabel: { fontSize: fontSize.xs },
-  breakdownValue: { fontSize: fontSize.base, fontWeight: '700', marginTop: 2 },
-  breakdownSub: { fontSize: fontSize.xs, textAlign: 'right', flexShrink: 0, maxWidth: 90 },
+  breakdown:      { marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
+  breakdownTitle: { fontSize: fontSize.base, fontWeight: '800', padding: spacing.md, paddingBottom: spacing.sm },
+  breakdownRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1 },
+  breakdownIconWrap: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  breakdownLabel: { flex: 1, fontSize: fontSize.sm },
+  breakdownValue: { fontSize: fontSize.sm, fontWeight: '700' },
 });

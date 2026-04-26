@@ -1,23 +1,18 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  ActivityIndicator,
-  Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Modal, TextInput, Alert, RefreshControl, FlatList,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useEffect, useState, useRef } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
-import { searchFoods, FoodResult } from '../../services/foodSearchService';
 import { colors, spacing, radius, fontSize } from '../../theme';
-import { logFood, logWater, getTodayCalories, getTodayWater } from '../../services/profileService';
+import { getTodayCalories, getTodayWater, logFood, logWater } from '../../services/profileService';
+import { supabase } from '../../services/supabase';
+//import { NIGERIAN_FOODS } from '../../data/nigerianFoods';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 
@@ -25,512 +20,406 @@ interface FoodEntry {
   id: string;
   food_name: string;
   calories: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fats_g?: number;
   meal_type: MealType;
 }
 
-// ── ADD FOOD MODAL ────────────────────────────────────────────
-function AddFoodModal({
-  theme,
-  mealType,
-  visible,
-  onClose,
-  onAdd,
-}: {
-  theme: typeof colors.dark;
-  mealType: MealType;
-  visible: boolean;
-  onClose: () => void;
-  onAdd: (entry: {
-    food_name: string;
-    calories: number;
-    meal_type: MealType;
-    protein_g?: number;
-    carbs_g?: number;
-    fats_g?: number;
-  }) => void;
+interface FoodResult {
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  serving: string;
+}
+
+// ── CALORIE HERO CARD ─────────────────────────────────────────
+function CalorieHero({ theme, consumed, goal, waterMl, waterGoalMl }: {
+  theme: typeof colors.light;
+  consumed: number; goal: number;
+  waterMl: number; waterGoalMl: number;
 }) {
+  const remaining = Math.max(goal - consumed, 0);
+  const pct = Math.min(consumed / goal, 1);
+  const waterPct = Math.min(waterMl / waterGoalMl, 1);
+
+  return (
+    <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.heroCard}>
+      {/* Calorie numbers */}
+      <View style={styles.heroRow}>
+        <View>
+          <Text style={styles.heroBig}>{consumed.toLocaleString()}</Text>
+          <Text style={styles.heroSubLabel}>kcal consumed</Text>
+        </View>
+        <View style={styles.heroRight}>
+          <Text style={styles.heroGoal}>{goal.toLocaleString()}</Text>
+          <Text style={styles.heroGoalLabel}>daily goal</Text>
+        </View>
+      </View>
+
+      {/* Calorie progress bar */}
+      <View style={styles.heroPB}>
+        <LinearGradient
+          colors={[theme.gradStart, theme.gradMid] as [string, string]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={[styles.heroPBFill, { width: `${Math.max(pct * 100, 2)}%` as any }]}
+        />
+      </View>
+      <Text style={[styles.heroRemaining, { color: theme.gradStart }]}>
+        {remaining > 0 ? `${remaining.toLocaleString()} kcal remaining` : 'Goal reached 🎉'}
+      </Text>
+
+      {/* Macro pills */}
+      <View style={styles.macroPills}>
+        {[
+          { label: 'Protein', g: Math.round(consumed * 0.3 / 4), color: '#FF6B35' },
+          { label: 'Carbs',   g: Math.round(consumed * 0.45 / 4), color: '#FFB830' },
+          { label: 'Fat',     g: Math.round(consumed * 0.25 / 9), color: '#4A90E2' },
+        ].map((m) => (
+          <View key={m.label} style={[styles.macroPill, { backgroundColor: m.color + '22', borderColor: m.color + '55' }]}>
+            <Text style={[styles.macroPillVal, { color: m.color }]}>{m.g}g</Text>
+            <Text style={[styles.macroPillLabel, { color: m.color, opacity: 0.75 }]}>{m.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Water progress */}
+      <View style={styles.waterRow}>
+        <Ionicons name="water-outline" size={14} color="#2BBCB0" />
+        <View style={[styles.waterBar, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+          <LinearGradient colors={['#2BBCB0', '#4A90E2'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={[styles.waterBarFill, { width: `${waterPct * 100}%` as any }]} />
+        </View>
+        <Text style={styles.waterLabel}>{(waterMl / 1000).toFixed(1)}L / {(waterGoalMl / 1000).toFixed(1)}L</Text>
+      </View>
+    </LinearGradient>
+  );
+}
+
+// ── WATER LOG CARD ────────────────────────────────────────────
+function WaterCard({ theme, waterMl, waterGoalMl, onLog }: {
+  theme: typeof colors.light; waterMl: number; waterGoalMl: number; onLog: (ml: number) => void;
+}) {
+  return (
+    <View style={[styles.waterCard, { backgroundColor: theme.waterCard }]}>
+      <View style={styles.waterCardLeft}>
+        <Ionicons name="water" size={22} color="#18a3e4" />
+        <View>
+          <Text style={[styles.waterCardTitle, { color: '#1f51f7e1' }]}>Water Intake</Text>
+          <Text style={[styles.waterCardSub, { color: '#0d11ee', opacity: 0.75 }]}>
+            {(waterMl / 1000).toFixed(1)}L of {(waterGoalMl / 1000).toFixed(1)}L
+          </Text>
+        </View>
+      </View>
+      <View style={styles.waterBtns}>
+        {[250, 500, 1000].map((ml) => (
+          <TouchableOpacity key={ml} onPress={() => onLog(ml)} activeOpacity={0.8}
+            style={[styles.waterBtn, { backgroundColor: '#2b65bc' + '22', borderColor: '#2b65bc' + '55' }]}>
+            <Text style={[styles.waterBtnText, { color: '#2b46bc' }]}>+{ml < 1000 ? `${ml}ml` : '1L'}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ── MEAL SECTION ──────────────────────────────────────────────
+function MealSection({ theme, title, mealType, items, onAddFood }: {
+  theme: typeof colors.light; title: string; mealType: MealType;
+  items: FoodEntry[]; onAddFood: (meal: MealType) => void;
+}) {
+  const MEAL_COLORS: Record<MealType, string> = {
+    breakfast: '#FF6B35', lunch: '#FFB830', dinner: '#4A90E2', snacks: '#2BBCB0',
+  };
+  const MEAL_ICONS: Record<MealType, any> = {
+    breakfast: 'sunny-outline', lunch: 'restaurant-outline', dinner: 'moon-outline', snacks: 'nutrition-outline',
+  };
+  const color = MEAL_COLORS[mealType];
+  const totalCal = items.reduce((s, i) => s + i.calories, 0);
+
+  return (
+    <View style={[styles.mealSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      {/* Header */}
+      <View style={styles.mealHeader}>
+        <View style={[styles.mealIconWrap, { backgroundColor: color + '22' }]}>
+          <Ionicons name={MEAL_ICONS[mealType]} size={16} color={color} />
+        </View>
+        <Text style={[styles.mealTitle, { color: theme.textPrimary }]}>{title}</Text>
+        {totalCal > 0 && (
+          <Text style={[styles.mealCal, { color }]}>{totalCal} kcal</Text>
+        )}
+      </View>
+
+      {/* Food items */}
+      {items.map((item) => (
+        <View key={item.id} style={[styles.foodItem, { borderColor: theme.border }]}>
+          <View style={[styles.foodItemDot, { backgroundColor: color }]} />
+          <Text style={[styles.foodItemName, { color: theme.textPrimary }]} numberOfLines={1}>{item.food_name}</Text>
+          <Text style={[styles.foodItemCal, { color }]}>{item.calories} kcal</Text>
+        </View>
+      ))}
+
+      {/* Add food button */}
+      <TouchableOpacity onPress={() => onAddFood(mealType)} activeOpacity={0.8}
+        style={[styles.addFoodBtn, { borderColor: color + '66' }]}>
+        <Ionicons name="add" size={16} color={color} />
+        <Text style={[styles.addFoodText, { color }]}>Add food</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── ADD FOOD MODAL ────────────────────────────────────────────
+// Correction: shows choice — Type manually OR Scan
+function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedMeals, onSaveFavourite }: {
+  visible: boolean; theme: typeof colors.light; mealType: MealType;
+  onClose: () => void; onScan: () => void;
+  onAdd: (entry: { food_name: string; calories: number; protein_g?: number; carbs_g?: number; fats_g?: number; meal_type: MealType }) => void;
+  savedMeals: FoodResult[];
+  onSaveFavourite: (food: FoodResult) => void;
+}) {
+  type View = 'choice' | 'search' | 'manual' | 'portion';
+  const [view, setView] = useState<View>('choice');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<FoodResult | null>(null);
   const [portion, setPortion] = useState('100');
-  const [isSaving, setIsSaving] = useState(false);
 
-  // ── Manual entry state ─────────────────────────────────────
-  const [showManual, setShowManual] = useState(false);
+  // Manual entry state
   const [manualName, setManualName] = useState('');
-  const [manualCalories, setManualCalories] = useState('');
+  const [manualCal, setManualCal] = useState('');
   const [manualProtein, setManualProtein] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
   const [manualFat, setManualFat] = useState('');
-  const [manualGrams, setManualGrams] = useState('');
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reset = () => { setView('choice'); setQuery(''); setResults([]); setSelected(null); setPortion('100'); setManualName(''); setManualCal(''); setManualProtein(''); setManualCarbs(''); setManualFat(''); };
 
-  // Reset all state when modal opens/closes
-  useEffect(() => {
-    if (visible) {
-      setQuery('');
-      setResults([]);
-      setSelected(null);
-      setPortion('100');
-      setIsSearching(false);
-      setShowManual(false);
-      setManualName('');
-      setManualCalories('');
-      setManualProtein('');
-      setManualCarbs('');
-      setManualFat('');
-      setManualGrams('');
-    }
-  }, [visible]);
-
-  // ── Debounced search ───────────────────────────────────────
-  const handleSearch = (text: string) => {
-    setQuery(text);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-
-    if (!text.trim()) {
-      setResults([]);
-      return;
-    }
-
-    searchTimer.current = setTimeout(async () => {
-      setIsSearching(true);
-      const found = await searchFoods(text);
-      setResults(found);
-      setIsSearching(false);
-    }, 400);
+  const handleSearch = async (q: string) => {
+    setQuery(q);
+    if (q.length < 2) { setResults([]); return; }
+    setSearching(true);
+    try {
+      // Search Nigerian foods first
+      //const nigerian = NIGERIAN_FOODS.filter((f: any) => f.name.toLowerCase().includes(q.toLowerCase())).slice(0, 4).map((f: any) => ({ name: f.name, calories: f.calories_per_100g, protein: f.protein_g, carbs: f.carbs_g, fats: f.fats_g, serving: '100g' }));
+      // Then Open Food Facts
+      const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&action=process&json=1&page_size=6`);
+      const data = await res.json();
+      const off: FoodResult[] = (data.products ?? []).filter((p: any) => p.product_name && p.nutriments).slice(0, 6).map((p: any) => ({
+        name: p.product_name,
+        calories: Math.round(p.nutriments['energy-kcal_100g'] ?? 0),
+        protein: Math.round(p.nutriments.proteins_100g ?? 0),
+        carbs: Math.round(p.nutriments.carbohydrates_100g ?? 0),
+        fats: Math.round(p.nutriments.fat_100g ?? 0),
+        serving: '100g',
+      }));
+      //setResults([...nigerian, ...off]);
+    } catch { setResults([]); }
+    finally { setSearching(false); }
   };
 
-  // ── Scale nutrition values by portion ─────────────────────
-  const scaled = selected
-    ? {
-        calories:  Math.round(selected.calories  * (parseFloat(portion) || 100) / 100),
-        protein_g: Math.round(selected.protein   * (parseFloat(portion) || 100) / 100),
-        carbs_g:   Math.round(selected.carbs     * (parseFloat(portion) || 100) / 100),
-        fats_g:    Math.round(selected.fat        * (parseFloat(portion) || 100) / 100),
-      }
-    : null;
+  const handleSelectFood = (food: FoodResult) => { setSelected(food); setPortion('100'); setView('portion'); };
 
-  // ── Add from database result ───────────────────────────────
-  const handleAdd = async () => {
-    if (!selected || !scaled) return;
-    setIsSaving(true);
-    await onAdd({
-      food_name: selected.name,
-      meal_type: mealType,
-      calories:  scaled.calories,
-      protein_g: scaled.protein_g,
-      carbs_g:   scaled.carbs_g,
-      fats_g:    scaled.fats_g,
-    });
-    setIsSaving(false);
-    onClose();
+  const handleAddPortion = () => {
+    if (!selected) return;
+    const mult = parseFloat(portion) / 100;
+    onAdd({ food_name: selected.name, calories: Math.round(selected.calories * mult), protein_g: Math.round(selected.protein * mult), carbs_g: Math.round(selected.carbs * mult), fats_g: Math.round(selected.fats * mult), meal_type: mealType });
+    reset(); onClose();
   };
 
-  // ── Add from manual entry ──────────────────────────────────
-  const handleManualAdd = async () => {
-    if (!manualName.trim()) {
-      Alert.alert('Food name required', 'Please enter the name of the food.');
-      return;
-    }
-    const cal = parseInt(manualCalories, 10);
-    if (!cal || cal <= 0) {
-      Alert.alert('Calories required', 'Please enter a valid calorie amount.');
-      return;
-    }
-    setIsSaving(true);
-    await onAdd({
-      food_name: manualName.trim(),
-      meal_type: mealType,
-      calories:  cal,
-      protein_g: manualProtein ? parseFloat(manualProtein) : undefined,
-      carbs_g:   manualCarbs   ? parseFloat(manualCarbs)   : undefined,
-      fats_g:    manualFat     ? parseFloat(manualFat)      : undefined,
-    });
-    setIsSaving(false);
-    onClose();
+  const handleManualAdd = () => {
+    if (!manualName || !manualCal) { Alert.alert('Required', 'Please enter food name and calories.'); return; }
+    onAdd({ food_name: manualName, calories: parseInt(manualCal) || 0, protein_g: parseInt(manualProtein) || 0, carbs_g: parseInt(manualCarbs) || 0, fats_g: parseInt(manualFat) || 0, meal_type: mealType });
+    reset(); onClose();
   };
 
-  const mealLabel = mealType.charAt(0).toUpperCase() + mealType.slice(1);
-
-  // ── Determine header back action ──────────────────────────
-  const handleBack = () => {
-    if (showManual) { setShowManual(false); return; }
-    if (selected)   { setSelected(null);    return; }
-    onClose();
-  };
-
-  const headerTitle = showManual
-    ? 'Log Manually'
-    : selected
-    ? selected.name
-    : `Add to ${mealLabel}`;
+  const MEAL_LABELS: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { reset(); onClose(); }}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
-
+        <View style={[styles.modalSheet, { backgroundColor: theme.card }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={handleBack} style={styles.modalBackBtn}>
-              <Ionicons
-                name={selected || showManual ? 'chevron-back' : 'close'}
-                size={22}
-                color={theme.textPrimary}
-              />
+            <TouchableOpacity onPress={() => { if (view === 'choice') { reset(); onClose(); } else setView('choice'); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name={view === 'choice' ? 'close' : 'chevron-back'} size={24} color={theme.textPrimary} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-              {headerTitle}
+              {view === 'choice' ? `Add to ${MEAL_LABELS[mealType]}` : view === 'search' ? 'Search Food' : view === 'manual' ? 'Manual Entry' : 'Adjust Portion'}
             </Text>
+            <View style={{ width: 24 }} />
           </View>
 
-          {/* ── MANUAL ENTRY VIEW ──────────────────────────── */}
-          {showManual && (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={[styles.manualHint, { color: theme.textMuted }]}>
-                Can't find your food? Enter the details below. Only name and calories are required.
-              </Text>
-
-              {/* Food name */}
-              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
-                Food name *
-              </Text>
-              <View style={[styles.manualInput, {
-                backgroundColor: theme.bg,
-                borderColor: theme.border,
-              }]}>
-                <TextInput
-                  value={manualName}
-                  onChangeText={setManualName}
-                  placeholder="e.g. Egusi soup, Pounded yam..."
-                  placeholderTextColor={theme.textMuted}
-                  style={[styles.manualInputText, { color: theme.textPrimary }]}
-                  autoFocus
-                />
-              </View>
-
-              {/* Grams (optional) */}
-              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
-                Portion size (optional)
-              </Text>
-              <View style={[styles.manualInput, {
-                backgroundColor: theme.bg,
-                borderColor: theme.border,
-              }]}>
-                <TextInput
-                  value={manualGrams}
-                  onChangeText={setManualGrams}
-                  placeholder="e.g. 250 (grams)"
-                  placeholderTextColor={theme.textMuted}
-                  keyboardType="number-pad"
-                  style={[styles.manualInputText, { color: theme.textPrimary }]}
-                />
-              </View>
-
-              {/* Calories */}
-              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
-                Calories (kcal) *
-              </Text>
-              <View style={[styles.manualInput, {
-                backgroundColor: theme.bg,
-                borderColor: theme.accent,
-              }]}>
-                <TextInput
-                  value={manualCalories}
-                  onChangeText={setManualCalories}
-                  placeholder="e.g. 450"
-                  placeholderTextColor={theme.textMuted}
-                  keyboardType="number-pad"
-                  style={[styles.manualInputText, { color: theme.accent, fontWeight: '700' }]}
-                />
-              </View>
-
-              {/* Macros row — optional */}
-              <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>
-                Macros (optional)
-              </Text>
-              <View style={styles.macroRow}>
-                {[
-                  { label: 'Protein (g)', value: manualProtein, set: setManualProtein, color: theme.accent },
-                  { label: 'Carbs (g)',   value: manualCarbs,   set: setManualCarbs,   color: theme.accentSecond },
-                  { label: 'Fat (g)',     value: manualFat,     set: setManualFat,     color: (theme as any).purple },
-                ].map((m) => (
-                  <View key={m.label} style={[styles.macroInput, {
-                    backgroundColor: theme.bg,
-                    borderColor: theme.border,
-                  }]}>
-                    <TextInput
-                      value={m.value}
-                      onChangeText={m.set}
-                      placeholder="0"
-                      placeholderTextColor={theme.textMuted}
-                      keyboardType="decimal-pad"
-                      style={[styles.macroInputText, { color: m.color }]}
-                    />
-                    <Text style={[styles.macroInputLabel, { color: theme.textMuted }]}>
-                      {m.label}
-                    </Text>
+          {/* CHOICE VIEW — Type manually OR Scan */}
+          {view === 'choice' && (
+            <ScrollView contentContainerStyle={{ gap: spacing.md, padding: spacing.lg }}>
+              {/* Scan option */}
+              <TouchableOpacity onPress={() => { reset(); onClose(); onScan(); }} activeOpacity={0.85} style={styles.choiceWrap}>
+                <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.choiceCard}>
+                  <Ionicons name="camera" size={32} color="#fff" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.choiceTitle}>Scan Food</Text>
+                    <Text style={styles.choiceSub}>Point camera at food — AI identifies and calculates nutrition</Text>
                   </View>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                onPress={handleManualAdd}
-                disabled={isSaving}
-                style={[styles.modalAddBtn, { backgroundColor: theme.accent, marginTop: spacing.lg }]}
-              >
-                {isSaving ? (
-                  <ActivityIndicator color={theme.bg} />
-                ) : (
-                  <Text style={[styles.modalAddBtnText, { color: theme.bg }]}>
-                    Add to {mealLabel}
-                  </Text>
-                )}
+                  <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.70)" />
+                </LinearGradient>
               </TouchableOpacity>
+
+              {/* Search option */}
+              <TouchableOpacity onPress={() => setView('search')} activeOpacity={0.85}
+                style={[styles.choiceCardOutline, { borderColor: theme.accent, backgroundColor: theme.accentDim as string }]}>
+                <Ionicons name="search" size={28} color={theme.accent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.choiceTitleDark, { color: theme.textPrimary }]}>Search Food Database</Text>
+                  <Text style={[styles.choiceSubDark, { color: theme.textSecondary }]}>Nigerian foods + global database</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+
+              {/* Type manually option */}
+              <TouchableOpacity onPress={() => setView('manual')} activeOpacity={0.85}
+                style={[styles.choiceCardOutline, { borderColor: theme.border, backgroundColor: theme.bg }]}>
+                <Ionicons name="create-outline" size={28} color={theme.textSecondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.choiceTitleDark, { color: theme.textPrimary }]}>Type Manually</Text>
+                  <Text style={[styles.choiceSubDark, { color: theme.textSecondary }]}>Enter food name and calories</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+
+              {/* Saved favourites */}
+              {savedMeals.length > 0 && (
+                <>
+                  <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>⭐ Favourites</Text>
+                  {savedMeals.map((f, i) => (
+                    <TouchableOpacity key={i} onPress={() => handleSelectFood(f)} activeOpacity={0.8}
+                      style={[styles.savedMealRow, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+                      <Ionicons name="star" size={16} color="#FFB830" />
+                      <Text style={[styles.savedMealName, { color: theme.textPrimary }]}>{f.name}</Text>
+                      <Text style={[styles.savedMealCal, { color: theme.textMuted }]}>{f.calories} kcal/100g</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
             </ScrollView>
           )}
 
-          {/* ── SEARCH VIEW ─────────────────────────────────── */}
-          {!selected && !showManual && (
-            <>
-              <View style={[styles.modalSearchBar, {
-                backgroundColor: theme.bg,
-                borderColor: theme.border,
-              }]}>
-                <Ionicons name="search-outline" size={18} color={theme.textMuted} />
-                <TextInput
-                  value={query}
-                  onChangeText={handleSearch}
-                  placeholder="Search e.g. jollof rice, chicken..."
-                  placeholderTextColor={theme.textMuted}
-                  style={[styles.modalSearchInput, { color: theme.textPrimary }]}
-                  returnKeyType="search"
-                  autoFocus
-                />
-                {query.length > 0 && (
-                  <TouchableOpacity onPress={() => handleSearch('')}>
-                    <Ionicons name="close-circle" size={18} color={theme.textMuted} />
-                  </TouchableOpacity>
-                )}
+          {/* SEARCH VIEW */}
+          {view === 'search' && (
+            <View style={{ flex: 1 }}>
+              <View style={[styles.searchBar, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+                <Ionicons name="search" size={18} color={theme.textMuted} />
+                <TextInput value={query} onChangeText={handleSearch} placeholder="Search food..." placeholderTextColor={theme.textMuted} style={[styles.searchInput, { color: theme.textPrimary }]} autoFocus />
               </View>
-
-              <Text style={[styles.modalListLabel, { color: theme.textMuted }]}>
-                {isSearching
-                  ? 'Searching...'
-                  : query.length === 0
-                  ? 'Type to search millions of foods'
-                  : `${results.length} result${results.length !== 1 ? 's' : ''}`}
-              </Text>
-
-              {isSearching && (
-                <View style={styles.searchingRow}>
-                  <ActivityIndicator size="small" color={theme.accent} />
-                  <Text style={[styles.searchingText, { color: theme.textMuted }]}>
-                    Searching Open Food Facts + Nigerian database...
-                  </Text>
-                </View>
-              )}
-
-              <ScrollView
-                style={styles.modalFoodList}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                {/* No results — show manual entry prompt */}
-                {!isSearching && query.length > 0 && results.length === 0 && (
-                  <View style={styles.modalEmptyState}>
-                    <Text style={[styles.modalEmptyText, { color: theme.textMuted }]}>
-                      No results for "{query}"
-                    </Text>
-                    <Text style={[styles.modalEmptyHint, { color: theme.textMuted }]}>
-                      Try a different spelling, or log it manually below.
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setManualName(query); // Pre-fill name from what they searched
-                        setShowManual(true);
-                      }}
-                      style={[styles.manualEntryBtn, {
-                        backgroundColor: theme.accentDim as string,
-                        borderColor: theme.accent,
-                      }]}
-                    >
-                      <Ionicons name="create-outline" size={16} color={theme.accent} />
-                      <Text style={[styles.manualEntryBtnText, { color: theme.accent }]}>
-                        Log "{query}" manually
-                      </Text>
+              <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+                {searching && <Text style={[styles.searchingText, { color: theme.textMuted }]}>Searching...</Text>}
+                {results.map((r, i) => (
+                  <TouchableOpacity key={i} onPress={() => handleSelectFood(r)} activeOpacity={0.8}
+                    style={[styles.resultRow, { borderColor: theme.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>{r.name}</Text>
+                      <Text style={[styles.resultMeta, { color: theme.textMuted }]}>P:{r.protein}g · C:{r.carbs}g · F:{r.fats}g</Text>
+                    </View>
+                    <Text style={[styles.resultCal, { color: theme.accent }]}>{r.calories} kcal</Text>
+                    <TouchableOpacity onPress={() => onSaveFavourite(r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="star-outline" size={18} color="#FFB830" />
                     </TouchableOpacity>
-                  </View>
-                )}
-
-                {results.map((food) => (
-                  <TouchableOpacity
-                    key={food.id}
-                    onPress={() => setSelected(food)}
-                    style={[styles.foodResultRow, {
-                      backgroundColor: theme.bg,
-                      borderColor: theme.border,
-                    }]}
-                  >
-                    <View style={styles.foodResultRowLeft}>
-                      <Text style={[styles.foodResultName, { color: theme.textPrimary }]}>
-                        {food.name}
-                      </Text>
-                      <Text style={[styles.foodResultMacros, { color: theme.textMuted }]}>
-                        {food.brand ? `${food.brand} · ` : ''}
-                        {food.servingSize}
-                        {'  ·  P '}
-                        {food.protein}g
-                        {'  C '}
-                        {food.carbs}g
-                        {'  F '}
-                        {food.fat}g
-                      </Text>
-                    </View>
-                    <View style={[styles.foodResultCalBadge, {
-                      backgroundColor: theme.accentDim as string,
-                    }]}>
-                      <Text style={[styles.foodResultCalNum, { color: theme.accent }]}>
-                        {food.calories}
-                      </Text>
-                      <Text style={[styles.foodResultCalUnit, { color: theme.accent }]}>
-                        kcal
-                      </Text>
-                    </View>
                   </TouchableOpacity>
                 ))}
-
-                {/* Always show manual option at the bottom of results too */}
-                {!isSearching && query.length > 0 && results.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setManualName(query);
-                      setShowManual(true);
-                    }}
-                    style={[styles.manualEntryBtnSmall, {
-                      borderColor: theme.border,
-                    }]}
-                  >
-                    <Ionicons name="create-outline" size={14} color={theme.textMuted} />
-                    <Text style={[styles.manualEntryBtnSmallText, { color: theme.textMuted }]}>
-                      Don't see your food? Log manually
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </ScrollView>
-
-              {/* Manual entry shortcut — always visible */}
-              <TouchableOpacity
-                onPress={() => setShowManual(true)}
-                style={[styles.manualEntryFooter, {
-                  borderTopColor: theme.border,
-                }]}
-              >
-                <Ionicons name="create-outline" size={16} color={theme.textSecondary} />
-                <Text style={[styles.manualEntryFooterText, { color: theme.textSecondary }]}>
-                  Log food manually
-                </Text>
-              </TouchableOpacity>
-            </>
+            </View>
           )}
 
-          {/* ── PORTION VIEW ────────────────────────────────── */}
-          {selected && scaled && !showManual && (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={[styles.servingNote, { color: theme.textMuted }]}>
-                Default serving: {selected.servingSize}
-                {selected.brand ? `  ·  ${selected.brand}` : ''}
-              </Text>
+          {/* PORTION VIEW — Edit Result / Perfect */}
+          {view === 'portion' && selected && (
+            <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+              <Text style={[styles.portionFoodName, { color: theme.textPrimary }]}>{selected.name}</Text>
+              <Text style={[styles.portionSub, { color: theme.textSecondary }]}>Adjust the portion size below</Text>
 
-              <Text style={[styles.portionTitle, { color: theme.textSecondary }]}>
-                Portion size (grams)
-              </Text>
-              <View style={[styles.portionInputRow, {
-                backgroundColor: theme.bg,
-                borderColor: theme.accent,
-              }]}>
-                <TextInput
-                  value={portion}
-                  onChangeText={setPortion}
-                  keyboardType="number-pad"
-                  style={[styles.portionInput, { color: theme.accent }]}
-                />
+              <View style={[styles.portionInputRow, { borderColor: theme.accent, backgroundColor: theme.bg }]}>
+                <TextInput value={portion} onChangeText={setPortion} keyboardType="number-pad" style={[styles.portionInput, { color: theme.textPrimary }]} />
                 <Text style={[styles.portionUnit, { color: theme.textMuted }]}>g</Text>
               </View>
 
+              {/* Quick portion pills */}
               <View style={styles.portionPills}>
-                {['50', '100', '150', '200', '250', '300'].map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    onPress={() => setPortion(p)}
-                    style={[styles.portionPill, {
-                      backgroundColor: portion === p ? theme.accent : theme.card,
-                      borderColor: portion === p ? theme.accent : theme.border,
-                    }]}
-                  >
-                    <Text style={[styles.portionPillText, {
-                      color: portion === p ? theme.bg : theme.textSecondary,
-                    }]}>
-                      {p}g
-                    </Text>
+                {['50', '100', '150', '200', '250'].map((p) => (
+                  <TouchableOpacity key={p} onPress={() => setPortion(p)} activeOpacity={0.8}
+                    style={[styles.portionPill, { backgroundColor: portion === p ? theme.accent : theme.bg, borderColor: portion === p ? theme.accent : theme.border }]}>
+                    <Text style={[styles.portionPillText, { color: portion === p ? '#fff' : theme.textSecondary }]}>{p}g</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
+              {/* Nutrition preview */}
               <View style={styles.nutritionGrid}>
                 {[
-                  { label: 'Calories', value: `${scaled.calories}`,  unit: 'kcal', color: theme.orange },
-                  { label: 'Protein',  value: `${scaled.protein_g}`, unit: 'g',    color: theme.accent },
-                  { label: 'Carbs',    value: `${scaled.carbs_g}`,   unit: 'g',    color: theme.accentSecond },
-                  { label: 'Fats',     value: `${scaled.fats_g}`,    unit: 'g',    color: (theme as any).purple },
+                  { label: 'Calories', val: Math.round(selected.calories * parseFloat(portion || '0') / 100), unit: 'kcal', color: theme.gradStart },
+                  { label: 'Protein',  val: Math.round(selected.protein  * parseFloat(portion || '0') / 100), unit: 'g', color: '#FF6B35' },
+                  { label: 'Carbs',    val: Math.round(selected.carbs    * parseFloat(portion || '0') / 100), unit: 'g', color: '#FFB830' },
+                  { label: 'Fat',      val: Math.round(selected.fats     * parseFloat(portion || '0') / 100), unit: 'g', color: '#4A90E2' },
                 ].map((n) => (
-                  <View key={n.label} style={[styles.nutritionCell, {
-                    backgroundColor: theme.bg,
-                    borderColor: theme.border,
-                  }]}>
-                    <Text style={[styles.nutritionCellValue, { color: n.color }]}>
-                      {n.value}
-                      <Text style={[styles.nutritionCellUnit, { color: n.color }]}>
-                        {' '}{n.unit}
-                      </Text>
-                    </Text>
-                    <Text style={[styles.nutritionCellLabel, { color: theme.textMuted }]}>
-                      {n.label}
-                    </Text>
+                  <View key={n.label} style={[styles.nutritionCell, { backgroundColor: n.color + '15', borderColor: n.color + '44' }]}>
+                    <Text style={[styles.nutritionCellValue, { color: n.color }]}>{n.val}</Text>
+                    <Text style={[styles.nutritionCellUnit, { color: n.color, opacity: 0.7 }]}>{n.unit}</Text>
+                    <Text style={[styles.nutritionCellLabel, { color: theme.textMuted }]}>{n.label}</Text>
                   </View>
                 ))}
               </View>
 
-              <TouchableOpacity
-                onPress={handleAdd}
-                disabled={isSaving}
-                style={[styles.modalAddBtn, { backgroundColor: theme.accent }]}
-              >
-                {isSaving ? (
-                  <ActivityIndicator color={theme.bg} />
-                ) : (
-                  <Text style={[styles.modalAddBtnText, { color: theme.bg }]}>
-                    Add to {mealLabel}
-                  </Text>
-                )}
-              </TouchableOpacity>
+              {/* Edit / Perfect buttons — from corrections doc */}
+              <View style={styles.editPerfectRow}>
+                <TouchableOpacity onPress={() => setView('search')} activeOpacity={0.8}
+                  style={[styles.editBtn, { borderColor: theme.border }]}>
+                  <Ionicons name="create-outline" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.editBtnText, { color: theme.textSecondary }]}>Edit Result</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleAddPortion} activeOpacity={0.85} style={styles.perfectBtnWrap}>
+                  <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.perfectBtn}>
+                    <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                    <Text style={styles.perfectBtnText}>Perfect ✓</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
+          {/* MANUAL ENTRY VIEW */}
+          {view === 'manual' && (
+            <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+              <Text style={[styles.manualHint, { color: theme.textSecondary }]}>Enter the food details manually. Only name and calories are required.</Text>
+
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Food Name *</Text>
+              <TextInput value={manualName} onChangeText={setManualName} placeholder="e.g. Jollof Rice" placeholderTextColor={theme.textMuted}
+                style={[styles.manualInput, { color: theme.textPrimary, borderColor: manualName ? theme.accent : theme.border, backgroundColor: theme.bg }]} />
+
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Calories (kcal) *</Text>
+              <TextInput value={manualCal} onChangeText={setManualCal} placeholder="e.g. 320" placeholderTextColor={theme.textMuted} keyboardType="number-pad"
+                style={[styles.manualInput, { color: theme.textPrimary, borderColor: manualCal ? theme.accent : theme.border, backgroundColor: theme.bg }]} />
+
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Macros (optional)</Text>
+              <View style={styles.macroRow}>
+                {[{ label: 'Protein (g)', val: manualProtein, set: setManualProtein }, { label: 'Carbs (g)', val: manualCarbs, set: setManualCarbs }, { label: 'Fat (g)', val: manualFat, set: setManualFat }].map((m) => (
+                  <View key={m.label} style={[styles.macroInput, { borderColor: theme.border, backgroundColor: theme.bg }]}>
+                    <TextInput value={m.val} onChangeText={m.set} placeholder="0" placeholderTextColor={theme.textMuted} keyboardType="number-pad" style={[styles.macroInputText, { color: theme.textPrimary }]} />
+                    <Text style={[styles.macroInputLabel, { color: theme.textMuted }]}>{m.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.editPerfectRow}>
+                <TouchableOpacity onPress={() => setView('choice')} activeOpacity={0.8}
+                  style={[styles.editBtn, { borderColor: theme.border }]}>
+                  <Text style={[styles.editBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleManualAdd} activeOpacity={0.85} style={styles.perfectBtnWrap}>
+                  <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.perfectBtn}>
+                    <Text style={styles.perfectBtnText}>Add Food</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           )}
         </View>
@@ -539,196 +428,7 @@ function AddFoodModal({
   );
 }
 
-// ── SEARCH BAR ────────────────────────────────────────────────
-// Now wired — tapping or typing opens the AddFoodModal for Breakfast
-// (the meal type doesn't matter here since the user picks it per section below;
-// the top bar is a quick shortcut that opens the modal pre-focused)
-function SearchBar({
-  theme,
-  onPress,
-  onScanPress,
-}: {
-  theme: typeof colors.dark;
-  onPress: () => void;
-  onScanPress: () => void;
-}) {
-  return (
-    <View style={styles.searchRow}>
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.8}
-        style={[styles.searchInput, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}
-      >
-        <Ionicons name="search-outline" size={18} color={theme.textMuted} />
-        <Text style={[styles.searchText, { color: theme.textMuted }]}>
-          Search food or log manually...
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={onScanPress}
-        style={[styles.scanBtn, { backgroundColor: theme.accent }]}
-      >
-        <Ionicons name="barcode-outline" size={22} color={theme.bg} />
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-// ── CALORIE DONUT SUMMARY ────────────────────────────────────
-function CalorieSummary({
-  theme,
-  consumed,
-  goal,
-}: {
-  theme: typeof colors.dark;
-  consumed: number;
-  goal: number;
-}) {
-  const remaining = Math.max(goal - consumed, 0);
-
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>
-        Today's Calories
-      </Text>
-      <View style={styles.donutRow}>
-        <View style={styles.donutContainer}>
-          <View style={[styles.donutRingOuter, { borderColor: theme.border }]} />
-          <View style={[styles.donutRingProgress, { borderColor: theme.accent }]} />
-          <View style={styles.donutCenterText}>
-            <Text style={[styles.donutValue, { color: theme.textPrimary }]}>{remaining}</Text>
-            <Text style={[styles.donutSub, { color: theme.textMuted }]}>left</Text>
-          </View>
-        </View>
-        <View style={styles.donutStats}>
-          {[
-            { dot: theme.textMuted, label: 'Goal',     value: `${goal} kcal` },
-            { dot: (theme as any).orange, label: 'Consumed',  value: `${consumed} kcal` },
-            { dot: theme.accent,    label: 'Remaining', value: `${remaining} kcal` },
-          ].map((s) => (
-            <View key={s.label} style={styles.donutStatRow}>
-              <View style={[styles.donutDot, { backgroundColor: s.dot }]} />
-              <Text style={[styles.donutLabel, { color: theme.textSecondary }]}>{s.label}</Text>
-              <Text style={[styles.donutVal, { color: theme.textPrimary }]}>{s.value}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ── WATER INTAKE CARD ────────────────────────────────────────
-function WaterCard({
-  theme,
-  waterMl,
-  goalMl,
-  onAdd,
-}: {
-  theme: typeof colors.dark;
-  waterMl: number;
-  goalMl: number;
-  onAdd: (ml: number) => void;
-}) {
-  const waterL = (waterMl / 1000).toFixed(1);
-  const goalL  = (goalMl  / 1000).toFixed(1);
-  const pct    = Math.min(waterMl / goalMl, 1);
-
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Water Intake</Text>
-      <Text style={[styles.waterValue, { color: theme.accentSecond }]}>{waterL}L</Text>
-      <Text style={[styles.waterSub, { color: theme.textSecondary }]}>
-        of {goalL}L daily goal
-      </Text>
-      <View style={[styles.waterBarBg, { backgroundColor: theme.border }]}>
-        <View style={[styles.waterBarFill, {
-          backgroundColor: theme.accentSecond,
-          width: `${pct * 100}%` as any,
-        }]} />
-      </View>
-      <View style={styles.waterBtns}>
-        {[250, 500, 1000].map((ml) => (
-          <TouchableOpacity
-            key={ml}
-            onPress={() => onAdd(ml)}
-            style={[styles.waterAddBtn, { borderColor: theme.accentSecond }]}
-          >
-            <Text style={[styles.waterAddText, { color: theme.accentSecond }]}>
-              +{ml >= 1000 ? '1L' : `${ml}ml`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ── MEAL SECTION ─────────────────────────────────────────────
-function MealSection({
-  theme,
-  title,
-  mealType,
-  items,
-  onAddFood,
-}: {
-  theme: typeof colors.dark;
-  title: string;
-  mealType: MealType;
-  items: FoodEntry[];
-  onAddFood: (mealType: MealType) => void;
-}) {
-  const totalCal = items.reduce((sum, item) => sum + item.calories, 0);
-
-  return (
-    <View style={styles.mealSection}>
-      <View style={styles.mealHeader}>
-        <Text style={[styles.mealTitle, { color: theme.textSecondary }]}>{title}</Text>
-        <Text style={[styles.mealCal, { color: theme.accent }]}>
-          {totalCal > 0 ? `${totalCal} kcal` : '—'}
-        </Text>
-      </View>
-
-      {items.length === 0 ? (
-        <View style={[styles.emptyMeal, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
-          <Text style={[styles.emptyMealText, { color: theme.textMuted }]}>
-            Nothing logged yet
-          </Text>
-        </View>
-      ) : (
-        items.map((item) => (
-          <View key={item.id} style={[styles.foodItem, {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          }]}>
-            <Text style={[styles.foodItemName, { color: theme.textPrimary }]}>
-              {item.food_name}
-            </Text>
-            <Text style={[styles.foodItemCal, { color: theme.accent }]}>
-              {item.calories} kcal
-            </Text>
-          </View>
-        ))
-      )}
-
-      <TouchableOpacity
-        onPress={() => onAddFood(mealType)}
-        style={[styles.addFoodBtn, { borderColor: theme.accent }]}
-      >
-        <Ionicons name="add" size={16} color={theme.accent} />
-        <Text style={[styles.addFoodText, { color: theme.accent }]}>Add food</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-// ── MAIN SCREEN ──────────────────────────────────────────────
+// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function CalorieScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
@@ -736,106 +436,64 @@ export default function CalorieScreen() {
   const theme = colors[colorScheme];
 
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
-  const [waterMl, setWaterMl] = useState(0);
-  const [foodEntries, setFoodEntries] = useState<FoodEntry[]>([]);
-  const [activeMeal, setActiveMeal] = useState<MealType>('breakfast');
-  const [showAddFood, setShowAddFood] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [waterMl, setWaterMl]                   = useState(0);
+  const [foodEntries, setFoodEntries]           = useState<FoodEntry[]>([]);
+  const [activeMeal, setActiveMeal]             = useState<MealType>('breakfast');
+  const [showAddFood, setShowAddFood]           = useState(false);
+  const [isRefreshing, setIsRefreshing]         = useState(false);
+  const [savedMeals, setSavedMeals]             = useState<any[]>([]);
 
   const calorieGoal = (profile as any)?.daily_calorie_goal ?? 2000;
   const waterGoalMl = (profile as any)?.water_goal_ml ?? 2500;
 
-  const handleOpenScanner = () => {
-    navigation.getParent()?.navigate('FoodScanner');
-  };
-
-  // Open modal from the top search bar — defaults to breakfast
-  // The user can switch meal type inside the per-section Add Food buttons
-  const handleOpenSearchBar = () => {
-    setActiveMeal('breakfast');
-    setShowAddFood(true);
-  };
-
-  useEffect(() => {
-    if (!user?.id) return;
-    loadData();
-  }, [user?.id]);
+  useFocusEffect(useCallback(() => { loadData(); }, [user?.id]));
 
   const loadData = async () => {
     if (!user?.id) return;
-    setIsLoading(true);
     try {
-      const { supabase } = await import('../../services/supabase');
-      const today = new Date().toISOString().split('T')[0];
-      const [caloriesData, waterData, foodData] = await Promise.all([
+      const [cal, water, entries, saved] = await Promise.all([
         getTodayCalories(user.id),
         getTodayWater(user.id),
-        supabase
-          .from('food_logs')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('date', today)
-          .order('logged_at', { ascending: true }),
+        supabase.from('food_logs').select('*').eq('user_id', user.id)
+          .eq('date', new Date().toISOString().split('T')[0]).order('created_at', { ascending: false }),
+        supabase.from('saved_meals').select('*').eq('user_id', user.id).limit(10),
       ]);
-      setCaloriesConsumed(caloriesData);
-      setWaterMl(waterData);
-      if (foodData.data) {
-        setFoodEntries(foodData.data.map((d: any) => ({
-          id: d.id,
-          food_name: d.food_name,
-          calories: d.calories,
-          meal_type: d.meal_type,
-        })));
-      }
-    } catch (error) {
-      console.error('Failed to load calorie data:', error);
-    } finally {
-      setIsLoading(false);
-    }
+      setCaloriesConsumed(cal);
+      setWaterMl(water);
+      if (entries.data) setFoodEntries(entries.data as FoodEntry[]);
+      if (saved.data) setSavedMeals(saved.data);
+    } catch (e) { console.error('CalorieScreen loadData:', e); }
+    finally { setIsRefreshing(false); }
   };
 
-  const handleAddWater = async (ml: number) => {
-    if (!user?.id) return;
-    const success = await logWater(user.id, ml);
-    if (success) {
-      const newTotal = waterMl + ml;
-      setWaterMl(newTotal);
-      if (newTotal >= waterGoalMl && waterMl < waterGoalMl) {
-        const { notifyWaterGoalReached } = await import('../../services/notificationService');
-        await notifyWaterGoalReached(user.id);
-      }
-    }
-  };
-
-  const handleAddFood = async (entry: {
-    food_name: string;
-    calories: number;
-    meal_type: MealType;
-    protein_g?: number;
-    carbs_g?: number;
-    fats_g?: number;
-  }) => {
+  const handleAddFood = async (entry: { food_name: string; calories: number; protein_g?: number; carbs_g?: number; fats_g?: number; meal_type: MealType }) => {
     if (!user?.id) return;
     const success = await logFood(user.id, entry);
     if (success) {
-      setFoodEntries((prev) => [...prev, {
-        id: Date.now().toString(),
-        food_name: entry.food_name,
-        calories: entry.calories,
-        meal_type: entry.meal_type,
-      }]);
-      const newTotal = caloriesConsumed + entry.calories;
-      setCaloriesConsumed(newTotal);
-
-      const { notifyFoodLogged, notifyCalorieGoalReached } =
-        await import('../../services/notificationService');
+      setFoodEntries((prev) => [...prev, { id: Date.now().toString(), ...entry }]);
+      setCaloriesConsumed((prev) => prev + entry.calories);
+      const { notifyFoodLogged, notifyCalorieGoalReached } = await import('../../services/notificationService');
       await notifyFoodLogged(user.id, entry.food_name, entry.calories);
-
-      if (newTotal >= calorieGoal && caloriesConsumed < calorieGoal) {
-        await notifyCalorieGoalReached(user.id);
-      }
+      if (caloriesConsumed + entry.calories >= calorieGoal && caloriesConsumed < calorieGoal) await notifyCalorieGoalReached(user.id);
     }
   };
+
+  const handleWaterLog = async (ml: number) => {
+    if (!user?.id) return;
+    const success = await logWater(user.id, ml);
+    if (success) setWaterMl((prev) => prev + ml);
+  };
+
+  const handleSaveFavourite = async (food: any) => {
+    if (!user?.id) return;
+    try {
+      await supabase.from('saved_meals').insert({ user_id: user.id, meal_data: food, name: food.name });
+      setSavedMeals((prev) => [...prev, food]);
+      Alert.alert('Saved! ⭐', `${food.name} added to your favourites.`);
+    } catch {}
+  };
+
+  const onRefresh = () => { setIsRefreshing(true); loadData(); };
 
   const meals: { title: string; type: MealType }[] = [
     { title: 'Breakfast', type: 'breakfast' },
@@ -846,351 +504,182 @@ export default function CalorieScreen() {
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
-          Calorie Tracker
-        </Text>
-        <Text style={[styles.pageDate, { color: theme.textSecondary }]}>
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long', month: 'long', day: 'numeric',
-          })}
-        </Text>
+        <View>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Calorie Tracker</Text>
+          <Text style={[styles.pageDate, { color: theme.textSecondary }]}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={() => { setActiveMeal('breakfast'); setShowAddFood(true); }}
+          activeOpacity={0.85} style={styles.addBtn}>
+          <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} style={styles.addBtnGrad}>
+            <Ionicons name="add" size={22} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Top search bar — now tappable, opens AddFoodModal */}
-        <SearchBar
-          theme={theme}
-          onPress={handleOpenSearchBar}
-          onScanPress={handleOpenScanner}
-        />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
 
-        <CalorieSummary theme={theme} consumed={caloriesConsumed} goal={calorieGoal} />
+        {/* Hero calorie card */}
+        <CalorieHero theme={theme} consumed={caloriesConsumed} goal={calorieGoal} waterMl={waterMl} waterGoalMl={waterGoalMl} />
 
-        <TouchableOpacity
-          onPress={handleOpenScanner}
-          style={[styles.scanFoodBtn, {
-            borderColor: theme.accent,
-            backgroundColor: theme.accentDim as string,
-          }]}
-        >
-          <Ionicons name="camera-outline" size={18} color={theme.accent} />
-          <Text style={[styles.scanFoodText, { color: theme.accent }]}>
-            Scan Food / Barcode / Food Label
-          </Text>
+        {/* Scan shortcut */}
+        <TouchableOpacity onPress={() => navigation.getParent()?.navigate('FoodScanner')} activeOpacity={0.85} style={styles.scanWrap}>
+          <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.scanCard}>
+            <View style={styles.scanLeft}>
+              <View style={styles.scanIconCircle}><Ionicons name="camera" size={20} color={theme.gradStart} /></View>
+              <View><Text style={styles.scanTitle}>Scan Food</Text><Text style={styles.scanSub}>AI-powered — point and log</Text></View>
+            </View>
+            <View style={styles.scanArrow}><Ionicons name="chevron-forward" size={16} color={theme.gradStart} /></View>
+          </LinearGradient>
         </TouchableOpacity>
 
-        <WaterCard
-          theme={theme}
-          waterMl={waterMl}
-          goalMl={waterGoalMl}
-          onAdd={handleAddWater}
-        />
+        {/* Water card */}
+        <WaterCard theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl} onLog={handleWaterLog} />
 
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          Meals
-        </Text>
-
-        {meals.map((meal) => (
-          <MealSection
-            key={meal.type}
-            theme={theme}
-            title={meal.title}
-            mealType={meal.type}
-            items={foodEntries.filter((e) => e.meal_type === meal.type)}
-            onAddFood={(type) => {
-              setActiveMeal(type);
-              setShowAddFood(true);
-            }}
-          />
+        {/* Meal sections */}
+        {meals.map((m) => (
+          <MealSection key={m.type} theme={theme} title={m.title} mealType={m.type}
+            items={foodEntries.filter((e) => e.meal_type === m.type)}
+            onAddFood={(meal) => { setActiveMeal(meal); setShowAddFood(true); }} />
         ))}
 
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Meals')}
-          style={[styles.mealPlannerBtn, { backgroundColor: theme.accent }]}
-        >
-          <Text style={[styles.mealPlannerText, { color: theme.bg }]}>
-            📅  Open Meal Planner
-          </Text>
-        </TouchableOpacity>
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       <AddFoodModal
-        theme={theme}
-        mealType={activeMeal}
-        visible={showAddFood}
+        visible={showAddFood} theme={theme} mealType={activeMeal}
         onClose={() => setShowAddFood(false)}
+        onScan={() => { setShowAddFood(false); navigation.getParent()?.navigate('FoodScanner'); }}
         onAdd={handleAddFood}
+        savedMeals={savedMeals}
+        onSaveFavourite={handleSaveFavourite}
       />
     </AndroidSafeView>
   );
 }
 
-// ── STYLES ───────────────────────────────────────────────────
+// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
-
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
-  pageDate: { fontSize: fontSize.base, marginTop: 2 },
+  pageDate: { fontSize: fontSize.xs, marginTop: 2 },
+  addBtn: { borderRadius: 20, overflow: 'hidden' },
+  addBtnGrad: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { paddingBottom: 120 },
 
-  searchRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  searchInput: {
-    flex: 1, flexDirection: 'row',
-    alignItems: 'center', gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    height: 48, borderRadius: radius.md, borderWidth: 1,
-  },
-  searchText: { flex: 1, fontSize: fontSize.base },
-  scanBtn: {
-    width: 48, height: 48,
-    borderRadius: radius.md,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  // Hero
+  heroCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.lg, borderRadius: 20 },
+  heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md },
+  heroBig: { fontSize: 52, fontWeight: '900', color: '#fff', lineHeight: 56 },
+  heroSubLabel: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
+  heroRight: { alignItems: 'flex-end' },
+  heroGoal: { fontSize: 24, fontWeight: '700', color: '#fff' },
+  heroGoalLabel: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.55)' },
+  heroPB: { height: 7, borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: spacing.sm },
+  heroPBFill: { height: '100%', borderRadius: 4 },
+  heroRemaining: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.md },
+  macroPills: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  macroPill: { flex: 1, padding: spacing.sm, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  macroPillVal: { fontSize: fontSize.base, fontWeight: '800' },
+  macroPillLabel: { fontSize: 10, fontWeight: '600' },
+  waterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  waterBar: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
+  waterBarFill: { height: '100%', borderRadius: 3 },
+  waterLabel: { fontSize: fontSize.xs, color: '#2BBCB0', fontWeight: '600' },
 
-  card: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  cardLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  // Scan shortcut
+  scanWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: radius.lg, overflow: 'hidden' },
+  scanCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
+  scanLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
+  scanIconCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  scanTitle: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
+  scanSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  scanArrow: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
 
-  // Donut
-  donutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  donutContainer: {
-    width: 90, height: 90,
-    position: 'relative',
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  donutRingOuter: {
-    position: 'absolute', width: 84, height: 84,
-    borderRadius: 42, borderWidth: 8,
-  },
-  donutRingProgress: {
-    position: 'absolute', width: 84, height: 84,
-    borderRadius: 42, borderWidth: 8,
-    borderTopColor: 'transparent', borderLeftColor: 'transparent',
-    transform: [{ rotate: '45deg' }],
-  },
-  donutCenterText: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  donutValue: { fontSize: fontSize.lg, fontWeight: '800', lineHeight: 20 },
-  donutSub: { fontSize: fontSize.xs, lineHeight: 14 },
-  donutStats: { flex: 1, gap: spacing.sm },
-  donutStatRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  donutDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  donutLabel: { fontSize: fontSize.sm, flex: 1 },
-  donutVal: { fontSize: fontSize.sm, fontWeight: '700' },
-
-  scanFoodBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 1.5, borderStyle: 'dashed',
-  },
-  scanFoodText: { fontSize: fontSize.base, fontWeight: '600' },
-
-  // Water
-  waterValue: { fontSize: 26, fontWeight: '800', marginBottom: 2 },
-  waterSub: { fontSize: fontSize.sm, marginBottom: spacing.sm },
-  waterBarBg: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: spacing.md },
-  waterBarFill: { height: '100%', borderRadius: 4 },
+  // Water card
+  waterCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.lg },
+  waterCardLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  waterCardTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  waterCardSub: { fontSize: fontSize.xs },
   waterBtns: { flexDirection: 'row', gap: spacing.sm },
-  waterAddBtn: {
-    flex: 1, paddingVertical: spacing.sm,
-    borderRadius: radius.sm, borderWidth: 1, alignItems: 'center',
-  },
-  waterAddText: { fontSize: fontSize.sm, fontWeight: '700' },
-
-  sectionLabel: {
-    fontSize: fontSize.sm, fontWeight: '600',
-    marginHorizontal: spacing.lg, marginBottom: spacing.xs,
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
+  waterBtn: { flex: 1, padding: spacing.sm, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  waterBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
 
   // Meal sections
-  mealSection: { marginBottom: spacing.sm },
-  mealHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.lg, marginBottom: spacing.xs,
-  },
-  mealTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  mealSection: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  mealHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  mealIconWrap: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  mealTitle: { flex: 1, fontSize: fontSize.base, fontWeight: '700' },
   mealCal: { fontSize: fontSize.sm, fontWeight: '700' },
-  emptyMeal: {
-    marginHorizontal: spacing.lg, marginBottom: 6,
-    padding: spacing.md, borderRadius: radius.sm,
-    borderWidth: 1, alignItems: 'center',
-  },
-  emptyMealText: { fontSize: fontSize.sm },
-  foodItem: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginHorizontal: spacing.lg, marginBottom: 6,
-    padding: spacing.md, borderRadius: radius.sm, borderWidth: 1,
-  },
-  foodItemName: { fontSize: fontSize.base, flex: 1 },
-  foodItemCal: { fontSize: fontSize.sm, fontWeight: '700' },
-  addFoodBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 4, marginHorizontal: spacing.lg, padding: spacing.sm,
-    borderRadius: radius.sm, borderWidth: 1,
-    borderStyle: 'dashed', marginBottom: spacing.sm,
-  },
+  foodItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 8, borderBottomWidth: 0.5 },
+  foodItemDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  foodItemName: { flex: 1, fontSize: fontSize.sm },
+  foodItemCal: { fontSize: fontSize.sm, fontWeight: '600' },
+  addFoodBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing.sm, marginTop: spacing.xs, borderTopWidth: 0.5, borderStyle: 'dashed' },
   addFoodText: { fontSize: fontSize.sm, fontWeight: '600' },
 
-  mealPlannerBtn: {
-    marginHorizontal: spacing.lg, marginTop: spacing.md,
-    padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center',
-  },
-  mealPlannerText: { fontSize: fontSize.lg, fontWeight: '700' },
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%', minHeight: '60%' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 0.5, borderColor: 'rgba(0,0,0,0.1)' },
+  modalTitle: { fontSize: fontSize.lg, fontWeight: '700' },
+  sectionLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  // ── Modal ─────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
-    maxHeight: '92%',
-    paddingBottom: spacing.xxxl,
-  },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: spacing.sm, marginBottom: spacing.md,
-  },
-  modalBackBtn: { padding: 4 },
-  modalTitle: { fontSize: fontSize.xl, fontWeight: '700', flex: 1 },
+  // Choice cards
+  choiceWrap: { borderRadius: 16, overflow: 'hidden' },
+  choiceCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
+  choiceTitle: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
+  choiceSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.70)', marginTop: 2, lineHeight: 16 },
+  choiceCardOutline: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: 16, borderWidth: 1.5 },
+  choiceTitleDark: { fontSize: fontSize.base, fontWeight: '700' },
+  choiceSubDark: { fontSize: fontSize.xs, marginTop: 2 },
 
-  modalSearchBar: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 1, marginBottom: spacing.sm,
-  },
-  modalSearchInput: { flex: 1, fontSize: fontSize.base },
-  modalListLabel: {
-    fontSize: fontSize.xs, fontWeight: '600', marginBottom: spacing.xs,
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  modalFoodList: { maxHeight: 320 },
-  modalEmptyState: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
-  modalEmptyText: { fontSize: fontSize.base, fontWeight: '600' },
-  modalEmptyHint: { fontSize: fontSize.sm },
+  // Saved meals
+  savedMealRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 10, borderWidth: 1 },
+  savedMealName: { flex: 1, fontSize: fontSize.sm, fontWeight: '600' },
+  savedMealCal: { fontSize: fontSize.xs },
 
-  // Manual entry button — shown when no results
-  manualEntryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-    borderRadius: radius.md, borderWidth: 1, marginTop: spacing.sm,
-  },
-  manualEntryBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+  // Search
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, margin: spacing.lg, padding: spacing.md, borderRadius: 12, borderWidth: 1 },
+  searchInput: { flex: 1, fontSize: fontSize.base },
+  searchingText: { textAlign: 'center', padding: spacing.lg, fontSize: fontSize.sm },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 0.5 },
+  resultName: { fontSize: fontSize.sm, fontWeight: '600' },
+  resultMeta: { fontSize: fontSize.xs, marginTop: 2 },
+  resultCal: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Subtle manual entry link — shown at bottom of results list
-  manualEntryBtnSmall: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.xs, padding: spacing.md,
-    borderRadius: radius.sm, borderWidth: 1,
-    marginTop: spacing.sm, marginBottom: spacing.sm,
-  },
-  manualEntryBtnSmallText: { fontSize: fontSize.sm },
-
-  // Footer always visible at bottom of modal
-  manualEntryFooter: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.sm, paddingTop: spacing.md,
-    borderTopWidth: 1, marginTop: spacing.sm,
-  },
-  manualEntryFooterText: { fontSize: fontSize.sm, fontWeight: '600' },
-
-  // Search result rows
-  foodResultRow: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 1, marginBottom: spacing.xs,
-  },
-  foodResultRowLeft: { flex: 1 },
-  foodResultName: { fontSize: fontSize.base, fontWeight: '600' },
-  foodResultMacros: { fontSize: fontSize.xs, marginTop: 3 },
-  foodResultCalBadge: {
-    paddingHorizontal: spacing.sm, paddingVertical: 4,
-    borderRadius: radius.sm, alignItems: 'center', minWidth: 52,
-  },
-  foodResultCalNum: { fontSize: fontSize.lg, fontWeight: '800' },
-  foodResultCalUnit: { fontSize: 9, fontWeight: '600' },
-
-  searchingRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: spacing.sm, padding: spacing.md,
-  },
-  searchingText: { fontSize: fontSize.sm },
-
-  // Portion view
-  servingNote: { fontSize: fontSize.xs, marginBottom: spacing.sm },
-  portionTitle: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.xs },
-  portionInputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 2, marginBottom: spacing.sm,
-  },
-  portionInput: { flex: 1, fontSize: 28, fontWeight: '800' },
-  portionUnit: { fontSize: fontSize.lg, fontWeight: '600' },
-  portionPills: {
-    flexDirection: 'row', gap: spacing.xs,
-    marginBottom: spacing.md, flexWrap: 'wrap',
-  },
-  portionPill: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
-    borderRadius: radius.sm, borderWidth: 1,
-  },
+  // Portion
+  portionFoodName: { fontSize: fontSize.xl, fontWeight: '800' },
+  portionSub: { fontSize: fontSize.sm },
+  portionInputRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: 12, borderWidth: 2 },
+  portionInput: { flex: 1, fontSize: 36, fontWeight: '800' },
+  portionUnit: { fontSize: fontSize.xl, fontWeight: '600' },
+  portionPills: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+  portionPill: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: 99, borderWidth: 1 },
   portionPillText: { fontSize: fontSize.sm, fontWeight: '600' },
-
-  nutritionGrid: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
-  nutritionCell: {
-    flex: 1, padding: spacing.sm,
-    borderRadius: radius.sm, borderWidth: 1, alignItems: 'center',
-  },
-  nutritionCellValue: { fontSize: fontSize.base, fontWeight: '800' },
+  nutritionGrid: { flexDirection: 'row', gap: spacing.xs },
+  nutritionCell: { flex: 1, padding: spacing.sm, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  nutritionCellValue: { fontSize: fontSize.lg, fontWeight: '800' },
   nutritionCellUnit: { fontSize: fontSize.xs },
   nutritionCellLabel: { fontSize: 9, marginTop: 2 },
+  editPerfectRow: { flexDirection: 'row', gap: spacing.md },
+  editBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md, borderRadius: 12, borderWidth: 1 },
+  editBtnText: { fontSize: fontSize.base, fontWeight: '600' },
+  perfectBtnWrap: { flex: 2, borderRadius: 12, overflow: 'hidden' },
+  perfectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md },
+  perfectBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
 
-  modalAddBtn: { padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center' },
-  modalAddBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
-
-  // ── Manual entry form ─────────────────────────────────────
-  manualHint: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
-  manualLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.xs },
-  manualInput: {
-    padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 1, marginBottom: spacing.md,
-  },
-  manualInputText: { fontSize: fontSize.base },
-  macroRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  macroInput: {
-    flex: 1, padding: spacing.sm,
-    borderRadius: radius.sm, borderWidth: 1, alignItems: 'center',
-  },
+  // Manual
+  fieldLabel: { fontSize: fontSize.sm, fontWeight: '600' },
+  manualHint: { fontSize: fontSize.sm, lineHeight: 18 },
+  manualInput: { padding: spacing.md, borderRadius: 10, borderWidth: 1.5, fontSize: fontSize.base },
+  macroRow: { flexDirection: 'row', gap: spacing.sm },
+  macroInput: { flex: 1, padding: spacing.sm, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
   macroInputText: { fontSize: fontSize.lg, fontWeight: '800', width: '100%' },
   macroInputLabel: { fontSize: 9, marginTop: 2, textAlign: 'center' },
 });

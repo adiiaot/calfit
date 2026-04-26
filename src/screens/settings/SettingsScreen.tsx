@@ -232,7 +232,7 @@ export default function SettingsScreen() {
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}
+        <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Main' }] })} style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
           <Text style={[styles.backText, { color: theme.textPrimary }]}>Home</Text>

@@ -3,6 +3,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import { loadFeed, loadDiscoverFeed, PostData } from '../services/postService';
 import { supabase } from '../../../services/supabase';
 
+// ── WHY: Restored to the original repo version.
+// The replacement file sent earlier changed updatePost to take a full
+// PostData object, breaking CalfitSocialScreen which calls
+// updatePost(postId, partialUpdate). This version keeps the correct
+// (postId: string, updates: Partial<PostData>) signature.
+//
+// Cold-start feed logic (show public posts when < 5 follows) is
+// handled inside loadFeed in postService.ts — not in this hook.
+
 export function useFeed(userId: string) {
   const [posts, setPosts] = useState<PostData[]>([]);
   const [discoverPosts, setDiscoverPosts] = useState<PostData[]>([]);
@@ -17,7 +26,6 @@ export function useFeed(userId: string) {
   );
 
   // All .on() listeners MUST be chained before .subscribe() is called once.
-  // Adding listeners after subscribe() causes the "cannot add callbacks" error.
   useEffect(() => {
     if (!userId) return;
 
@@ -26,8 +34,8 @@ export function useFeed(userId: string) {
       channelRef.current = null;
     }
 
-   const channel = supabase
-  .channel(`posts_feed_${userId.slice(0, 8)}_${Date.now()}`)
+    const channel = supabase
+      .channel(`posts_feed_${userId.slice(0, 8)}_${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'posts' },
@@ -53,7 +61,7 @@ export function useFeed(userId: string) {
           setDiscoverPosts(remover);
         }
       )
-      .subscribe(); // ← called once, after all listeners are registered
+      .subscribe();
 
     channelRef.current = channel;
 
@@ -82,6 +90,7 @@ export function useFeed(userId: string) {
     setIsRefreshing(false);
   };
 
+  // ── updatePost: (postId, partialUpdate) — do NOT change this signature
   const updatePost = (postId: string, updates: Partial<PostData>) => {
     setPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, ...updates } : p))

@@ -167,8 +167,6 @@
 - [ ] **App icon and splash screen** — blocking store submission on both platforms
 - [ ] **EAS build configuration** — `eas.json` not yet set up. Needed to generate APK and IPA
 
-### Medium Priority
-
 - [ ] **Micronutrient tracking** — toggle in Settings to show/hide micronutrients in food log. UI placeholder exists but not wired
 - [ ] **Equipment preferences** — save preferred equipment in Settings, used to filter workout library
 - [ ] **Calorie trend charts** — view by day/week/month with actual chart rendering (currently flat list)
@@ -180,8 +178,6 @@
 - [ ] **PR showcase on profile** — show personal records section on public profile page
 - [ ] **Withdrawal history in Credits screen** — show past withdrawal records (date, amount, method, status)
 - [ ] **App Store listing copy** — description, keywords, subtitle, age rating answers
-
-### Lower Priority (Phase 2)
 
 - [ ] **Manual meal planning** — drag and drop meal slots, save templates, auto grocery list
 - [ ] **Recipes library** — organised recipe library with ratings, save/submit, step-by-step instructions, import via URL
@@ -196,7 +192,7 @@
 
 ---
 
-## ⏳ PENDING — WAITING ON FABS DEVELOPMENT
+## ⏳ PENDING — WAITING ON BIGCUT
 
 ### Requires Anthropic API Key
 - [ ] AI Coach real responses (currently falls back to static message)
@@ -211,7 +207,7 @@
 - [ ] App Store submission
 - [ ] TestFlight beta testing
 - [ ] Apple Sign In (onboarding Step 7)
-- [ ] Apple In-App Purchase products (`com.fabsdevelopment.calfit.pro.monthly`, `com.fabsdevelopment.calfit.premium.monthly`)
+- [ ] Apple In-App Purchase products (`store.bigcut.calfit.pro.monthly`, `store.bigcut.calfit.premium.monthly`)
 
 ### Requires Google Play Console ($25 one-time)
 - [ ] Play Store submission
@@ -227,14 +223,8 @@
 - [ ] Live streaming (Go Live screen — UI complete, Agora SDK not configured)
 - [ ] Accountability partner audio/video calls (spec requirement)
 
-### Requires Stripe Connect
-- [ ] Referral payout processing (paying out 15% commission to referring users via PayPal/Bank Transfer)
-- [ ] Note: Stripe is NOT used for user subscriptions — that goes through Apple/Google IAP only
-
-### Requires Supabase Migration
-- [ ] Move database from AOT's Supabase account to FABS Development Supabase org
-- [ ] Re-deploy Edge Functions with new service role key
-- [ ] Update `.env` with new Supabase URL and keys
+### Requires Paystack
+- [ ] Referral payout processing (paying out 15% commission to referring users via Bank Transfer)
 
 ### Requires Hostinger Email Setup
 - [DONE] `dev@bigcut.store` — register Apple Developer, Google Play, Firebase, Supabase, GitHub, Expo, Anthropic
@@ -247,30 +237,18 @@
 
 ---
 
-## 💰 FUNDS NEEDED FROM FABS DEVELOPMENT
-
-| Item | Cost | Type | Unblocks |
-|------|------|------|---------|
-| Apple Developer Program | $99/year | One-time (annual) | App Store, TestFlight, Apple Sign In, Apple IAP |
-| Google Play Console | $25 | One-time | Play Store, Google Sign In, Google Play Billing |
-| Hostinger Premium Email ×2 | ~$4/month | Monthly | All platform registrations |
-| Anthropic API credits | ~$50/month | Monthly | AI Coach, Meal Planner, Vision, Food Scanner |
-| **Total first month** | **~$178** | | |
-
----
-
 ## 🏗️ INFRASTRUCTURE REFERENCE
 
 ### App Bundle IDs
 ```
-iOS:     com.bigcutstore.calfit
-Android: com.bigcutstore.calfit
+iOS:     store.bigcut.calfit
+Android: store.bigcut.calfit
 ```
 
 ### IAP Product IDs (must match exactly in App Store Connect + Google Play Console)
 ```
-com.bigcutstore.calfit.pro.monthly      — $9.99/month
-com.bigcutstore.calfit.premium.monthly  — $19.99/month
+store.bigcut.calfit.pro.monthly      — $9.99/month
+store.bigcut.calfit.premium.monthly  — $19.99/month
 ```
 
 ### Subscription Tiers

@@ -1,619 +1,444 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  RefreshControl, Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useNavigation } from '@react-navigation/native';
 import { useState, useCallback } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
-import { BodyMeasurements } from './BodyMeasurementScreen';
+import { supabase } from '../../services/supabase';
 
+const { width: SW } = Dimensions.get('window');
+const PINK   = '#FF6B9D';
+const ORANGE = '#FFB347';
+const GOLD   = '#FFD133';
+const PURPLE = '#B280FF';
+const BLUE   = '#6699FF';
+const GREEN  = '#2DDC8C';
 
+type Period = 'Week' | 'Month' | '3 Months' | 'Year';
 
-// ── TYPE DEFINITIONS ─────────────────────────────────────────
-type WorkoutSession = {
-  name: string;
-  calories_burned: number;
-  completed_at: string;
-};
+// ── DATA LOADER ───────────────────────────────────────────────
+async function loadStats(userId: string, period: Period) {
+  const days = period === 'Week' ? 7 : period === 'Month' ? 30 : period === '3 Months' ? 90 : 365;
+  const since = new Date(); since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().split('T')[0];
 
-type ProgressStats = {
-  daysTracked: number;
-  workoutsDone: number;
-  avgSleep: number;
-  waterGoalDays: number;
-  avgSteps: number;
-  activeDays: number;
-  totalCaloriesBurned: number;
-  totalFoodLogs: number;
-};
+  const [food, workouts, water, sleep, steps, profile, measurements] = await Promise.all([
+    supabase.from('food_logs').select('calories,logged_at').eq('user_id', userId).gte('logged_at', sinceStr),
+    supabase.from('workout_logs').select('calories_burned,completed_at,exercise_name,duration_minutes').eq('user_id', userId).gte('completed_at', sinceStr),
+    supabase.from('water_logs').select('amount_ml,logged_at').eq('user_id', userId).gte('logged_at', sinceStr),
+    supabase.from('sleep_logs').select('duration_hours,date').eq('user_id', userId).gte('date', sinceStr),
+    supabase.from('step_logs').select('steps,date').eq('user_id', userId).gte('date', sinceStr),
+    supabase.from('profiles').select('streak_count,weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml').eq('id', userId).single(),
+    supabase.from('body_measurements').select('*').eq('user_id', userId).order('measured_at', { ascending: false }).limit(2),
+  ]);
 
-// ── PERIOD TABS ──────────────────────────────────────────────
-function PeriodTabs({
-  theme,
-  active,
-  onSelect,
-}: {
-  theme: typeof colors.dark;
-  active: string;
-  onSelect: (p: string) => void;
+  const foodData     = (food.data ?? []) as any[];
+  const workoutData  = (workouts.data ?? []) as any[];
+  const waterData    = (water.data ?? []) as any[];
+  const sleepData    = (sleep.data ?? []) as any[];
+  const stepsData    = (steps.data ?? []) as any[];
+  const p            = profile.data as any;
+  const measData     = (measurements.data ?? []) as any[];
+
+  const totalCal     = foodData.reduce((s:number,r:any)=>s+(r.calories??0),0);
+  const totalBurned  = workoutData.reduce((s:number,r:any)=>s+(r.calories_burned??0),0);
+  const totalWater   = waterData.reduce((s:number,r:any)=>s+(r.amount_ml??0),0);
+  const totalSteps   = stepsData.reduce((s:number,r:any)=>s+(r.steps??0),0);
+  const avgSleep     = sleepData.length > 0
+    ? sleepData.reduce((s:number,r:any)=>s+(r.duration_hours??0),0)/sleepData.length : 0;
+
+  // Build daily calorie chart data
+  const calorieByDay: Record<string, number> = {};
+  foodData.forEach((r:any) => {
+    const d = r.logged_at?.split('T')[0];
+    if (d) calorieByDay[d] = (calorieByDay[d] ?? 0) + (r.calories ?? 0);
+  });
+  const chartDays = Array.from({ length: Math.min(days, 14) }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (Math.min(days,14) - 1 - i));
+    const key = d.toISOString().split('T')[0];
+    return { date: key, calories: calorieByDay[key] ?? 0, label: d.toLocaleDateString('en',{weekday:'short'}).slice(0,2) };
+  });
+
+  return {
+    totalCal, totalBurned, totalWater, totalSteps, avgSleep,
+    daysTracked: new Set(foodData.map((r:any)=>r.logged_at?.split('T')[0])).size,
+    workoutsDone: workoutData.length,
+    streak: p?.streak_count ?? 0,
+    weight: p?.weight_kg ?? null,
+    targetWeight: p?.target_weight_kg ?? null,
+    calorieGoal: p?.daily_calorie_goal ?? 2000,
+    waterGoal: p?.water_goal_ml ?? 2500,
+    recentWorkouts: workoutData.slice(0,5),
+    chartDays,
+    latestMeasurement: measData[0] ?? null,
+    prevMeasurement: measData[1] ?? null,
+  };
+}
+
+// ── MINI BAR CHART ────────────────────────────────────────────
+function MiniBarChart({ data, goal, theme }: {
+  data: { label: string; calories: number }[];
+  goal: number; theme: typeof colors.dark;
 }) {
-  const periods = ['Week', 'Month', '3 Months', 'Year'];
+  const max = Math.max(...data.map(d => d.calories), goal, 1);
   return (
-    <View style={[styles.periodTabs, { borderBottomColor: theme.border }]}>
-      {periods.map((p) => (
-        <TouchableOpacity
-          key={p}
-          onPress={() => onSelect(p)}
-          style={[
-            styles.periodTab,
-            active === p && { borderBottomColor: theme.accent },
-          ]}
-        >
-          <Text style={[
-            styles.periodTabText,
-            { color: active === p ? theme.textPrimary : theme.textMuted },
-            active === p && { fontWeight: '700' },
-          ]}>
-            {p}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <View style={chart.wrap}>
+      <View style={chart.bars}>
+        {data.map((d, i) => {
+          const pct = d.calories / max;
+          const atGoal = d.calories >= goal * 0.85 && d.calories <= goal * 1.15;
+          const over   = d.calories > goal * 1.15;
+          const color  = over ? '#FF5959' : atGoal ? GREEN : BLUE;
+          return (
+            <View key={i} style={chart.barWrap}>
+              <View style={[chart.bar, { height: Math.max(pct * 80, d.calories > 0 ? 4 : 0), backgroundColor: color }]} />
+              <Text style={[chart.label, { color: theme.textMuted }]}>{d.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+      {/* Goal line */}
+      <View style={[chart.goalLine, { bottom: 18 + (goal/max)*80, borderColor: GOLD + '80' }]} />
     </View>
   );
 }
+const chart = StyleSheet.create({
+  wrap:    { height: 120, position: 'relative', marginTop: spacing.sm },
+  bars:    { flexDirection: 'row', alignItems: 'flex-end', height: 100, gap: 3, paddingBottom: 18 },
+  barWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 100 },
+  bar:     { width: '80%', borderRadius: 3, minHeight: 2 },
+  label:   { fontSize: 8, marginTop: 3 },
+  goalLine:{ position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed' },
+});
 
-// ── WEIGHT CARD ──────────────────────────────────────────────
-function WeightCard({ theme, currentWeight, targetWeight }: {
-  theme: typeof colors.dark;
-  currentWeight: number | null;
-  targetWeight: number | null;
+// ── STAT CARD ─────────────────────────────────────────────────
+function StatCard({ icon, label, value, sub, color, theme }: {
+  icon: string; label: string; value: string; sub?: string;
+  color: string; theme: typeof colors.dark;
 }) {
-  if (!currentWeight) {
-    return (
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Weight</Text>
-        <View style={styles.emptyState}>
-          <Ionicons name="scale-outline" size={32} color={theme.textMuted} />
-          <Text style={[styles.emptyStateText, { color: theme.textMuted }]}>
-            No weight data yet. Update your body stats in Settings → Edit Profile.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  const diff = targetWeight ? currentWeight - targetWeight : null;
-  const isOnTrack = diff !== null && diff <= 5;
-
   return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Weight</Text>
-      <View style={styles.weightRow}>
-        <View>
-          <Text style={[styles.chartValue, { color: theme.textPrimary }]}>
-            {currentWeight} kg
-          </Text>
-          {diff !== null && (
-            <View style={styles.changeRow}>
-              <Ionicons
-                name={diff > 0 ? 'arrow-down' : 'arrow-up'}
-                size={14}
-                color={theme.accent}
-              />
-              <Text style={[styles.changeText, { color: theme.accent }]}>
-                {Math.abs(diff).toFixed(1)}kg {diff > 0 ? 'to lose' : 'to gain'} to reach goal
-              </Text>
-            </View>
-          )}
-        </View>
-        {targetWeight && (
-          <View style={[styles.goalBadge, {
-            backgroundColor: theme.accentDim as string,
-            borderColor: theme.accent,
-          }]}>
-            <Text style={[styles.goalBadgeLabel, { color: theme.textMuted }]}>Goal</Text>
-            <Text style={[styles.goalBadgeValue, { color: theme.accent }]}>
-              {targetWeight} kg
-            </Text>
-          </View>
-        )}
+    <View style={[sc.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[sc.icon, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon as any} size={18} color={color} />
       </View>
-      {diff !== null && targetWeight && (
-        <>
-          <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
-            <View style={[styles.progressBarFill, {
-              backgroundColor: theme.accent,
-              width: `${Math.min(Math.max((1 - diff / (currentWeight - targetWeight + 0.01)) * 100, 0), 100)}%` as any,
-            }]} />
-          </View>
-          <Text style={[styles.progressNote, { color: theme.textMuted }]}>
-            {isOnTrack ? 'Almost there! 🎯' : `${diff.toFixed(1)}kg remaining to goal`}
-          </Text>
-        </>
+      <Text style={[sc.value, { color: theme.textPrimary }]}>{value}</Text>
+      <Text style={[sc.label, { color: theme.textMuted }]}>{label}</Text>
+      {sub && <Text style={[sc.sub, { color: color }]}>{sub}</Text>}
+    </View>
+  );
+}
+const sc = StyleSheet.create({
+  card:  { flex: 1, minWidth: (SW - spacing.lg * 2 - spacing.sm) / 2, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: 3 },
+  icon:  { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  value: { fontSize: fontSize.xl, fontWeight: '800' },
+  label: { fontSize: fontSize.xs, fontWeight: '600' },
+  sub:   { fontSize: fontSize.xs, fontWeight: '700', marginTop: 1 },
+});
+
+// ── SECTION HEADER ────────────────────────────────────────────
+function SectionHeader({ title, icon, color, theme, onPress, actionLabel }: {
+  title: string; icon: string; color: string; theme: typeof colors.dark;
+  onPress?: () => void; actionLabel?: string;
+}) {
+  return (
+    <View style={sh.row}>
+      <View style={sh.left}>
+        <View style={[sh.icon, { backgroundColor: color + '18' }]}>
+          <Ionicons name={icon as any} size={15} color={color} />
+        </View>
+        <Text style={[sh.title, { color: theme.textPrimary }]}>{title}</Text>
+      </View>
+      {onPress && (
+        <TouchableOpacity onPress={onPress}>
+          <Text style={[sh.action, { color: color }]}>{actionLabel ?? 'See All'}</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
 }
+const sh = StyleSheet.create({
+  row:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.lg, marginBottom: spacing.sm, marginTop: spacing.lg },
+  left:   { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  icon:   { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  title:  { fontSize: fontSize.base, fontWeight: '700' },
+  action: { fontSize: fontSize.sm, fontWeight: '600' },
+});
 
-// ── STATS GRID ───────────────────────────────────────────────
-function StatsGrid({ theme, stats }: {
-  theme: typeof colors.dark;
-  stats: ProgressStats;
-}) {
-  const hasAnyData =
-    stats.daysTracked > 0 ||
-    stats.workoutsDone > 0 ||
-    stats.totalFoodLogs > 0;
-
-  if (!hasAnyData) {
-    return (
-      <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Ionicons name="bar-chart-outline" size={36} color={theme.textMuted} />
-        <Text style={[styles.emptyCardTitle, { color: theme.textPrimary }]}>
-          No activity yet
-        </Text>
-        <Text style={[styles.emptyCardSub, { color: theme.textMuted }]}>
-          Complete workouts, log meals, and track water to see your stats here.
-        </Text>
-      </View>
-    );
-  }
-
-  const items = [
-    { label: 'Days Tracked',  value: `${stats.daysTracked}`,        icon: 'calendar-outline',   color: theme.accent },
-    { label: 'Workouts Done', value: `${stats.workoutsDone}`,        icon: 'barbell-outline',    color: theme.accentSecond },
-    { label: 'Avg Sleep',     value: stats.avgSleep > 0 ? `${stats.avgSleep}h` : '—', icon: 'moon-outline', color: (theme as any).purple },
-    { label: 'Water Days',    value: `${stats.waterGoalDays}`,       icon: 'water-outline',      color: theme.accentSecond },
-    { label: 'Cal Burned',    value: `${stats.totalCaloriesBurned}`, icon: 'flame-outline',      color: (theme as any).orange },
-    { label: 'Meals Logged',  value: `${stats.totalFoodLogs}`,       icon: 'restaurant-outline', color: (theme as any).gold },
-  ];
-
-  return (
-    <View style={styles.statsGrid}>
-      {items.map((s) => (
-        <View key={s.label} style={[styles.statCard, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
-          <View style={[styles.statIconWrap, { backgroundColor: s.color + '22' }]}>
-            <Ionicons name={s.icon as any} size={18} color={s.color} />
-          </View>
-          <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-          <Text style={[styles.statLabel, { color: theme.textMuted }]}>{s.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// ── STREAK PROGRESS ──────────────────────────────────────────
-function StreakProgress({ theme, streakCount }: {
-  theme: typeof colors.dark;
-  streakCount: number;
-}) {
-  if (streakCount === 0) {
-    return (
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Streak Progress</Text>
-        <View style={styles.emptyState}>
-          <Ionicons name="flame-outline" size={32} color={theme.textMuted} />
-          <Text style={[styles.emptyStateText, { color: theme.textMuted }]}>
-            No streak yet. Check in daily from the Streaks screen to start your streak.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  const nextMilestone = [7, 14, 30, 60, 90, 180].find((m) => m > streakCount) ?? 180;
-  const prevMilestone = [0, 7, 14, 30, 60, 90].reverse().find((m) => m <= streakCount) ?? 0;
-  const pct = Math.round(
-    ((streakCount - prevMilestone) / (nextMilestone - prevMilestone)) * 100
-  );
-
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Streak Progress</Text>
-      <Text style={[styles.chartValue, { color: theme.textPrimary }]}>
-        {streakCount} day streak 🔥
-      </Text>
-      <Text style={[styles.streakSub, { color: theme.textSecondary }]}>
-        Next milestone: {nextMilestone} days — {nextMilestone - streakCount} days to go
-      </Text>
-      <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
-        <View style={[styles.progressBarFill, {
-          backgroundColor: theme.accent,
-          width: `${pct}%` as any,
-        }]} />
-      </View>
-      <Text style={[styles.streakPct, { color: theme.accent }]}>{pct}%</Text>
-    </View>
-  );
-}
-
-// ── WORKOUT SUMMARY ───────────────────────────────────────────
-function WorkoutSummary({ theme, sessions }: {
-  theme: typeof colors.dark;
-  sessions: WorkoutSession[];
-}) {
-  if (sessions.length === 0) {
-    return (
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Recent Workouts</Text>
-        <View style={styles.emptyState}>
-          <Ionicons name="barbell-outline" size={32} color={theme.textMuted} />
-          <Text style={[styles.emptyStateText, { color: theme.textMuted }]}>
-            No workouts yet. Head to the Activity tab to complete your first session.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Recent Workouts</Text>
-      {sessions.slice(0, 5).map((s, i) => (
-        <View key={i} style={[styles.workoutRow, { borderBottomColor: theme.border }]}>
-          <View style={[styles.workoutIcon, { backgroundColor: theme.accentDim as string }]}>
-            <Ionicons name="barbell-outline" size={16} color={theme.accent} />
-          </View>
-          <View style={styles.workoutInfo}>
-            <Text style={[styles.workoutName, { color: theme.textPrimary }]}>{s.name}</Text>
-            <Text style={[styles.workoutDate, { color: theme.textMuted }]}>
-              {new Date(s.completed_at).toLocaleDateString('en-GB', {
-                weekday: 'short', day: 'numeric', month: 'short',
-              })}
-            </Text>
-          </View>
-          <View style={[styles.workoutCalBadge, { backgroundColor: theme.accentDim as string }]}>
-            <Text style={[styles.workoutCal, { color: theme.accent }]}>
-              {s.calories_burned} kcal
-            </Text>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// ── BODY MEASUREMENTS ────────────────────────────────────────
-
-// ── MAIN SCREEN ──────────────────────────────────────────────
+// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function ProgressScreen() {
-  const navigation = useNavigation<any>();
+  const navigation   = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [period, setPeriod] = useState('Month');
+  const [period, setPeriod]       = useState<Period>('Week');
+  const [data, setData]           = useState<Awaited<ReturnType<typeof loadStats>> | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
-  const [stats, setStats] = useState<ProgressStats>({
-    daysTracked: 0,
-    workoutsDone: 0,
-    avgSleep: 0,
-    waterGoalDays: 0,
-    avgSteps: 0,
-    activeDays: 0,
-    totalCaloriesBurned: 0,
-    totalFoodLogs: 0,
-  });
 
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) loadProgressData();
-    }, [user?.id, period])
-  );
+  useFocusEffect(useCallback(() => { if (user?.id) load(); }, [user?.id, period]));
 
-  const getDaysBack = () => {
-    if (period === 'Week') return 7;
-    if (period === 'Month') return 30;
-    if (period === '3 Months') return 90;
-    return 365;
-  };
-
-  const loadProgressData = async () => {
+  const load = async () => {
     if (!user?.id) return;
-    try {
-      const { supabase } = await import('../../services/supabase');
-      const daysBack = getDaysBack();
-      const fromDate = new Date();
-      fromDate.setDate(fromDate.getDate() - daysBack);
-      const fromISO = fromDate.toISOString();
-
-      const [workoutsData, foodData, waterData] = await Promise.all([
-        supabase
-          .from('workout_sessions')
-          .select('name, calories_burned, completed_at, duration_seconds')
-          .eq('user_id', user.id)
-          .eq('status', 'completed')
-          .gte('completed_at', fromISO)
-          .order('completed_at', { ascending: false }),
-
-        supabase
-          .from('food_logs')
-          .select('id, date')
-          .eq('user_id', user.id)
-          .gte('logged_at', fromISO),
-
-        supabase
-          .from('water_logs')
-          .select('amount_ml, logged_at')
-          .eq('user_id', user.id)
-          .gte('logged_at', fromISO),
-      ]);
-
-      const workouts = (workoutsData.data ?? []) as WorkoutSession[];
-      const foods = (foodData.data ?? []) as any[];
-      const waters = (waterData.data ?? []) as any[];
-
-      const foodDates = new Set(foods.map((f) => f.date));
-
-      const waterByDay: Record<string, number> = {};
-      waters.forEach((w) => {
-        const day = w.logged_at.split('T')[0];
-        waterByDay[day] = (waterByDay[day] ?? 0) + w.amount_ml;
-      });
-      const waterGoalDays = Object.values(waterByDay).filter((v) => v >= 1500).length;
-
-      const totalCaloriesBurned = workouts.reduce(
-        (sum, s) => sum + (s.calories_burned ?? 0), 0
-      );
-
-      setWorkoutSessions(workouts);
-      setStats({
-        daysTracked: foodDates.size,
-        workoutsDone: workouts.length,
-        avgSleep: 0,
-        waterGoalDays,
-        avgSteps: 0,
-        activeDays: Math.max(foodDates.size, workouts.length),
-        totalCaloriesBurned,
-        totalFoodLogs: foods.length,
-      });
-    } catch (error) {
-      console.error('Failed to load progress data:', error);
-    }
+    try { setData(await loadStats(user.id, period)); } catch {}
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadProgressData();
-    setIsRefreshing(false);
-  };
+  const refresh = async () => { setIsRefreshing(true); await load(); setIsRefreshing(false); };
+
+  const PERIODS: Period[] = ['Week', 'Month', '3 Months', 'Year'];
+  const name = profile?.full_name?.split(' ')[0] || 'You';
+
+  const weightProgress = data?.weight && data?.targetWeight
+    ? Math.min(Math.abs(data.weight - data.targetWeight) / Math.abs((profile as any)?.starting_weight_kg - data.targetWeight || 1), 1)
+    : 0;
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>Back</Text>
+      {/* ── GRADIENT HEADER ── */}
+      <LinearGradient
+        colors={[PURPLE + 'DD', PINK + 'CC'] as [string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.navigate('Main' as never)} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>My Progress</Text>
-
-        {/* Recap button */}
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Recap')}
-          style={[styles.recapBtn, {
-            backgroundColor: theme.accentDim as string,
-            borderColor: theme.accent,
-          }]}
-        >
-          <Ionicons name="share-social-outline" size={14} color={theme.accent} />
-          <Text style={[styles.recapBtnText, { color: theme.accent }]}>Recap</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>My Progress</Text>
+          <Text style={styles.headerSub}>{name}'s fitness journey</Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Recap' as never)} style={styles.recapBtn}>
+          <Ionicons name="share-social-outline" size={16} color="#fff" />
+          <Text style={styles.recapBtnText}>Recap</Text>
         </TouchableOpacity>
+      </LinearGradient>
+
+      {/* ── PERIOD TABS ── */}
+      <View style={[styles.periodTabs, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+        {PERIODS.map((p) => (
+          <TouchableOpacity
+            key={p}
+            onPress={() => setPeriod(p)}
+            style={[styles.periodTab, period === p && { borderBottomColor: PURPLE }]}
+          >
+            <Text style={[styles.periodTabText, {
+              color: period === p ? PURPLE : theme.textMuted,
+              fontWeight: period === p ? '700' : '500',
+            }]}>{p}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
-
-      <PeriodTabs theme={theme} active={period} onSelect={setPeriod} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.accent}
-            colors={[theme.accent]}
-          />
-        }
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={PURPLE} colors={[PURPLE]} />}
       >
-        <WeightCard
-          theme={theme}
-          currentWeight={profile?.current_weight_kg ?? null}
-          targetWeight={profile?.target_weight_kg ?? null}
+        {/* ── WEIGHT CARD ── */}
+        {data?.weight && (
+          <>
+            <SectionHeader title="Weight" icon="body-outline" color={PINK} theme={theme} />
+            <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+              <View style={styles.weightRow}>
+                <View>
+                  <Text style={[styles.weightVal, { color: theme.textPrimary }]}>{data.weight} kg</Text>
+                  <Text style={[styles.weightSub, { color: theme.textMuted }]}>Current weight</Text>
+                </View>
+                {data.targetWeight && (
+                  <View style={styles.weightTarget}>
+                    <Text style={[styles.weightTargetVal, { color: GREEN }]}>{data.targetWeight} kg</Text>
+                    <Text style={[styles.weightSub, { color: theme.textMuted }]}>Target</Text>
+                  </View>
+                )}
+                <View style={[styles.bmiChip, { backgroundColor: PINK + '18' }]}>
+                  <Text style={[styles.bmiText, { color: PINK }]}>
+                    BMI {data.weight && (profile as any)?.height_cm
+                      ? ((data.weight / ((profile as any).height_cm / 100) ** 2)).toFixed(1)
+                      : '—'}
+                  </Text>
+                </View>
+              </View>
+              {data.targetWeight && (
+                <View style={{ marginTop: spacing.md }}>
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${Math.round(weightProgress * 100)}%`, backgroundColor: PINK }]} />
+                  </View>
+                  <Text style={[styles.progressLabel, { color: theme.textMuted }]}>
+                    {Math.abs(data.weight - data.targetWeight).toFixed(1)} kg to goal
+                  </Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* ── CALORIE CHART ── */}
+        {data?.chartDays && data.chartDays.length > 0 && (
+          <>
+            <SectionHeader title="Calorie Trend" icon="flame-outline" color={ORANGE} theme={theme} />
+            <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+              <View style={styles.chartLegend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: GREEN }]} />
+                  <Text style={[styles.legendText, { color: theme.textMuted }]}>On target</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: BLUE }]} />
+                  <Text style={[styles.legendText, { color: theme.textMuted }]}>Below goal</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#FF5959' }]} />
+                  <Text style={[styles.legendText, { color: theme.textMuted }]}>Over goal</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: GOLD, height: 1, width: 12, borderRadius: 0 }]} />
+                  <Text style={[styles.legendText, { color: theme.textMuted }]}>Goal line</Text>
+                </View>
+              </View>
+              <MiniBarChart data={data.chartDays} goal={data.calorieGoal} theme={theme} />
+            </View>
+          </>
+        )}
+
+        {/* ── STATS GRID ── */}
+        {data && (
+          <>
+            <SectionHeader title="Activity Summary" icon="stats-chart-outline" color={BLUE} theme={theme} />
+            <View style={styles.statsGrid}>
+              <StatCard icon="restaurant-outline" label="Calories In"    value={data.totalCal.toLocaleString()}    sub={`/ ${data.calorieGoal.toLocaleString()} goal`} color={ORANGE}  theme={theme} />
+              <StatCard icon="flame-outline"      label="Calories Out"   value={data.totalBurned.toLocaleString()}  sub={`${data.workoutsDone} sessions`}               color={PINK}    theme={theme} />
+              <StatCard icon="water-outline"      label="Water Total"    value={`${(data.totalWater/1000).toFixed(1)}L`} sub={`/ ${(data.waterGoal/1000).toFixed(1)}L goal`} color={BLUE} theme={theme} />
+              <StatCard icon="footsteps-outline"  label="Total Steps"    value={data.totalSteps > 0 ? (data.totalSteps/1000).toFixed(1)+'k' : '—'} sub="steps tracked" color={GREEN}   theme={theme} />
+              <StatCard icon="moon-outline"       label="Avg Sleep"      value={data.avgSleep > 0 ? `${data.avgSleep.toFixed(1)}h` : '—'} sub="per night"     color={PURPLE}  theme={theme} />
+              <StatCard icon="bonfire-outline"    label="Streak"         value={`${data.streak}d`}                  sub="current streak"                                color={GOLD}    theme={theme} />
+            </View>
+          </>
+        )}
+
+        {/* ── RECENT WORKOUTS ── */}
+        {data?.recentWorkouts && data.recentWorkouts.length > 0 && (
+          <>
+            <SectionHeader
+              title="Recent Workouts" icon="barbell-outline" color={PINK} theme={theme}
+              onPress={() => navigation.navigate('Main' as never, { screen: 'Activity' } as never)}
+            />
+            <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+              {data.recentWorkouts.map((w: any, i: number) => (
+                <View key={i} style={[styles.workoutRow, i < data.recentWorkouts.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
+                  <View style={[styles.workoutIcon, { backgroundColor: PINK + '18' }]}>
+                    <Ionicons name="barbell-outline" size={14} color={PINK} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.workoutName, { color: theme.textPrimary }]}>{w.exercise_name}</Text>
+                    <Text style={[styles.workoutMeta, { color: theme.textMuted }]}>
+                      {w.completed_at?.split('T')[0]} · {w.duration_minutes ?? '?'} min
+                    </Text>
+                  </View>
+                  <Text style={[styles.workoutCal, { color: ORANGE }]}>{w.calories_burned ?? 0} kcal</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* ── BODY MEASUREMENTS ── */}
+        <SectionHeader
+          title="Body Measurements" icon="body-outline" color={PURPLE} theme={theme}
+          onPress={() => navigation.navigate('BodyMeasurements' as never)}
+          actionLabel="Log"
         />
+        {data?.latestMeasurement ? (
+          <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
+            <Text style={[styles.measDate, { color: theme.textMuted }]}>
+              Last logged: {data.latestMeasurement.measured_at?.split('T')[0]}
+            </Text>
+            <View style={styles.measGrid}>
+              {[
+                { label: 'Chest',   value: data.latestMeasurement.chest_cm,   unit: 'cm', prev: data.prevMeasurement?.chest_cm },
+                { label: 'Waist',   value: data.latestMeasurement.waist_cm,   unit: 'cm', prev: data.prevMeasurement?.waist_cm },
+                { label: 'Hips',    value: data.latestMeasurement.hips_cm,    unit: 'cm', prev: data.prevMeasurement?.hips_cm },
+                { label: 'Arms',    value: data.latestMeasurement.arms_cm,    unit: 'cm', prev: data.prevMeasurement?.arms_cm },
+                { label: 'Thighs',  value: data.latestMeasurement.thighs_cm,  unit: 'cm', prev: data.prevMeasurement?.thighs_cm },
+                { label: 'Neck',    value: data.latestMeasurement.neck_cm,    unit: 'cm', prev: data.prevMeasurement?.neck_cm },
+              ].filter(m => m.value != null).map((m) => {
+                const diff = m.prev != null ? m.value - m.prev : null;
+                return (
+                  <View key={m.label} style={[styles.measItem, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+                    <Text style={[styles.measLabel, { color: theme.textMuted }]}>{m.label}</Text>
+                    <Text style={[styles.measValue, { color: theme.textPrimary }]}>{m.value}{m.unit}</Text>
+                    {diff !== null && diff !== 0 && (
+                      <Text style={[styles.measDiff, { color: diff < 0 ? GREEN : '#FF5959' }]}>
+                        {diff > 0 ? '+' : ''}{diff.toFixed(1)}cm
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('BodyMeasurements' as never)}
+            style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}
+          >
+            <Ionicons name="body-outline" size={28} color={theme.textMuted} />
+            <Text style={[styles.emptyCardText, { color: theme.textMuted }]}>
+              Tap to log your first body measurements
+            </Text>
+          </TouchableOpacity>
+        )}
 
-        <StatsGrid theme={theme} stats={stats} />
-
-        <StreakProgress
-          theme={theme}
-          streakCount={profile?.streak_count ?? 0}
-        />
-
-        <WorkoutSummary theme={theme} sessions={workoutSessions} />
-
-<BodyMeasurements theme={theme} userId={user?.id ?? ''} />
+        <View style={{ height: 80 }} />
       </ScrollView>
     </AndroidSafeView>
   );
 }
 
-// ── STYLES ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backText: { fontSize: fontSize.lg, fontWeight: '400' },
-  pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
-  recapBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-  },
-  recapBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
-
-  periodTabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  periodTab: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-    marginBottom: -1,
-  },
-  periodTabText: { fontSize: fontSize.base },
-
-  card: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  cardLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  weightRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  chartValue: { fontSize: 26, fontWeight: '800', marginBottom: 4 },
-  changeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  changeText: { fontSize: fontSize.sm, fontWeight: '600' },
-  goalBadge: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  goalBadgeLabel: { fontSize: fontSize.xs },
-  goalBadgeValue: { fontSize: fontSize.xl, fontWeight: '800', marginTop: 2 },
-  progressBarBg: { height: 7, borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
-  progressBarFill: { height: '100%', borderRadius: 4 },
-  progressNote: { fontSize: fontSize.xs },
-
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.md,
-  },
-  statCard: {
-    width: '47%',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  statIconWrap: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  statValue: { fontSize: fontSize.lg, fontWeight: '700', marginBottom: 2 },
-  statLabel: { fontSize: fontSize.xs },
-
-  streakSub: { fontSize: fontSize.sm, marginTop: 4, marginBottom: spacing.sm },
-  streakPct: { fontSize: fontSize.sm, fontWeight: '700', textAlign: 'right', marginTop: 4 },
-
-  workoutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-  },
-  workoutIcon: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  workoutInfo: { flex: 1 },
-  workoutName: { fontSize: fontSize.base, fontWeight: '600' },
-  workoutDate: { fontSize: fontSize.xs, marginTop: 2 },
-  workoutCalBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
-  },
-  workoutCal: { fontSize: fontSize.xs, fontWeight: '700' },
-
-  measureHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  addMeasureBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-  },
-  addMeasureText: { fontSize: fontSize.sm, fontWeight: '600' },
-
-  emptyState: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-  },
-  emptyStateText: {
-    fontSize: fontSize.sm,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  emptyCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: spacing.xl,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  emptyCardTitle: { fontSize: fontSize.lg, fontWeight: '700' },
-  emptyCardSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18 },
+  safe:     { flex: 1 },
+  scroll:   { paddingBottom: 40 },
+  header:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
+  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
+  headerSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
+  recapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.18)' },
+  recapBtnText: { color: '#fff', fontSize: fontSize.xs, fontWeight: '700' },
+  periodTabs: { flexDirection: 'row', borderBottomWidth: 1 },
+  periodTab:  { flex: 1, alignItems: 'center', paddingVertical: spacing.sm + 2, borderBottomWidth: 2.5, borderBottomColor: 'transparent', marginBottom: -1 },
+  periodTabText: { fontSize: fontSize.xs },
+  card:       { borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg },
+  statsGrid:  { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: spacing.lg, gap: spacing.sm },
+  weightRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  weightVal:  { fontSize: 28, fontWeight: '900' },
+  weightSub:  { fontSize: fontSize.xs, marginTop: 2 },
+  weightTarget:{ alignItems: 'center' },
+  weightTargetVal: { fontSize: fontSize.lg, fontWeight: '800' },
+  bmiChip:    { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.md },
+  bmiText:    { fontSize: fontSize.sm, fontWeight: '700' },
+  progressBar: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,107,157,0.15)', overflow: 'hidden' },
+  progressFill:{ height: '100%', borderRadius: 4 },
+  progressLabel: { fontSize: fontSize.xs, marginTop: 4 },
+  chartLegend: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginBottom: spacing.sm },
+  legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot:   { width: 8, height: 8, borderRadius: 4 },
+  legendText:  { fontSize: 10 },
+  workoutRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  workoutIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  workoutName: { fontSize: fontSize.sm, fontWeight: '600' },
+  workoutMeta: { fontSize: fontSize.xs, marginTop: 1 },
+  workoutCal:  { fontSize: fontSize.sm, fontWeight: '700' },
+  measDate:    { fontSize: fontSize.xs, marginBottom: spacing.md },
+  measGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  measItem:    { padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', minWidth: 80 },
+  measLabel:   { fontSize: 10, fontWeight: '600' },
+  measValue:   { fontSize: fontSize.base, fontWeight: '800', marginTop: 2 },
+  measDiff:    { fontSize: 10, fontWeight: '700', marginTop: 1 },
+  emptyCard:   { padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', gap: spacing.md, borderStyle: 'dashed' },
+  emptyCardText: { fontSize: fontSize.sm, textAlign: 'center' },
 });

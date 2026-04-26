@@ -256,7 +256,7 @@ export default function SettingsScreen() {
 
       {/* ── HEADER ── */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation.navigate('Main' as never)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Settings</Text>
@@ -314,7 +314,7 @@ export default function SettingsScreen() {
             label: 'Units',
             value: (profile as any)?.units === 'imperial' ? 'Imperial (lbs, ft)' : 'Metric (kg, cm)',
             icon: 'speedometer-outline', iconColor: theme.accentSecond,
-            onPress: () => navigation.navigate('Goals' as never),
+            onPress: () => navigation.navigate('EditProfile' as never),
           },
           {
             label: 'Micronutrients',

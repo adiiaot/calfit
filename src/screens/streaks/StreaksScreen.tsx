@@ -1,361 +1,112 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Alert, RefreshControl,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { Ionicons } from '@expo/vector-icons';
 import { useState, useCallback } from 'react';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { UserAvatar } from '../../modules/shared/UserAvatar';
 import { supabase } from '../../services/supabase';
 
+const ORANGE = '#FFB347';
+const GOLD   = '#FFD133';
+const PINK   = '#FF6B9D';
+const BLUE   = '#6699FF';
+const GREEN  = '#2DDC8C';
+
+// ── MILESTONE BADGES ──────────────────────────────────────────
+const MILESTONES = [
+  { days: 3,   emoji: '🔥', label: '3-Day Spark',      color: ORANGE },
+  { days: 7,   emoji: '⚡', label: '1-Week Warrior',    color: GOLD   },
+  { days: 14,  emoji: '💪', label: '2-Week Grinder',    color: PINK   },
+  { days: 30,  emoji: '🏅', label: '30-Day Champion',   color: BLUE   },
+  { days: 60,  emoji: '🥇', label: '60-Day Legend',     color: GREEN  },
+  { days: 90,  emoji: '💎', label: '90-Day Diamond',    color: '#60A5FA' },
+  { days: 180, emoji: '👑', label: '6-Month Royalty',   color: GOLD   },
+  { days: 365, emoji: '🌟', label: '1-Year Immortal',   color: '#B280FF' },
+];
+
+// ── PARTNER INFO ──────────────────────────────────────────────
 interface PartnerInfo {
-  partner_id: string;
-  full_name: string;
-  calfit_id: string;
-  avatar_url: string | null;
-  streak_count: number;
+  partner_id: string; full_name: string; calfit_id: string;
+  avatar_url: string | null; streak_count: number;
 }
 
-interface GroupInfo {
-  id: string;
-  name: string;
-  member_count: number;
-  streak: number;
-  emoji: string;
-}
+// ── DAY DOT ROW ───────────────────────────────────────────────
+function DayDots({ streak, theme }: { streak: number; theme: typeof colors.dark }) {
+  const today = new Date();
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today); d.setDate(d.getDate() - (6 - i));
+    const isToday = i === 6;
+    const active  = streak > 0 && i >= 7 - Math.min(streak, 7);
+    return { label: d.toLocaleDateString('en', { weekday: 'short' }).slice(0, 2), active, isToday };
+  });
 
-// ── PERSONAL STREAK HERO ─────────────────────────────────────
-function PersonalStreakHero({ theme, streakCount }: {
-  theme: typeof colors.dark;
-  streakCount: number;
-}) {
-  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const today = new Date().getDay();
-  const todayIndex = today === 0 ? 6 : today - 1;
-
-  const badgeLabel =
-    streakCount >= 30 ? 'Gold' :
-    streakCount >= 7  ? 'Silver' : 'Bronze';
+  const ringColors = [ORANGE, GOLD, PINK, BLUE, GREEN, '#60A5FA', '#B280FF'];
 
   return (
-    <View style={[styles.heroCard, {
-      backgroundColor: theme.card,
-      borderColor: theme.accent,
-    }]}>
-      <Text style={styles.heroFlame}>🔥</Text>
-      <View style={styles.heroTop}>
-        <View>
-          <Text style={[styles.heroLabel, { color: theme.textSecondary }]}>
-            Personal Streak
-          </Text>
-          <Text style={[styles.heroNumber, { color: theme.accent }]}>
-            {streakCount}
-          </Text>
-          <Text style={[styles.heroUnit, { color: theme.textSecondary }]}>days</Text>
-        </View>
-        <View style={styles.heroRight}>
-          <View style={[styles.goldBadge, { borderColor: (theme as any).gold }]}>
-            <Text style={[styles.goldBadgeText, { color: (theme as any).gold }]}>
-              {badgeLabel}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.dayDots}>
-        {days.map((day, i) => (
-          <View key={`${day}-${i}`} style={[styles.dayDot, {
-            backgroundColor: i <= todayIndex ? theme.accent : theme.card,
-            borderColor:     i <= todayIndex ? theme.accent : theme.border,
+    <View style={dd.row}>
+      {days.map((d, i) => (
+        <View key={i} style={dd.dayWrap}>
+          {d.active && d.isToday && (
+            <Text style={dd.fireAbove}>🔥</Text>
+          )}
+          <View style={[dd.dot, {
+            backgroundColor: d.active ? ringColors[i] : theme.border,
+            borderColor:     d.isToday ? ringColors[i] : 'transparent',
+            borderWidth:     d.isToday ? 2 : 0,
           }]}>
-            <Text style={[styles.dayDotText, {
-              color: i <= todayIndex ? theme.bg : theme.textMuted,
-            }]}>
-              {day}
-            </Text>
+            {d.active && <Ionicons name="checkmark" size={12} color="#fff" />}
           </View>
-        ))}
-      </View>
-
-      <View style={styles.milestonePills}>
-        {[7, 14, 30, 60, 90].map((milestone) => (
-          <View key={milestone} style={[styles.milestonePill, {
-            backgroundColor: streakCount >= milestone ? theme.accent : theme.card,
-            borderColor:     streakCount >= milestone ? theme.accent : theme.border,
-          }]}>
-            <Text style={[styles.milestonePillText, {
-              color: streakCount >= milestone ? theme.bg : theme.textMuted,
-            }]}>
-              {milestone}d
-            </Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ── PARTNER STREAK ────────────────────────────────────────────
-function PartnerStreak({
-  theme,
-  navigation,
-  partners,
-  myStreakCount,
-  loading,
-}: {
-  theme: typeof colors.dark;
-  navigation: any;
-  partners: PartnerInfo[];
-  myStreakCount: number;
-  loading: boolean;
-}) {
-  if (loading) {
-    return (
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Partner Streak</Text>
-        <ActivityIndicator color={theme.accent} style={{ marginVertical: spacing.md }} />
-      </View>
-    );
-  }
-
-  // No partners — CTA goes to Accountability screen, not Credits
-  if (partners.length === 0) {
-    return (
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Partner Streak</Text>
-        <View style={styles.emptySection}>
-          <Ionicons name="people-outline" size={36} color={theme.textMuted} />
-          <Text style={[styles.emptySectionTitle, { color: theme.textPrimary }]}>
-            No accountability partner yet
-          </Text>
-          <Text style={[styles.emptySectionSub, { color: theme.textMuted }]}>
-            Add a partner by their CalFit ID to share a streak and keep each other accountable.
-          </Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Accountability')}
-            style={[styles.emptySectionBtn, { backgroundColor: theme.accent }]}
-          >
-            <Ionicons name="person-add-outline" size={16} color={theme.bg} />
-            <Text style={[styles.emptySectionBtnText, { color: theme.bg }]}>
-              Add a Partner
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Has partners — show real data
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Partner Streak</Text>
-      {partners.map((partner) => {
-        const initial = (partner.full_name || 'P').charAt(0).toUpperCase();
-        return (
-          <View key={partner.partner_id} style={[styles.partnerRow, { marginBottom: spacing.sm }]}>
-            <View style={[styles.partnerAvatar, {
-              backgroundColor: (theme as any).purple + '22',
-              borderColor: (theme as any).purple,
-            }]}>
-              <Text style={[styles.partnerAvatarText, { color: (theme as any).purple }]}>
-                {initial}
-              </Text>
-            </View>
-            <View style={styles.partnerInfo}>
-              <Text style={[styles.partnerName, { color: theme.textPrimary }]}>
-                {partner.full_name}
-              </Text>
-              <Text style={[styles.partnerGoal, { color: theme.textSecondary }]}>
-                @{partner.calfit_id}
-              </Text>
-              <View style={styles.streakCompareRow}>
-                <Text style={[styles.partnerStreak, { color: theme.accent }]}>
-                  🔥 Your streak: {myStreakCount}d
-                </Text>
-                <Text style={[styles.partnerStreak, { color: (theme as any).purple }]}>
-                  · Their streak: {partner.streak_count}d
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Accountability')}
-              style={[styles.nudgeBtn, {
-                backgroundColor: theme.accentDim as string,
-                borderColor: theme.accent,
-              }]}
-            >
-              <Text style={[styles.nudgeBtnText, { color: theme.accent }]}>View →</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-// ── GROUP STREAK ──────────────────────────────────────────────
-function GroupStreak({
-  theme,
-  navigation,
-  groups,
-  loading,
-}: {
-  theme: typeof colors.dark;
-  navigation: any;
-  groups: GroupInfo[];
-  loading: boolean;
-}) {
-  if (loading) {
-    return (
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Group Streak</Text>
-        <ActivityIndicator color={theme.accent} style={{ marginVertical: spacing.md }} />
-      </View>
-    );
-  }
-
-  // No groups — CTA goes to Community screen
-  if (groups.length === 0) {
-    return (
-      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Group Streak</Text>
-        <View style={styles.emptySection}>
-          <Ionicons name="fitness-outline" size={36} color={theme.textMuted} />
-          <Text style={[styles.emptySectionTitle, { color: theme.textPrimary }]}>
-            Not in any group yet
-          </Text>
-          <Text style={[styles.emptySectionSub, { color: theme.textMuted }]}>
-            Join or create a group to build a shared streak with other CalFit members.
-          </Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Community')}
-            style={[styles.emptySectionBtn, { backgroundColor: theme.accent }]}
-          >
-            <Ionicons name="compass-outline" size={16} color={theme.bg} />
-            <Text style={[styles.emptySectionBtnText, { color: theme.bg }]}>
-              Browse Communities
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Has groups — show real group streak data
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Group Streak</Text>
-      {groups.map((group) => (
-        <View key={group.id} style={styles.groupItem}>
-          <View style={styles.groupRow}>
-            <Text style={styles.groupEmoji}>{group.emoji}</Text>
-            <View style={styles.groupInfo}>
-              <Text style={[styles.groupName, { color: theme.textPrimary }]}>
-                {group.name}
-              </Text>
-              <Text style={[styles.groupSub, { color: theme.textSecondary }]}>
-                {group.member_count} member{group.member_count !== 1 ? 's' : ''}
-                {group.streak > 0 ? ` · 🔥 ${group.streak}d streak` : ''}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Community')}
-              style={[styles.nudgeBtn, {
-                backgroundColor: theme.accentDim as string,
-                borderColor: theme.accent,
-              }]}
-            >
-              <Text style={[styles.nudgeBtnText, { color: theme.accent }]}>View →</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={[dd.label, { color: d.active ? ringColors[i] : theme.textMuted }]}>{d.label}</Text>
         </View>
       ))}
     </View>
   );
 }
+const dd = StyleSheet.create({
+  row:     { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.md },
+  dayWrap: { alignItems: 'center', gap: 4 },
+  fireAbove: { fontSize: 10, marginBottom: -2 },
+  dot:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  label:   { fontSize: 10, fontWeight: '700' },
+});
 
-// ── MILESTONE BADGES ──────────────────────────────────────────
-function MilestoneBadges({ theme, streakCount }: {
-  theme: typeof colors.dark;
-  streakCount: number;
-}) {
-  const badges = [
-    { label: '7 Days',   emoji: '🔥', milestone: 7 },
-    { label: '14 Days',  emoji: '⚡', milestone: 14 },
-    { label: '30 Days',  emoji: '💎', milestone: 30 },
-    { label: '60 Days',  emoji: '👑', milestone: 60 },
-    { label: '90 Days',  emoji: '🏆', milestone: 90 },
-    { label: '6 Months', emoji: '🌟', milestone: 180 },
-  ];
-
-  const handleClaimBadge = (badge: typeof badges[0], earned: boolean) => {
-    if (!earned) {
-      const remaining = badge.milestone - streakCount;
-      Alert.alert(
-        `${badge.emoji} ${badge.label}`,
-        `You need ${remaining} more day${remaining === 1 ? '' : 's'} to unlock this badge. Keep checking in!`,
-        [{ text: 'Keep Going!' }]
-      );
-      return;
-    }
-    Alert.alert(
-      `${badge.emoji} Badge Unlocked!`,
-      `Congratulations! You've earned the ${badge.label} streak badge. Amazing consistency!`,
-      [{ text: 'Claim it! 🎉' }]
-    );
-  };
-
+// ── PARTNER STREAK CARD ───────────────────────────────────────
+function PartnerCard({ partner, theme }: { partner: PartnerInfo; theme: typeof colors.dark }) {
+  const pct = Math.min(partner.streak_count / 30, 1);
   return (
-    <View style={styles.badgesSection}>
-      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-        Milestone Badges
-      </Text>
-      <Text style={[styles.badgesHint, { color: theme.textMuted }]}>
-        Tap a badge to claim it once unlocked
-      </Text>
-      <View style={styles.badgeGrid}>
-        {badges.map((b) => {
-          const earned = streakCount >= b.milestone;
-          return (
-            <TouchableOpacity
-              key={b.label}
-              onPress={() => handleClaimBadge(b, earned)}
-              style={[styles.badge, {
-                backgroundColor: theme.card,
-                borderColor: earned ? theme.accent : theme.border,
-                opacity: earned ? 1 : 0.45,
-              }]}
-            >
-              <Text style={styles.badgeEmoji}>{b.emoji}</Text>
-              <Text style={[styles.badgeLabel, {
-                color: earned ? theme.accent : theme.textMuted,
-              }]}>
-                {b.label}
-              </Text>
-              {earned ? (
-                <View style={[styles.badgeEarned, { backgroundColor: theme.accent }]}>
-                  <Text style={[styles.badgeEarnedText, { color: theme.bg }]}>✓ Earned</Text>
-                </View>
-              ) : (
-                <Text style={[styles.badgeRemaining, { color: theme.textMuted }]}>
-                  {b.milestone - streakCount}d left
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+    <View style={[pc.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <UserAvatar uri={partner.avatar_url} name={partner.full_name} size={44} theme={theme} />
+      <View style={{ flex: 1 }}>
+        <Text style={[pc.name, { color: theme.textPrimary }]}>{partner.full_name}</Text>
+        <Text style={[pc.id, { color: theme.textMuted }]}>@{partner.calfit_id}</Text>
+        <View style={[pc.bar, { backgroundColor: theme.border }]}>
+          <View style={[pc.fill, { width: `${pct * 100}%`, backgroundColor: ORANGE }]} />
+        </View>
+      </View>
+      <View style={[pc.badge, { backgroundColor: ORANGE + '18' }]}>
+        <Text style={pc.badgeEmoji}>🔥</Text>
+        <Text style={[pc.badgeNum, { color: ORANGE }]}>{partner.streak_count}</Text>
       </View>
     </View>
   );
 }
+const pc = StyleSheet.create({
+  card:  { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  name:  { fontSize: fontSize.sm, fontWeight: '700' },
+  id:    { fontSize: fontSize.xs, marginTop: 1 },
+  bar:   { height: 4, borderRadius: 2, marginTop: spacing.xs, overflow: 'hidden' },
+  fill:  { height: '100%', borderRadius: 2 },
+  badge: { alignItems: 'center', padding: spacing.sm, borderRadius: radius.md },
+  badgeEmoji: { fontSize: 16 },
+  badgeNum:   { fontSize: fontSize.base, fontWeight: '900', marginTop: 1 },
+});
 
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function StreaksScreen() {
@@ -364,342 +115,259 @@ export default function StreaksScreen() {
   const { user, profile, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const streakCount = (profile as any)?.streak_count ?? 0;
-  const today = new Date().toISOString().split('T')[0];
-  const alreadyCheckedIn = (profile as any)?.last_active_date === today;
+  const streak         = (profile as any)?.streak_count ?? 0;
+  const today          = new Date().toISOString().split('T')[0];
+  const alreadyChecked = (profile as any)?.last_active_date === today;
+  const hasFreezeThisWeek = (profile as any)?.streak_freeze_used_week === today?.slice(0, 7);
 
-  const [partners, setPartners] = useState<PartnerInfo[]>([]);
-  const [groups, setGroups] = useState<GroupInfo[]>([]);
-  const [loadingPartners, setLoadingPartners] = useState(true);
-  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [partners, setPartners]       = useState<PartnerInfo[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
 
-  // Reload on every focus so partners and groups reflect the latest state
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) {
-        loadPartners();
-        loadGroups();
-      }
-    }, [user?.id])
-  );
+  useFocusEffect(useCallback(() => {
+    if (user?.id) loadPartners();
+  }, [user?.id]));
 
   const loadPartners = async () => {
     if (!user?.id) return;
-    setLoadingPartners(true);
     try {
       const { data } = await supabase
         .from('partners')
-        .select(`
-          partner_id,
-          partner_profile:partner_id (
-            full_name, calfit_id, avatar_url, streak_count
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active');
-
-      if (data) {
-        setPartners(
-          (data as any[]).map((p) => ({
-            partner_id:   p.partner_id,
-            full_name:    p.partner_profile?.full_name    ?? 'Partner',
-            calfit_id:    p.partner_profile?.calfit_id    ?? '',
-            avatar_url:   p.partner_profile?.avatar_url   ?? null,
-            streak_count: p.partner_profile?.streak_count ?? 0,
-          }))
-        );
-      }
-    } catch (e) {
-      console.error('loadPartners error:', e);
-    }
-    setLoadingPartners(false);
-  };
-
-  const loadGroups = async () => {
-    if (!user?.id) return;
-    setLoadingGroups(true);
-    try {
-      const { data } = await supabase
-        .from('group_members')
-        .select(`
-          group_id,
-          groups:group_id (
-            id, name, member_count, streak, category
-          )
-        `)
-        .eq('user_id', user.id);
-
-      if (data) {
-        const emojiMap: Record<string, string> = {
-          Fitness: '💪', Nutrition: '🥗', 'Weight Loss': '⚡',
-          'Muscle Gain': '🏋️', Running: '🏃', 'Mental Health': '🧘',
-          Yoga: '🌿', Sports: '⚽',
-        };
-        setGroups(
-          (data as any[])
-            .filter((m) => m.groups !== null)
-            .map((m) => ({
-              id:           m.groups.id,
-              name:         m.groups.name,
-              member_count: m.groups.member_count ?? 0,
-              streak:       m.groups.streak       ?? 0,
-              emoji:        emojiMap[m.groups.category] ?? '✨',
-            }))
-        );
-      }
-    } catch (e) {
-      console.error('loadGroups error:', e);
-    }
-    setLoadingGroups(false);
+        .select('partner_id, partner_profile:partner_id(full_name,calfit_id,avatar_url,streak_count)')
+        .eq('user_id', user.id).eq('status', 'active');
+      if (data) setPartners((data as any[]).map(p => ({
+        partner_id:   p.partner_id,
+        full_name:    p.partner_profile?.full_name    ?? 'Partner',
+        calfit_id:    p.partner_profile?.calfit_id    ?? '',
+        avatar_url:   p.partner_profile?.avatar_url   ?? null,
+        streak_count: p.partner_profile?.streak_count ?? 0,
+      })));
+    } catch {}
   };
 
   const handleCheckIn = async () => {
-    if (!user?.id) return;
-
-    if (alreadyCheckedIn) {
-      Alert.alert(
-        'Already Checked In ✓',
-        'You have already checked in today. Come back tomorrow to keep your streak going!',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
+    if (alreadyChecked || !user?.id) return;
+    setIsCheckingIn(true);
     try {
-      const newCount = streakCount + 1;
-
-      await supabase
-        .from('profiles')
-        .update({ streak_count: newCount, last_active_date: today })
-        .eq('id', user.id);
-
-      updateProfile({ streak_count: newCount, last_active_date: today });
-
-      const { notifyStreakCheckIn } = await import('../../services/notificationService');
-      await notifyStreakCheckIn(user.id, newCount);
-
-      Alert.alert(
-        'Checked In! 🔥',
-        `Day ${newCount} streak recorded. Come back tomorrow to keep it going!`,
-        [{ text: "Let's Go!" }]
-      );
-    } catch (error) {
-      console.error('Check in failed:', error);
-      Alert.alert('Error', 'Could not record your check-in. Please try again.');
+      const newStreak = streak + 1;
+      await supabase.from('profiles').update({
+        streak_count: newStreak,
+        last_active_date: today,
+      }).eq('id', user.id);
+      updateProfile({ streak_count: newStreak, last_active_date: today } as any);
+      Alert.alert('Streak extended! 🔥', `You're on a ${newStreak}-day streak. Keep it up!`);
+    } catch {
+      Alert.alert('Error', 'Could not check in. Please try again.');
+    } finally {
+      setIsCheckingIn(false);
     }
   };
 
+  const handleFreezeStreak = () => {
+    if (hasFreezeThisWeek) {
+      Alert.alert('Already used', 'You can only freeze your streak once per week.');
+      return;
+    }
+    Alert.alert(
+      'Freeze Streak?',
+      'This protects your streak for today if you miss a check-in. You can use this once per week.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Freeze', onPress: async () => {
+          if (!user?.id) return;
+          await supabase.from('profiles').update({
+            streak_freeze_used_week: today.slice(0, 7),
+          }).eq('id', user.id);
+          updateProfile({ streak_freeze_used_week: today.slice(0, 7) } as any);
+          Alert.alert('Streak frozen! 🧊', 'Your streak is protected for today.');
+        }},
+      ]
+    );
+  };
+
+  const nextMilestone = MILESTONES.find(m => m.days > streak);
+  const daysToNext    = nextMilestone ? nextMilestone.days - streak : 0;
+  const refresh = async () => { setIsRefreshing(true); await loadPartners(); setIsRefreshing(false); };
+
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>Home</Text>
+
+      {/* ── GRADIENT HEADER ── */}
+      <LinearGradient
+        colors={[ORANGE + 'EE', '#FF4500CC'] as [string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Streaks</Text>
-        <View style={{ width: 60 }} />
-      </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Streaks</Text>
+          <Text style={styles.headerSub}>Stay consistent. Build momentum.</Text>
+        </View>
+        {!hasFreezeThisWeek && (
+          <TouchableOpacity onPress={handleFreezeStreak} style={styles.freezeBtn}>
+            <Text style={{ fontSize: 14 }}>🧊</Text>
+            <Text style={styles.freezeBtnText}>Freeze</Text>
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={ORANGE} colors={[ORANGE]} />}
       >
-        <PersonalStreakHero theme={theme} streakCount={streakCount} />
 
-        <PartnerStreak
-          theme={theme}
-          navigation={navigation}
-          partners={partners}
-          myStreakCount={streakCount}
-          loading={loadingPartners}
-        />
-
-        <GroupStreak
-          theme={theme}
-          navigation={navigation}
-          groups={groups}
-          loading={loadingGroups}
-        />
-
-        <MilestoneBadges theme={theme} streakCount={streakCount} />
-
-        <TouchableOpacity
-          onPress={handleCheckIn}
-          style={[styles.checkInBtn, {
-            backgroundColor: alreadyCheckedIn ? theme.border : theme.accent,
-          }]}
+        {/* ── STREAK HERO CARD ── */}
+        <LinearGradient
+          colors={[ORANGE + '22', GOLD + '11'] as [string, string]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[styles.heroCard, { borderColor: ORANGE + '40' }]}
         >
-          <Ionicons
-            name={alreadyCheckedIn ? 'checkmark-circle' : 'add-circle'}
-            size={20}
-            color={alreadyCheckedIn ? theme.textMuted : theme.bg}
-          />
-          <Text style={[styles.checkInBtnText, {
-            color: alreadyCheckedIn ? theme.textMuted : theme.bg,
-          }]}>
-            {alreadyCheckedIn ? 'Checked In Today ✓' : 'Check In Today'}
-          </Text>
-        </TouchableOpacity>
+          {/* Big streak number */}
+          <View style={styles.heroTop}>
+            <View style={styles.heroLeft}>
+              <Text style={styles.heroFire}>🔥</Text>
+              <View>
+                <Text style={[styles.heroNum, { color: theme.textPrimary }]}>{streak}</Text>
+                <Text style={[styles.heroLabel, { color: ORANGE }]}>day streak</Text>
+              </View>
+            </View>
+            {nextMilestone && (
+              <View style={[styles.nextMilestone, { backgroundColor: nextMilestone.color + '18', borderColor: nextMilestone.color + '40' }]}>
+                <Text style={{ fontSize: 18 }}>{nextMilestone.emoji}</Text>
+                <Text style={[styles.nextMilestoneText, { color: nextMilestone.color }]}>
+                  {daysToNext}d to{'\n'}{nextMilestone.label.split(' ').pop()}
+                </Text>
+              </View>
+            )}
+          </View>
 
-        {alreadyCheckedIn && (
-          <Text style={[styles.nextCheckIn, { color: theme.textMuted }]}>
-            Next check-in available tomorrow 🕛
-          </Text>
+          {/* Day dots */}
+          <DayDots streak={streak} theme={theme} />
+
+          {/* Check-in button */}
+          <TouchableOpacity
+            onPress={handleCheckIn}
+            disabled={alreadyChecked || isCheckingIn}
+            style={[styles.checkinBtn, {
+              backgroundColor: alreadyChecked ? theme.border : ORANGE,
+              opacity: isCheckingIn ? 0.7 : 1,
+            }]}
+          >
+            <Ionicons
+              name={alreadyChecked ? 'checkmark-circle' : 'flame-outline'}
+              size={18}
+              color={alreadyChecked ? theme.textMuted : '#fff'}
+            />
+            <Text style={[styles.checkinText, { color: alreadyChecked ? theme.textMuted : '#fff' }]}>
+              {alreadyChecked ? 'Checked in today ✓' : isCheckingIn ? 'Checking in…' : 'Check In Now'}
+            </Text>
+          </TouchableOpacity>
+        </LinearGradient>
+
+        {/* ── MILESTONE BADGES ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Milestone Badges</Text>
+          <Text style={[styles.sectionSub, { color: theme.textMuted }]}>Earn by maintaining your streak</Text>
+        </View>
+
+        <View style={styles.badgesGrid}>
+          {MILESTONES.map((m) => {
+            const earned = streak >= m.days;
+            return (
+              <View key={m.days} style={[styles.badge, {
+                backgroundColor: earned ? m.color + '18' : theme.card,
+                borderColor: earned ? m.color + '50' : theme.border,
+                opacity: earned ? 1 : 0.5,
+              }]}>
+                <Text style={styles.badgeEmoji}>{m.emoji}</Text>
+                <Text style={[styles.badgeLabel, { color: earned ? m.color : theme.textMuted }]} numberOfLines={1}>
+                  {m.label}
+                </Text>
+                <Text style={[styles.badgeDays, { color: earned ? m.color : theme.textMuted }]}>
+                  {m.days}d
+                </Text>
+                {earned && (
+                  <View style={[styles.badgeEarnedPill, { backgroundColor: m.color }]}>
+                    <Text style={styles.badgeEarnedText}>✓</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* ── PARTNER STREAKS ── */}
+        {partners.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Partner Streaks</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Accountability' as never)}>
+                <Text style={[styles.seeAll, { color: theme.accent }]}>Manage</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.partnerList}>
+              {partners.map(p => <PartnerCard key={p.partner_id} partner={p} theme={theme} />)}
+            </View>
+          </>
         )}
+
+        {/* ── STREAK TIPS ── */}
+        <View style={[styles.tipsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[styles.tipsTitle, { color: theme.textPrimary }]}>Keep Your Streak Alive</Text>
+          {[
+            '🍳 Log at least one meal each day',
+            '💧 Hit your daily water goal',
+            '🏋️ Complete at least one workout',
+            '🧊 Use your weekly streak freeze wisely',
+          ].map((tip) => (
+            <View key={tip} style={styles.tipRow}>
+              <Text style={[styles.tipText, { color: theme.textSecondary }]}>{tip}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ height: 80 }} />
       </ScrollView>
     </AndroidSafeView>
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backText: { fontSize: fontSize.lg, fontWeight: '400' },
-  pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
-
-  heroCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroFlame: {
-    position: 'absolute', right: 16, top: 12,
-    fontSize: 64, opacity: 0.15,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  heroLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: 4 },
-  heroNumber: { fontSize: 52, fontWeight: '800', lineHeight: 56 },
-  heroUnit: { fontSize: fontSize.base },
-  heroRight: { alignItems: 'flex-end', gap: spacing.sm },
-  goldBadge: {
-    paddingHorizontal: spacing.md, paddingVertical: 4,
-    borderRadius: radius.full, borderWidth: 1,
-  },
-  goldBadgeText: { fontSize: fontSize.sm, fontWeight: '700' },
-
-  dayDots: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
-  dayDot: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
-  },
-  dayDotText: { fontSize: fontSize.xs, fontWeight: '700' },
-
-  milestonePills: { flexDirection: 'row', gap: spacing.xs },
-  milestonePill: {
-    paddingHorizontal: spacing.sm, paddingVertical: 4,
-    borderRadius: radius.sm, borderWidth: 1,
-  },
-  milestonePillText: { fontSize: fontSize.xs, fontWeight: '700' },
-
-  card: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  cardLabel: {
-    fontSize: fontSize.xs, fontWeight: '700',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-    marginBottom: spacing.md,
-  },
-
-  emptySection: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  emptySectionTitle: { fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center' },
-  emptySectionSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18 },
-  emptySectionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingHorizontal: spacing.xl, paddingVertical: spacing.md,
-    borderRadius: radius.lg, marginTop: spacing.xs,
-  },
-  emptySectionBtnText: { fontSize: fontSize.base, fontWeight: '700' },
-
-  partnerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  partnerAvatar: {
-    width: 48, height: 48, borderRadius: 24,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, flexShrink: 0,
-  },
-  partnerAvatarText: { fontSize: fontSize.xl, fontWeight: '700' },
-  partnerInfo: { flex: 1 },
-  partnerName: { fontSize: fontSize.base, fontWeight: '700' },
-  partnerGoal: { fontSize: fontSize.sm, marginTop: 2 },
-  streakCompareRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 4 },
-  partnerStreak: { fontSize: fontSize.xs, fontWeight: '600' },
-  nudgeBtn: {
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
-    borderRadius: radius.sm, borderWidth: 1,
-  },
-  nudgeBtnText: { fontSize: fontSize.sm, fontWeight: '600' },
-
-  groupItem: { marginBottom: spacing.sm },
-  groupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  groupEmoji: { fontSize: 28, flexShrink: 0 },
-  groupInfo: { flex: 1 },
-  groupName: { fontSize: fontSize.base, fontWeight: '700' },
-  groupSub: { fontSize: fontSize.sm, marginTop: 2 },
-
-  badgesSection: { marginBottom: spacing.md },
-  sectionLabel: {
-    fontSize: fontSize.xs, fontWeight: '700',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-    marginHorizontal: spacing.lg, marginBottom: spacing.xs,
-  },
-  badgesHint: { fontSize: fontSize.xs, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
-  badgeGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    gap: spacing.sm, paddingHorizontal: spacing.lg,
-  },
-  badge: {
-    width: '30%', padding: spacing.md,
-    borderRadius: radius.md, borderWidth: 1,
-    alignItems: 'center', gap: 4,
-  },
-  badgeEmoji: { fontSize: 28 },
-  badgeLabel: { fontSize: fontSize.xs, fontWeight: '600', textAlign: 'center' },
-  badgeEarned: {
-    paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: radius.sm, marginTop: 2,
-  },
-  badgeEarnedText: { fontSize: 8, fontWeight: '700' },
-  badgeRemaining: { fontSize: 9, marginTop: 2 },
-
-  checkInBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.sm, marginHorizontal: spacing.lg,
-    marginTop: spacing.sm, padding: spacing.lg, borderRadius: radius.lg,
-  },
-  checkInBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
-  nextCheckIn: {
-    textAlign: 'center', fontSize: fontSize.sm,
-    marginTop: spacing.sm, marginBottom: spacing.md,
-  },
-  graceBar: {
-    marginTop: spacing.md, padding: spacing.sm,
-    borderRadius: radius.sm, alignItems: 'center',
-  },
-  graceText: { fontSize: fontSize.xs },
+  safe:     { flex: 1 },
+  scroll:   { paddingBottom: 40 },
+  header:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
+  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
+  headerSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
+  freezeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.18)' },
+  freezeBtnText: { color: '#fff', fontSize: fontSize.xs, fontWeight: '700' },
+  heroCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.xl ?? 20, borderWidth: 1, padding: spacing.lg, gap: spacing.lg },
+  heroTop:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  heroFire: { fontSize: 40 },
+  heroNum:  { fontSize: 52, fontWeight: '900', lineHeight: 56 },
+  heroLabel:{ fontSize: fontSize.base, fontWeight: '700' },
+  nextMilestone:  { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center' },
+  nextMilestoneText: { fontSize: 10, fontWeight: '700', textAlign: 'center', marginTop: 2 },
+  checkinBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: 13, borderRadius: radius.lg },
+  checkinText:{ fontSize: fontSize.base, fontWeight: '800' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.sm },
+  sectionTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  sectionSub:   { fontSize: fontSize.xs },
+  seeAll:       { fontSize: fontSize.sm, fontWeight: '600' },
+  badgesGrid:   { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, gap: spacing.sm },
+  badge:        { width: '22%', alignItems: 'center', padding: spacing.sm, borderRadius: radius.lg, borderWidth: 1, gap: 3, position: 'relative' },
+  badgeEmoji:   { fontSize: 22 },
+  badgeLabel:   { fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  badgeDays:    { fontSize: 9, fontWeight: '600' },
+  badgeEarnedPill: { position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  badgeEarnedText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  partnerList:  { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  tipsCard:     { marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
+  tipsTitle:    { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.xs },
+  tipRow:       { paddingVertical: spacing.xs },
+  tipText:      { fontSize: fontSize.sm, lineHeight: 20 },
 });

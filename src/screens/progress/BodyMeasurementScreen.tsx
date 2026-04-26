@@ -1,319 +1,275 @@
 import {
-  View, Text, TouchableOpacity, Modal,
-  TextInput, ScrollView, ActivityIndicator,
-  StyleSheet, Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { useState, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { useState, useCallback } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../../store/themeStore';
+import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 
+const PURPLE = '#B280FF';
+const PINK   = '#FF6B9D';
+const GREEN  = '#2DDC8C';
+
 interface Measurement {
-  id: string;
-  date: string;
-  chest_cm: number | null;
-  waist_cm: number | null;
-  hips_cm: number | null;
-  arms_cm: number | null;
-  thighs_cm: number | null;
-  weight_kg: number | null;
-  notes: string;
+  id?: string; measured_at: string;
+  chest_cm?: number; waist_cm?: number; hips_cm?: number;
+  arms_cm?: number; thighs_cm?: number; neck_cm?: number;
+  body_fat_pct?: number; notes?: string;
 }
 
-const FIELDS: { key: keyof Measurement; label: string; icon: string }[] = [
-  { key: 'chest_cm',  label: 'Chest (cm)',  icon: 'body-outline' },
-  { key: 'waist_cm',  label: 'Waist (cm)',  icon: 'resize-outline' },
-  { key: 'hips_cm',   label: 'Hips (cm)',   icon: 'ellipse-outline' },
-  { key: 'arms_cm',   label: 'Arms (cm)',   icon: 'barbell-outline' },
-  { key: 'thighs_cm', label: 'Thighs (cm)', icon: 'walk-outline' },
-  { key: 'weight_kg', label: 'Weight (kg)', icon: 'scale-outline' },
+const FIELDS: Array<{ key: keyof Measurement; label: string; icon: string; color: string }> = [
+  { key: 'chest_cm',    label: 'Chest',       icon: 'body-outline',         color: PINK   },
+  { key: 'waist_cm',    label: 'Waist',        icon: 'resize-outline',       color: PURPLE },
+  { key: 'hips_cm',     label: 'Hips',         icon: 'body-outline',         color: '#FF8C42' },
+  { key: 'arms_cm',     label: 'Arms (bicep)', icon: 'barbell-outline',      color: '#6699FF' },
+  { key: 'thighs_cm',   label: 'Thighs',       icon: 'walk-outline',         color: '#2DDC8C' },
+  { key: 'neck_cm',     label: 'Neck',         icon: 'person-outline',       color: '#FFD133' },
+  { key: 'body_fat_pct',label: 'Body Fat %',   icon: 'pie-chart-outline',    color: '#FF5959' },
 ];
 
-function LogMeasurementModal({
-  theme,
-  visible,
-  userId,
-  onClose,
-  onSaved,
-}: {
-  theme: typeof colors.dark;
-  visible: boolean;
-  userId: string;
-  onClose: () => void;
-  onSaved: (m: Measurement) => void;
-}) {
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
+export default function BodyMeasurementsScreen() {
+  const navigation = useNavigation<any>();
+  const { colorScheme } = useThemeStore();
+  const { user } = useAuthStore();
+  const theme = colors[colorScheme];
 
-  const handleSave = async () => {
-    const hasAny = FIELDS.some((f) => values[f.key as string]?.trim());
-    if (!hasAny) {
-      Alert.alert('Add at least one measurement', 'Enter at least one value before saving.');
-      return;
-    }
-    setSaving(true);
-    const payload: any = {
-      user_id: userId,
-      date: new Date().toISOString().split('T')[0],
-      notes,
-    };
-    FIELDS.forEach((f) => {
-      const v = parseFloat(values[f.key as string] ?? '');
-      payload[f.key] = isNaN(v) ? null : v;
-    });
+  const [history, setHistory]   = useState<Measurement[]>([]);
+  const [form, setForm]         = useState<Partial<Measurement>>({});
+  const [notes, setNotes]       = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-    const { data, error } = await supabase
-      .from('body_measurements')
-      .insert(payload)
-      .select()
-      .single();
-
-    setSaving(false);
-    if (error) {
-      Alert.alert('Error', 'Could not save measurements. Please try again.');
-      return;
-    }
-    onSaved(data as Measurement);
-    setValues({});
-    setNotes('');
-    onClose();
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={bStyles.overlay}>
-        <View style={[bStyles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={[bStyles.sheetHeader, { borderBottomColor: theme.border }]}>
-            <Text style={[bStyles.sheetTitle, { color: theme.textPrimary }]}>Log Measurements</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={22} color={theme.textMuted} />
-            </TouchableOpacity>
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={[bStyles.hint, { color: theme.textMuted }]}>
-              Enter any measurements you want to track. Leave blank to skip.
-            </Text>
-            {FIELDS.map((f) => (
-              <View key={f.key as string} style={bStyles.fieldRow}>
-                <Ionicons name={f.icon as any} size={18} color={theme.textSecondary} />
-                <Text style={[bStyles.fieldLabel, { color: theme.textSecondary }]}>{f.label}</Text>
-                <View style={[bStyles.fieldInput, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-                  <TextInput
-                    value={values[f.key as string] ?? ''}
-                    onChangeText={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
-                    keyboardType="decimal-pad"
-                    placeholder="—"
-                    placeholderTextColor={theme.textMuted}
-                    style={[bStyles.fieldInputText, { color: theme.accent }]}
-                  />
-                </View>
-              </View>
-            ))}
-            <View style={[bStyles.notesInput, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-              <TextInput
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Notes (optional)"
-                placeholderTextColor={theme.textMuted}
-                style={[bStyles.notesText, { color: theme.textPrimary }]}
-                multiline
-              />
-            </View>
-            <TouchableOpacity
-              onPress={handleSave}
-              disabled={saving}
-              style={[bStyles.saveBtn, { backgroundColor: theme.accent }]}
-            >
-              {saving
-                ? <ActivityIndicator color={theme.bg} />
-                : <Text style={[bStyles.saveBtnText, { color: theme.bg }]}>Save Measurements</Text>
-              }
-            </TouchableOpacity>
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-export function BodyMeasurements({
-  theme,
-  userId,
-}: {
-  theme: typeof colors.dark;
-  userId: string;
-}) {
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-
-  useEffect(() => {
-    load();
-  }, [userId]);
+  useFocusEffect(useCallback(() => { load(); }, [user?.id]));
 
   const load = async () => {
-    setLoading(true);
+    if (!user?.id) return;
+    setIsLoading(true);
     const { data } = await supabase
       .from('body_measurements')
       .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false })
+      .eq('user_id', user.id)
+      .order('measured_at', { ascending: false })
       .limit(10);
-    if (data) setMeasurements(data as Measurement[]);
-    setLoading(false);
+    setHistory((data ?? []) as Measurement[]);
+    setIsLoading(false);
   };
 
-  const latest = measurements[0];
+  const handleSave = async () => {
+    if (!user?.id) return;
+    const hasAnyValue = FIELDS.some(f => form[f.key] != null && form[f.key] !== '');
+    if (!hasAnyValue) {
+      Alert.alert('Nothing to save', 'Enter at least one measurement before saving.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const payload: any = {
+        user_id: user.id,
+        measured_at: new Date().toISOString(),
+        notes: notes.trim() || null,
+      };
+      FIELDS.forEach(f => {
+        const v = form[f.key];
+        if (v != null && v !== '') payload[f.key] = parseFloat(String(v));
+      });
+      const { error } = await supabase.from('body_measurements').insert(payload);
+      if (error) throw error;
+      setForm({});
+      setNotes('');
+      await load();
+      Alert.alert('Saved! 📏', 'Your measurements have been logged.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not save. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-  const formatVal = (v: number | null, unit: string) =>
-    v !== null && v !== undefined ? `${v}${unit}` : '—';
+  const latest = history[0];
+  const prev   = history[1];
 
   return (
-    <View style={[bStyles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={bStyles.cardHeader}>
-        <Text style={[bStyles.cardLabel, { color: theme.textSecondary }]}>
-          Body Measurements
-        </Text>
-        <TouchableOpacity
-          onPress={() => setShowModal(true)}
-          style={[bStyles.logBtn, { borderColor: theme.accent }]}
-        >
-          <Ionicons name="add" size={14} color={theme.accent} />
-          <Text style={[bStyles.logBtnText, { color: theme.accent }]}>Log</Text>
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+      <LinearGradient
+        colors={[PURPLE + 'DD', PINK + 'CC'] as [string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator color={theme.accent} style={{ marginVertical: spacing.lg }} />
-      ) : !latest ? (
-        <View style={bStyles.empty}>
-          <Ionicons name="body-outline" size={32} color={theme.textMuted} />
-          <Text style={[bStyles.emptyText, { color: theme.textMuted }]}>
-            No measurements logged yet. Tap Log to track your body measurements over time.
-          </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Body Measurements</Text>
+          <Text style={styles.headerSub}>Track your body composition</Text>
         </View>
-      ) : (
-        <>
-          <Text style={[bStyles.dateLabel, { color: theme.textMuted }]}>
-            Last logged: {new Date(latest.date).toLocaleDateString('en-GB', {
-              day: 'numeric', month: 'short', year: 'numeric',
-            })}
-          </Text>
-          <View style={bStyles.metricsGrid}>
-            {FIELDS.map((f) => {
-              const val = latest[f.key] as number | null;
-              const unit = f.key === 'weight_kg' ? 'kg' : 'cm';
-              if (val === null) return null;
-              return (
-                <View key={f.key as string} style={[bStyles.metricCell, {
-                  backgroundColor: theme.bg,
-                  borderColor: theme.border,
-                }]}>
-                  <Ionicons name={f.icon as any} size={14} color={theme.accent} />
-                  <Text style={[bStyles.metricValue, { color: theme.textPrimary }]}>
-                    {formatVal(val, unit)}
-                  </Text>
-                  <Text style={[bStyles.metricLabel, { color: theme.textMuted }]}>
-                    {f.label.split(' ')[0]}
-                  </Text>
-                </View>
-              );
-            })}
+      </LinearGradient>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+          {/* ── LOG NEW ── */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Log Today's Measurements</Text>
+            <Text style={[styles.sectionSub, { color: theme.textMuted }]}>All fields in cm unless noted</Text>
           </View>
 
-          {measurements.length > 1 && (
-            <Text style={[bStyles.historyNote, { color: theme.textMuted }]}>
-              {measurements.length} entries logged · Tap Log to add a new measurement
-            </Text>
-          )}
-        </>
-      )}
+          <View style={[styles.formCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {FIELDS.map((f) => (
+              <View key={f.key} style={[styles.fieldRow, { borderBottomColor: theme.border }]}>
+                <View style={[styles.fieldIcon, { backgroundColor: f.color + '18' }]}>
+                  <Ionicons name={f.icon as any} size={16} color={f.color} />
+                </View>
+                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>{f.label}</Text>
+                <TextInput
+                  value={form[f.key] != null ? String(form[f.key]) : ''}
+                  onChangeText={(v) => setForm(p => ({ ...p, [f.key]: v }))}
+                  placeholder="—"
+                  placeholderTextColor={theme.textMuted}
+                  keyboardType="decimal-pad"
+                  style={[styles.fieldInput, { color: theme.textPrimary, borderColor: theme.border }]}
+                />
+              </View>
+            ))}
 
-      <LogMeasurementModal
-        theme={theme}
-        visible={showModal}
-        userId={userId}
-        onClose={() => setShowModal(false)}
-        onSaved={(m) => {
-          setMeasurements((prev) => [m, ...prev]);
-          setShowModal(false);
-        }}
-      />
-    </View>
+            <View style={styles.notesWrap}>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Notes (optional)…"
+                placeholderTextColor={theme.textMuted}
+                multiline
+                style={[styles.notesInput, { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.bg }]}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity onPress={handleSave} disabled={isSaving} style={[styles.saveBtn, { opacity: isSaving ? 0.7 : 1 }]}>
+            <LinearGradient
+              colors={[PURPLE, PINK] as [string, string]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.saveGrad}
+            >
+              {isSaving
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Ionicons name="save-outline" size={18} color="#fff" />}
+              <Text style={styles.saveBtnText}>{isSaving ? 'Saving…' : 'Save Measurements'}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* ── HISTORY ── */}
+          {history.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Measurement History</Text>
+              </View>
+
+              {/* Latest vs previous comparison */}
+              {latest && prev && (
+                <View style={[styles.compCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <Text style={[styles.compTitle, { color: theme.textPrimary }]}>Latest vs Previous</Text>
+                  <View style={styles.compRow}>
+                    {FIELDS.filter(f => latest[f.key] != null).map(f => {
+                      const curr = latest[f.key] as number;
+                      const prevVal = prev[f.key] as number | undefined;
+                      const diff = prevVal != null ? curr - prevVal : null;
+                      return (
+                        <View key={f.key} style={[styles.compItem, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+                          <Text style={[styles.compLabel, { color: theme.textMuted }]}>{f.label}</Text>
+                          <Text style={[styles.compValue, { color: theme.textPrimary }]}>{curr}cm</Text>
+                          {diff !== null && diff !== 0 && (
+                            <Text style={[styles.compDiff, { color: diff < 0 ? GREEN : '#FF5959' }]}>
+                              {diff > 0 ? '+' : ''}{diff.toFixed(1)}
+                            </Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* History list */}
+              {history.map((m) => (
+                <View key={m.measured_at} style={[styles.historyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <Text style={[styles.historyDate, { color: theme.accent }]}>
+                    {new Date(m.measured_at).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </Text>
+                  <View style={styles.historyGrid}>
+                    {FIELDS.filter(f => m[f.key] != null).map(f => (
+                      <View key={f.key} style={styles.historyItem}>
+                        <Text style={[styles.historyItemLabel, { color: theme.textMuted }]}>{f.label}</Text>
+                        <Text style={[styles.historyItemValue, { color: f.color }]}>{m[f.key]}{f.key === 'body_fat_pct' ? '%' : 'cm'}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {m.notes && <Text style={[styles.historyNotes, { color: theme.textMuted }]}>{m.notes}</Text>}
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* SQL hint for first time */}
+          {!isLoading && history.length === 0 && (
+            <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Ionicons name="body-outline" size={40} color={theme.textMuted} />
+              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No measurements yet</Text>
+              <Text style={[styles.emptySub, { color: theme.textMuted }]}>
+                Log your first measurements above to start tracking your body composition over time.
+              </Text>
+            </View>
+          )}
+
+          <View style={{ height: 80 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </AndroidSafeView>
   );
 }
 
-const bStyles = StyleSheet.create({
-  card: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  cardLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  logBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: spacing.sm, paddingVertical: 4,
-    borderRadius: radius.sm, borderWidth: 1,
-  },
-  logBtnText: { fontSize: fontSize.xs, fontWeight: '700' },
-  empty: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
-  emptyText: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
-  dateLabel: { fontSize: fontSize.xs, marginBottom: spacing.sm },
-  metricsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs,
-  },
-  metricCell: {
-    alignItems: 'center', padding: spacing.sm,
-    borderRadius: radius.sm, borderWidth: 1,
-    minWidth: 80, gap: 2,
-  },
-  metricValue: { fontSize: fontSize.base, fontWeight: '800' },
-  metricLabel: { fontSize: 9 },
-  historyNote: { fontSize: fontSize.xs, marginTop: spacing.sm },
-
-  // Modal
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: {
-    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
-    maxHeight: '90%', padding: spacing.lg,
-  },
-  sheetHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1,
-  },
-  sheetTitle: { fontSize: fontSize.xl, fontWeight: '700' },
-  hint: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
-  fieldRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: spacing.sm, marginBottom: spacing.sm,
-  },
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
-  fieldInput: {
-    padding: spacing.sm, borderRadius: radius.sm,
-    borderWidth: 1, minWidth: 80, alignItems: 'center',
-  },
-  fieldInputText: { fontSize: fontSize.base, fontWeight: '700', textAlign: 'center' },
-  notesInput: {
-    padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 1, marginTop: spacing.sm, marginBottom: spacing.md,
-  },
-  notesText: { fontSize: fontSize.base, minHeight: 50 },
-  saveBtn: { padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center' },
-  saveBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+const styles = StyleSheet.create({
+  safe:          { flex: 1 },
+  scroll:        { paddingBottom: 40 },
+  header:        { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
+  backBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle:   { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
+  headerSub:     { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
+  sectionHeader: { paddingHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.sm },
+  sectionTitle:  { fontSize: fontSize.base, fontWeight: '700' },
+  sectionSub:    { fontSize: fontSize.xs, marginTop: 2 },
+  formCard:      { marginHorizontal: spacing.lg, borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
+  fieldRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1 },
+  fieldIcon:     { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  fieldLabel:    { flex: 1, fontSize: fontSize.sm, fontWeight: '600' },
+  fieldInput:    { width: 80, textAlign: 'right', fontSize: fontSize.base, fontWeight: '700', borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  notesWrap:     { padding: spacing.md },
+  notesInput:    { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, fontSize: fontSize.sm, minHeight: 60 },
+  saveBtn:       { marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: radius.lg, overflow: 'hidden' },
+  saveGrad:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md + 2 },
+  saveBtnText:   { color: '#fff', fontSize: fontSize.base, fontWeight: '800' },
+  compCard:      { marginHorizontal: spacing.lg, borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg, gap: spacing.md },
+  compTitle:     { fontSize: fontSize.sm, fontWeight: '700' },
+  compRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  compItem:      { padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', minWidth: 72 },
+  compLabel:     { fontSize: 9, fontWeight: '600' },
+  compValue:     { fontSize: fontSize.sm, fontWeight: '800', marginTop: 1 },
+  compDiff:      { fontSize: 10, fontWeight: '700', marginTop: 1 },
+  historyCard:   { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: radius.lg, borderWidth: 1, padding: spacing.md },
+  historyDate:   { fontSize: fontSize.sm, fontWeight: '700', marginBottom: spacing.sm },
+  historyGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  historyItem:   { alignItems: 'center', minWidth: 64 },
+  historyItemLabel: { fontSize: 9, fontWeight: '600' },
+  historyItemValue: { fontSize: fontSize.sm, fontWeight: '800', marginTop: 1 },
+  historyNotes:  { fontSize: fontSize.xs, marginTop: spacing.sm, fontStyle: 'italic' },
+  emptyCard:     { marginHorizontal: spacing.lg, padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', gap: spacing.md },
+  emptyTitle:    { fontSize: fontSize.lg, fontWeight: '700' },
+  emptySub:      { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
 });

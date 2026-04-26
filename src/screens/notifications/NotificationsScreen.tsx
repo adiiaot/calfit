@@ -1,464 +1,289 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useEffect, useState, useCallback } from 'react';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useState, useCallback } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
-import {
-  AppNotification,
-  getNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  deleteNotification,
-} from '../../services/notificationService';
+import { supabase } from '../../services/supabase';
 
-// ── NOTIFICATION ICON ─────────────────────────────────────────
-function NotifIcon({
-  type,
-  theme,
-}: {
-  type: AppNotification['type'];
-  theme: typeof colors.dark;
-}) {
-  const config: Record<AppNotification['type'], { icon: string; color: string }> = {
-    achievement: { icon: 'trophy',              color: theme.gold },
-    social:      { icon: 'heart',               color: theme.red },
-    streak:      { icon: 'flame',               color: theme.orange },
-    upgrade:     { icon: 'star',                color: theme.gold },
-    coach:       { icon: 'chatbubble-ellipses', color: theme.accent },
-    community:   { icon: 'people',              color: theme.accentSecond },
-    goal:        { icon: 'checkmark-circle',    color: theme.accent },
-    referral:    { icon: 'wallet',              color: theme.accent },
-    system:      { icon: 'settings',            color: theme.textSecondary },
-    welcome:     { icon: 'sparkles',            color: theme.accent },
+const ORANGE = '#FFB347';
+const GOLD   = '#FFD133';
+const PINK   = '#FF6B9D';
+const BLUE   = '#6699FF';
+const GREEN  = '#2DDC8C';
+const PURPLE = '#B280FF';
+const RED    = '#FF5959';
+
+type FilterTab = 'All' | 'Unread' | 'Activity' | 'Achievements' | 'Social' | 'System';
+
+interface Notification {
+  id: string; type: string; title: string; message: string;
+  read: boolean; action_label?: string; created_at: string;
+}
+
+function getNotifStyle(type: string): { icon: string; color: string } {
+  const map: Record<string, { icon: string; color: string }> = {
+    streak:      { icon: 'flame',              color: ORANGE },
+    goal:        { icon: 'trophy',             color: GOLD   },
+    social:      { icon: 'heart',              color: PINK   },
+    workout:     { icon: 'barbell',            color: BLUE   },
+    nutrition:   { icon: 'restaurant',         color: GREEN  },
+    community:   { icon: 'people',             color: PURPLE },
+    referral:    { icon: 'gift',               color: GOLD   },
+    upgrade:     { icon: 'star',               color: GOLD   },
+    system:      { icon: 'notifications',      color: BLUE   },
+    reminder:    { icon: 'alarm',              color: ORANGE },
+    achievement: { icon: 'ribbon',             color: GOLD   },
   };
-
-  const { icon, color } = config[type] ?? { icon: 'notifications', color: theme.accent };
-
-  return (
-    <View style={[styles.notifIcon, { backgroundColor: color + '22' }]}>
-      <Ionicons name={icon as any} size={20} color={color} />
-    </View>
-  );
+  return map[type] ?? { icon: 'notifications-outline', color: BLUE };
 }
 
-// ── TIME AGO ──────────────────────────────────────────────────
 function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
-  if (diff < 172800) return 'Yesterday';
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins  < 1) return 'just now';
+  if (mins  < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 }
 
-// ── NOTIFICATION ITEM ─────────────────────────────────────────
-function NotifItem({
-  notif,
-  theme,
-  onPress,
-  onDelete,
+function NotifCard({
+  notif, theme, onTap, onDelete,
 }: {
-  notif: AppNotification;
-  theme: typeof colors.dark;
-  onPress: (id: string) => void;
-  onDelete: (id: string) => void;
+  notif: Notification; theme: typeof colors.dark;
+  onTap: (n: Notification) => void; onDelete: (id: string) => void;
 }) {
+  const style = getNotifStyle(notif.type);
   return (
     <TouchableOpacity
-      onPress={() => onPress(notif.id)}
-      onLongPress={() =>
-        Alert.alert(
-          'Delete notification?',
-          '',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => onDelete(notif.id) },
-          ]
-        )
-      }
-      style={[styles.notifRow, {
+      onPress={() => onTap(notif)}
+      onLongPress={() => Alert.alert('Delete Notification', 'Remove this notification?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(notif.id) },
+      ])}
+      style={[styles.card, {
         backgroundColor: notif.read ? theme.card : theme.accentDim as string,
-        borderColor: notif.read ? theme.border : theme.accent,
+        borderColor: notif.read ? theme.border : theme.accent + '40',
+        borderWidth: notif.read ? 1 : 1.5,
       }]}
     >
-      <NotifIcon type={notif.type} theme={theme} />
-      <View style={styles.notifContent}>
-        <View style={styles.notifTitleRow}>
-          <Text style={[styles.notifTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+      {/* Icon */}
+      <View style={[styles.iconWrap, { backgroundColor: style.color + '20' }]}>
+        <Ionicons name={style.icon as any} size={20} color={style.color} />
+        {!notif.read && <View style={[styles.unreadDot, { backgroundColor: style.color }]} />}
+      </View>
+
+      {/* Content */}
+      <View style={styles.content}>
+        <View style={styles.contentTop}>
+          <Text style={[styles.title, { color: theme.textPrimary, fontWeight: notif.read ? '600' : '800' }]} numberOfLines={1}>
             {notif.title}
           </Text>
-          {!notif.read && (
-            <View style={[styles.unreadDot, { backgroundColor: theme.accent }]} />
-          )}
+          <Text style={[styles.time, { color: theme.textMuted }]}>{timeAgo(notif.created_at)}</Text>
         </View>
-        <Text style={[styles.notifBody, { color: theme.textSecondary }]} numberOfLines={2}>
-          {notif.body}
+        <Text style={[styles.message, { color: theme.textSecondary }]} numberOfLines={2}>
+          {notif.message}
         </Text>
-        <View style={styles.notifFooter}>
-          <Text style={[styles.notifTime, { color: theme.textMuted }]}>
-            {timeAgo(notif.created_at)}
-          </Text>
-          {notif.action_label && (
-            <Text style={[styles.notifAction, { color: theme.accent }]}>
-              {notif.action_label} →
-            </Text>
-          )}
-        </View>
+        {notif.action_label && (
+          <View style={[styles.actionPill, { backgroundColor: style.color + '18', borderColor: style.color + '40' }]}>
+            <Text style={[styles.actionText, { color: style.color }]}>{notif.action_label}</Text>
+            <Ionicons name="chevron-forward" size={10} color={style.color} />
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
 }
 
-// ── FILTER TABS ───────────────────────────────────────────────
-function FilterTabs({
-  theme,
-  active,
-  onSelect,
-  unreadCount,
-}: {
-  theme: typeof colors.dark;
-  active: string;
-  onSelect: (f: string) => void;
-  unreadCount: number;
-}) {
-  const filters = ['All', 'Unread', 'Activity', 'Achievements', 'System'];
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.filterRow}
-    >
-      {filters.map((f) => (
-        <TouchableOpacity
-          key={f}
-          onPress={() => onSelect(f)}
-          style={[styles.filterTab, {
-            backgroundColor: active === f ? theme.accent : theme.card,
-            borderColor: active === f ? theme.accent : theme.border,
-          }]}
-        >
-          <Text style={[styles.filterTabText, {
-            color: active === f ? theme.bg : theme.textSecondary,
-            fontWeight: active === f ? '700' : '400',
-          }]}>
-            {f === 'Unread' && unreadCount > 0 ? `Unread (${unreadCount})` : f}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-}
-
-// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { user } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [activeTab, setActiveTab]         = useState<FilterTab>('All');
+  const [isRefreshing, setIsRefreshing]   = useState(false);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  useFocusEffect(useCallback(() => { if (user?.id) load(); }, [user?.id]));
 
-  // Load on mount and every time screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) loadNotifications();
-    }, [user?.id])
-  );
-
-  const loadNotifications = async () => {
+  const load = async () => {
     if (!user?.id) return;
-    const data = await getNotifications(user.id);
-    setNotifications(data);
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(60);
+    setNotifications((data ?? []) as Notification[]);
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadNotifications();
-    setIsRefreshing(false);
-  };
+  const refresh = async () => { setIsRefreshing(true); await load(); setIsRefreshing(false); };
 
-const handleMarkRead = async (id: string) => {
-  await markNotificationRead(id);
-  setNotifications((prev) =>
-    prev.map((n) => n.id === id ? { ...n, read: true } : n)
-  );
-
-  const notif = notifications.find((n) => n.id === id);
-  if (!notif?.action_label) return;
-
-  setTimeout(() => {
-    // Tab screens must be navigated to via Main → screen
-    // Root stack screens can be navigated to directly
-const actionMap: Record<string, () => void> = {
-  'View Streaks':     () => navigation.navigate('Streaks'),
-  'Check In':         () => navigation.navigate('Streaks'),
-  'View Progress':    () => navigation.navigate('Progress'),
-  'View Fasting':     () => navigation.navigate('IntermittentFasting'),
-  'View Sleep':       () => navigation.navigate('Sleep'),
-
-  // Tab screens
-  'View Calories':    () => navigation.navigate('Main', { screen: 'Calorie' }),
-  'View History':     () => navigation.navigate('Main', { screen: 'Activity' }),
-  'View Plan':        () => navigation.navigate('Main', { screen: 'Meals' }),
-  'Open Coach':       () => navigation.navigate('Main', { screen: 'Coach' }),
-  'View Post':        () => navigation.navigate('Main', { screen: 'Social' }),
-
-  // DM notification — goes to Messages list, not Social feed
-  'Reply':            () => navigation.navigate('Messages'),
-
-  // Root stack screens
-  'View Group':       () => navigation.navigate('Community'),
-  'View Earnings':    () => navigation.navigate('Main', { screen: 'Credits' }),
-  'View Plans':       () => navigation.navigate('Subscription'),
-  'Complete Profile': () => navigation.navigate('Settings'),
-};
-
-    const navigate = actionMap[notif.action_label!];
-    if (navigate) navigate();
-  }, 100);
-};
-  const handleMarkAllRead = async () => {
+  const markAllRead = async () => {
     if (!user?.id) return;
-    await markAllNotificationsRead(user.id);
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const handleDelete = async (id: string) => {
-    await deleteNotification(id);
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    await supabase.from('notifications').delete().eq('id', id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  // Filter logic
-  const filtered = notifications.filter((n) => {
-    if (activeFilter === 'All') return true;
-    if (activeFilter === 'Unread') return !n.read;
-    if (activeFilter === 'Activity') return ['goal', 'streak', 'coach'].includes(n.type);
-    if (activeFilter === 'Achievements') return ['achievement', 'referral', 'upgrade'].includes(n.type);
-    if (activeFilter === 'System') return ['system', 'welcome'].includes(n.type);
+  const handleTap = async (notif: Notification) => {
+    // Mark as read
+    if (!notif.read) {
+      await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    }
+    // Navigate
+    if (!notif.action_label) return;
+    const map: Record<string, () => void> = {
+      'View Streaks':     () => navigation.navigate('Streaks'),
+      'Check In':         () => navigation.navigate('Streaks'),
+      'View Progress':    () => navigation.navigate('Progress'),
+      'View Fasting':     () => navigation.navigate('IntermittentFasting'),
+      'View Sleep':       () => navigation.navigate('Sleep'),
+      'View Calories':    () => navigation.navigate('Main', { screen: 'Calorie' }),
+      'View History':     () => navigation.navigate('Main', { screen: 'Activity' }),
+      'View Plan':        () => navigation.navigate('Main', { screen: 'Meals' }),
+      'Open Coach':       () => navigation.navigate('Coach'),
+      'View Post':        () => navigation.navigate('Main', { screen: 'Social' }),
+      'Reply':            () => navigation.navigate('Chat'),
+      'View Group':       () => navigation.navigate('Community'),
+      'View Earnings':    () => navigation.navigate('Credits'),
+      'View Plans':       () => navigation.navigate('Subscription'),
+      'Complete Profile': () => navigation.navigate('Settings'),
+    };
+    map[notif.action_label]?.();
+  };
+
+  const TABS: FilterTab[] = ['All', 'Unread', 'Activity', 'Achievements', 'Social', 'System'];
+  const TAB_COLORS: Record<FilterTab, string> = {
+    All: theme.accent, Unread: PINK, Activity: BLUE,
+    Achievements: GOLD, Social: ORANGE, System: PURPLE,
+  };
+
+  const filtered = notifications.filter(n => {
+    if (activeTab === 'All')          return true;
+    if (activeTab === 'Unread')       return !n.read;
+    if (activeTab === 'Activity')     return ['streak','workout','nutrition','goal','reminder'].includes(n.type);
+    if (activeTab === 'Achievements') return ['achievement','goal'].includes(n.type);
+    if (activeTab === 'Social')       return ['social','community','referral'].includes(n.type);
+    if (activeTab === 'System')       return ['system','upgrade'].includes(n.type);
     return true;
   });
 
-  const unread = filtered.filter((n) => !n.read);
-  const read = filtered.filter((n) => n.read);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-          {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>Home</Text>
+
+      {/* ── GRADIENT HEADER ── */}
+      <LinearGradient
+        colors={[BLUE + 'EE', PURPLE + 'CC'] as [string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Notifications</Text>
-        {unreadCount > 0 ? (
-          <TouchableOpacity onPress={handleMarkAllRead}>
-            <Text style={[styles.markAllText, { color: theme.accent }]}>Mark all read</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          {unreadCount > 0 && (
+            <Text style={styles.headerSub}>{unreadCount} unread</Text>
+          )}
+        </View>
+        {unreadCount > 0 && (
+          <TouchableOpacity onPress={markAllRead} style={styles.markAllBtn}>
+            <Text style={styles.markAllText}>Mark all read</Text>
           </TouchableOpacity>
-        ) : (
-          <View style={{ width: 70 }} />
         )}
+      </LinearGradient>
+
+      {/* ── FILTER TABS ── */}
+      <View style={[styles.tabRow, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={TABS}
+          keyExtractor={t => t}
+          contentContainerStyle={styles.tabList}
+          renderItem={({ item: tab }) => (
+            <TouchableOpacity
+              onPress={() => setActiveTab(tab)}
+              style={[styles.tab, activeTab === tab && { backgroundColor: TAB_COLORS[tab], borderColor: TAB_COLORS[tab] },
+                { borderColor: activeTab === tab ? TAB_COLORS[tab] : theme.border }]}
+            >
+              <Text style={[styles.tabText, { color: activeTab === tab ? '#fff' : theme.textMuted }]}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
       </View>
 
-      {/* Filter tabs */}
-      <FilterTabs
-        theme={theme}
-        active={activeFilter}
-        onSelect={setActiveFilter}
-        unreadCount={unreadCount}
+      {/* ── NOTIFICATION LIST ── */}
+      <FlatList
+        data={filtered}
+        keyExtractor={n => n.id}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={BLUE} colors={[BLUE]} />
+        }
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="notifications-outline" size={48} color={theme.textMuted} />
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+              {activeTab === 'Unread' ? 'All caught up!' : 'No notifications'}
+            </Text>
+            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
+              {activeTab === 'Unread' ? "You've read everything." : 'Notifications will appear here as you use the app.'}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <NotifCard notif={item} theme={theme} onTap={handleTap} onDelete={handleDelete} />
+        )}
       />
-
-      {/* Empty state */}
-      {filtered.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="notifications-off-outline" size={52} color={theme.textMuted} />
-          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-            {activeFilter === 'Unread' ? 'All caught up!' : 'No notifications yet'}
-          </Text>
-          <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-            {activeFilter === 'Unread'
-              ? 'You have no unread notifications right now.'
-              : 'Complete activities in the app and your notifications will appear here.'}
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.accent}
-              colors={[theme.accent]}
-            />
-          }
-        >
-          {/* Unread section */}
-          {unread.length > 0 && (
-            <>
-              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>New</Text>
-              {unread.map((notif) => (
-                <NotifItem
-                  key={notif.id}
-                  notif={notif}
-                  theme={theme}
-                  onPress={handleMarkRead}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </>
-          )}
-
-          {/* Read section */}
-          {read.length > 0 && (
-            <>
-              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Earlier</Text>
-              {read.map((notif) => (
-                <NotifItem
-                  key={notif.id}
-                  notif={notif}
-                  theme={theme}
-                  onPress={handleMarkRead}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </>
-          )}
-
-          <Text style={[styles.hint, { color: theme.textMuted }]}>
-            Long press any notification to delete it
-          </Text>
-        </ScrollView>
-      )}
     </AndroidSafeView>
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100, paddingTop: spacing.xs },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backText: { fontSize: fontSize.lg, fontWeight: '400' },
-  pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
-  markAllText: { fontSize: fontSize.sm, fontWeight: '600' },
-
-  filterRow: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  filterTab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: 'center',
-  },
-  filterTabText: { fontSize: fontSize.sm },
-
-  sectionLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-  },
-
-
-  actionBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-  },
-
-
-  notifRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  notifIcon: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  notifContent: { flex: 1 },
-  notifTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  notifTitle: { fontSize: fontSize.base, fontWeight: '700', flex: 1 },
-  unreadDot: {
-    width: 8, height: 8, borderRadius: 4,
-    marginLeft: spacing.sm, flexShrink: 0,
-  },
-  notifBody: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.xs },
-  notifFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  notifTime: { fontSize: fontSize.xs },
-  notifAction: { fontSize: fontSize.xs, fontWeight: '700' },
-
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xxl,
-  },
-  emptyTitle: { fontSize: fontSize.xl, fontWeight: '700', textAlign: 'center' },
-  emptySub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 20 },
-
-  hint: {
-    fontSize: fontSize.xs,
-    textAlign: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-  },
+  safe:     { flex: 1 },
+  header:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
+  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
+  headerSub:   { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  markAllBtn:  { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.18)' },
+  markAllText: { color: '#fff', fontSize: fontSize.xs, fontWeight: '700' },
+  tabRow:   { borderBottomWidth: 1 },
+  tabList:  { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
+  tab:      { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1.5 },
+  tabText:  { fontSize: fontSize.xs, fontWeight: '700' },
+  list:     { padding: spacing.lg, gap: spacing.sm, paddingBottom: 80 },
+  card:     { flexDirection: 'row', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg },
+  iconWrap: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' },
+  unreadDot:{ position: 'absolute', top: 0, right: 0, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#fff' },
+  content:  { flex: 1, gap: 3 },
+  contentTop:{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  title:    { flex: 1, fontSize: fontSize.sm },
+  time:     { fontSize: 10, fontWeight: '500', flexShrink: 0 },
+  message:  { fontSize: fontSize.xs, lineHeight: 16 },
+  actionPill: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1, marginTop: 2 },
+  actionText: { fontSize: 10, fontWeight: '700' },
+  empty:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: spacing.md },
+  emptyTitle:{ fontSize: fontSize.lg, fontWeight: '700' },
+  emptySub: { fontSize: fontSize.sm, textAlign: 'center', maxWidth: 260 },
 });

@@ -39,6 +39,7 @@ import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import RecapScreen from '../screens/progress/RecapScreen';
 import IntermittentFastingScreen from '../screens/meals/IntermittentFastingScreen';
+import BodyMeasurementsScreen from '../screens/progress/BodyMeasurementScreen';
 
 // ── SOCIAL MODULE ─────────────────────────────────────────────
 import SocialScreen from '../screens/social/CalfitSocialScreen';
@@ -187,6 +188,7 @@ export default function AppNavigator() {
             <RootStack.Screen name="Chat"                component={ChatScreen} />
             <RootStack.Screen name="Accountability"      component={AccountabilityScreen} />
             <RootStack.Screen name="Live"                component={LiveScreen} />
+            <RootStack.Screen name="BodyMeasurements" component={BodyMeasurementsScreen} />
           </>
         )}
       </RootStack.Navigator>

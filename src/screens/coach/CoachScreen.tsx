@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
@@ -463,7 +465,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
-
   coachHeader: {
     flexDirection: 'row',
     alignItems: 'center',

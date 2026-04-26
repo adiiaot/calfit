@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, Alert, RefreshControl, FlatList,
+  Modal, TextInput, Alert, RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
@@ -12,7 +12,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { getTodayCalories, getTodayWater, logFood, logWater } from '../../services/profileService';
 import { supabase } from '../../services/supabase';
-//import { NIGERIAN_FOODS } from '../../data/nigerianFoods';
+import { searchFoods } from '../../services/foodSearchService';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 
@@ -105,10 +105,10 @@ function WaterCard({ theme, waterMl, waterGoalMl, onLog }: {
   return (
     <View style={[styles.waterCard, { backgroundColor: theme.waterCard }]}>
       <View style={styles.waterCardLeft}>
-        <Ionicons name="water" size={22} color="#18a3e4" />
+        <Ionicons name="water" size={22} color="#2BBCB0" />
         <View>
-          <Text style={[styles.waterCardTitle, { color: '#1f51f7e1' }]}>Water Intake</Text>
-          <Text style={[styles.waterCardSub, { color: '#0d11ee', opacity: 0.75 }]}>
+          <Text style={[styles.waterCardTitle, { color: '#2BBCB0' }]}>Water Intake</Text>
+          <Text style={[styles.waterCardSub, { color: '#2BBCB0', opacity: 0.75 }]}>
             {(waterMl / 1000).toFixed(1)}L of {(waterGoalMl / 1000).toFixed(1)}L
           </Text>
         </View>
@@ -116,8 +116,8 @@ function WaterCard({ theme, waterMl, waterGoalMl, onLog }: {
       <View style={styles.waterBtns}>
         {[250, 500, 1000].map((ml) => (
           <TouchableOpacity key={ml} onPress={() => onLog(ml)} activeOpacity={0.8}
-            style={[styles.waterBtn, { backgroundColor: '#2b65bc' + '22', borderColor: '#2b65bc' + '55' }]}>
-            <Text style={[styles.waterBtnText, { color: '#2b46bc' }]}>+{ml < 1000 ? `${ml}ml` : '1L'}</Text>
+            style={[styles.waterBtn, { backgroundColor: '#2BBCB0' + '22', borderColor: '#2BBCB0' + '55' }]}>
+            <Text style={[styles.waterBtnText, { color: '#2BBCB0' }]}>+{ml < 1000 ? `${ml}ml` : '1L'}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -202,20 +202,15 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
     if (q.length < 2) { setResults([]); return; }
     setSearching(true);
     try {
-      // Search Nigerian foods first
-      //const nigerian = NIGERIAN_FOODS.filter((f: any) => f.name.toLowerCase().includes(q.toLowerCase())).slice(0, 4).map((f: any) => ({ name: f.name, calories: f.calories_per_100g, protein: f.protein_g, carbs: f.carbs_g, fats: f.fats_g, serving: '100g' }));
-      // Then Open Food Facts
-      const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&action=process&json=1&page_size=6`);
-      const data = await res.json();
-      const off: FoodResult[] = (data.products ?? []).filter((p: any) => p.product_name && p.nutriments).slice(0, 6).map((p: any) => ({
-        name: p.product_name,
-        calories: Math.round(p.nutriments['energy-kcal_100g'] ?? 0),
-        protein: Math.round(p.nutriments.proteins_100g ?? 0),
-        carbs: Math.round(p.nutriments.carbohydrates_100g ?? 0),
-        fats: Math.round(p.nutriments.fat_100g ?? 0),
-        serving: '100g',
-      }));
-      //setResults([...nigerian, ...off]);
+      const raw = await searchFoods(q);
+      setResults(raw.map((r) => ({
+        name: r.name,
+        calories: r.calories,
+        protein: r.protein,
+        carbs: r.carbs,
+        fats: r.fat,
+        serving: r.servingSize,
+      })));
     } catch { setResults([]); }
     finally { setSearching(false); }
   };

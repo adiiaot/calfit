@@ -148,7 +148,7 @@ export default function AppNavigator() {
   const showAuth = !user || isOnboarding;
 
   return (
-    <NavigationContainer>
+  <NavigationContainer key={user ? `authed-${user.id}` : 'guest'}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {showAuth ? (
           // ── AUTH / ONBOARDING FLOW ────────────────────────

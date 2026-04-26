@@ -11,9 +11,15 @@ import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+
+// Required for OAuth redirect handling on mobile
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
@@ -21,9 +27,10 @@ export default function LoginScreen() {
   const { signIn, isLoading } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -32,18 +39,113 @@ export default function LoginScreen() {
     }
     try {
       await signIn(email, password);
+      // Auth listener in App.tsx handles redirect
     } catch (error: any) {
       Alert.alert('Sign In Failed', error.message);
     }
   };
 
+  // ── GOOGLE SIGN IN ────────────────────────────────────────
+  // Uses Supabase OAuth → opens browser → redirects back to app
+  // Requires Supabase Dashboard → Auth → Providers → Google enabled
+  // and Google OAuth credentials configured
+  const handleGoogleSignIn = async () => {
+    setOauthLoading('google');
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const redirectTo = makeRedirectUri({ scheme: 'com.bigcutstore.calfit' });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+      if (!data.url) throw new Error('No OAuth URL returned');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      if (result.type === 'success' && result.url) {
+        const url = new URL(result.url);
+        const accessToken = url.searchParams.get('access_token');
+        const refreshToken = url.searchParams.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          // Auth listener handles redirect to main app
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Google Sign In Failed', error.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
+  // ── APPLE SIGN IN ─────────────────────────────────────────
+  // Uses Supabase OAuth → opens browser → redirects back to app
+  // Requires Supabase Dashboard → Auth → Providers → Apple enabled
+  // and Apple Developer account with Sign in with Apple configured
+  const handleAppleSignIn = async () => {
+    setOauthLoading('apple');
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const redirectTo = makeRedirectUri({ scheme: 'com.bigcutstore.calfit' });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+      if (!data.url) throw new Error('No OAuth URL returned');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      if (result.type === 'success' && result.url) {
+        const url = new URL(result.url);
+        const accessToken = url.searchParams.get('access_token');
+        const refreshToken = url.searchParams.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Apple Sign In Failed', error.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Enter your email', 'Type your email address above, then tap Forgot Password.');
+      return;
+    }
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'com.bigcutstore.calfit://reset-password',
+      });
+      if (error) throw error;
+      Alert.alert('Check your email', `We sent a password reset link to ${email}`);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
   return (
-
-
-          <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-                 {/* Back button */}
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+      {/* Back button */}
       <TouchableOpacity
-        onPress={() => navigation.goBack()}
+        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] })}
         style={styles.backBtn}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
@@ -52,29 +154,33 @@ export default function LoginScreen() {
 
       <View style={styles.container}>
         <View>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>
-            Welcome back
-          </Text>
-          <Text style={[styles.sub, { color: theme.textSecondary }]}>
-            Sign in to CalFit
-          </Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Welcome back</Text>
+          <Text style={[styles.sub, { color: theme.textSecondary }]}>Sign in to CalFit</Text>
         </View>
 
-        {/* Social logins */}
-        {[
-          { icon: 'logo-google', label: 'Continue with Google' },
-          { icon: 'logo-apple', label: 'Continue with Apple' },
-        ].map((s) => (
-          <TouchableOpacity key={s.label} style={[styles.socialBtn, {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          }]}>
-            <Ionicons name={s.icon as any} size={20} color={theme.textPrimary} />
-            <Text style={[styles.socialBtnText, { color: theme.textPrimary }]}>
-              {s.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {/* Google Sign In */}
+        <TouchableOpacity
+          onPress={handleGoogleSignIn}
+          disabled={oauthLoading !== null || isLoading}
+          style={[styles.socialBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          {oauthLoading === 'google'
+            ? <ActivityIndicator size="small" color={theme.textPrimary} />
+            : <Text style={styles.googleIcon}>G</Text>}
+          <Text style={[styles.socialBtnText, { color: theme.textPrimary }]}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        {/* Apple Sign In */}
+        <TouchableOpacity
+          onPress={handleAppleSignIn}
+          disabled={oauthLoading !== null || isLoading}
+          style={[styles.socialBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          {oauthLoading === 'apple'
+            ? <ActivityIndicator size="small" color={theme.textPrimary} />
+            : <Ionicons name="logo-apple" size={20} color={theme.textPrimary} />}
+          <Text style={[styles.socialBtnText, { color: theme.textPrimary }]}>Continue with Apple</Text>
+        </TouchableOpacity>
 
         {/* Divider */}
         <View style={styles.divider}>
@@ -85,27 +191,22 @@ export default function LoginScreen() {
 
         {/* Email */}
         <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Email</Text>
-        <View style={[styles.inputWrap, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
+        <View style={[styles.inputWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="favour@email.com"
+            placeholder="your@email.com"
             placeholderTextColor={theme.textMuted}
             style={[styles.input, { color: theme.textPrimary }]}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
 
         {/* Password */}
         <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Password</Text>
-        <View style={[styles.inputWrap, {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        }]}>
+        <View style={[styles.inputWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <TextInput
             value={password}
             onChangeText={setPassword}
@@ -113,41 +214,35 @@ export default function LoginScreen() {
             placeholderTextColor={theme.textMuted}
             style={[styles.input, { color: theme.textPrimary }]}
             secureTextEntry={!showPassword}
+            autoCorrect={false}
           />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Ionicons
-              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={theme.textMuted}
-            />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textMuted} />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.forgotBtn}>
-          <Text style={[styles.forgotText, { color: theme.accent }]}>
-            Forgot password?
-          </Text>
+        <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotBtn}>
+          <Text style={[styles.forgotText, { color: theme.accent }]}>Forgot password?</Text>
         </TouchableOpacity>
 
-        {/* Sign in */}
+        {/* Sign in CTA */}
         <TouchableOpacity
           onPress={handleSignIn}
-          disabled={isLoading}
-          style={[styles.signInBtn, { backgroundColor: theme.accent }]}
+          disabled={isLoading || oauthLoading !== null}
+          style={styles.signInBtnWrap}
         >
-          {isLoading ? (
-            <ActivityIndicator color={theme.bg} />
-          ) : (
-            <Text style={[styles.signInBtnText, { color: theme.bg }]}>
-              Sign In
-            </Text>
-          )}
+          <LinearGradient
+            colors={[theme.accent, theme.accent] as [string, string]}
+            style={styles.signInBtn}
+          >
+            {isLoading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.signInBtnText}>Sign In</Text>}
+          </LinearGradient>
         </TouchableOpacity>
 
         {/* Biometric */}
-        <TouchableOpacity style={[styles.biometricBtn, {
-          borderColor: theme.border,
-        }]}>
+        <TouchableOpacity style={[styles.biometricBtn, { borderColor: theme.border }]}>
           <Ionicons name="finger-print-outline" size={20} color={theme.textSecondary} />
           <Text style={[styles.biometricText, { color: theme.textSecondary }]}>
             Sign in with Face ID / Fingerprint
@@ -156,41 +251,29 @@ export default function LoginScreen() {
 
         {/* Sign up link */}
         <View style={styles.signUpRow}>
-          <Text style={[styles.signUpText, { color: theme.textSecondary }]}>
-            Don't have an account?{' '}
-          </Text>
+          <Text style={[styles.signUpText, { color: theme.textSecondary }]}>Don't have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Onboarding')}>
-            <Text style={[styles.signUpLink, { color: theme.accent }]}>
-              Sign up free
-            </Text>
+            <Text style={[styles.signUpLink, { color: theme.accent }]}>Sign up free</Text>
           </TouchableOpacity>
         </View>
       </View>
-          </AndroidSafeView>
+    </AndroidSafeView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   backBtn: { padding: spacing.lg, paddingBottom: 0 },
-  container: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    gap: spacing.md,
-  },
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
 
   title: { fontSize: 28, fontWeight: '800' },
   sub: { fontSize: fontSize.lg, marginTop: 4 },
 
   socialBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1,
   },
+  googleIcon: { fontSize: 18, fontWeight: '900', color: '#4285F4' },
   socialBtnText: { fontSize: fontSize.lg, fontWeight: '600' },
 
   divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -199,33 +282,21 @@ const styles = StyleSheet.create({
 
   inputLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: -spacing.xs },
   inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
+    flexDirection: 'row', alignItems: 'center',
+    padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: spacing.sm,
   },
   input: { flex: 1, fontSize: fontSize.lg },
 
   forgotBtn: { alignSelf: 'flex-end' },
   forgotText: { fontSize: fontSize.base, fontWeight: '600' },
 
-  signInBtn: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-  },
-  signInBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
+  signInBtnWrap: { borderRadius: radius.lg, overflow: 'hidden' },
+  signInBtn: { padding: spacing.lg, alignItems: 'center', borderRadius: radius.lg },
+  signInBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
 
   biometricBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1,
   },
   biometricText: { fontSize: fontSize.base, fontWeight: '500' },
 

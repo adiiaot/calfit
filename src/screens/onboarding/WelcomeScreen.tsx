@@ -64,7 +64,7 @@ export default function WelcomeScreen() {
         {/* CTAs */}
         <View style={styles.ctas}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Onboarding')}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] })}
             style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
           >
             <Text style={[styles.primaryBtnText, { color: theme.bg }]}>
@@ -73,7 +73,7 @@ export default function WelcomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}
             style={[styles.secondaryBtn, {
               borderColor: theme.border,
             }]}

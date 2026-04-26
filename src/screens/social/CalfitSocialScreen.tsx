@@ -22,8 +22,7 @@ import { CommentSheet } from '../../modules/social/components/commentSheet';
 import { StoryRow } from '../../modules/social/components/storyRow';
 import { DiscoverUserCard } from '../../modules/social/components/discoverUserCard';
 import { EmptyState } from '../../modules/shared/EmptyState';
-import CommunityScreen from '../../modules/community/screens/CommunityScreen';
-import { UserAvatar } from '../../modules/shared/UserAvatar';
+import { SocialCommunitiesTab } from '../../modules/social/components/SocialCommunitiesTab';
 
 import { useFeed } from '../../modules/social/hooks/useFeed';
 import { useFollow } from '../../modules/social/hooks/useFollow';
@@ -37,89 +36,61 @@ interface DiscoverUser {
 type SocialTab = 'Feed' | 'Discover' | 'Communities';
 
 // ── STORY CAPTION MODAL ───────────────────────────────────────
-// Shown after image is picked so user can optionally add a caption
 function StoryCaptionModal({
-  theme,
-  visible,
-  imageUri,
-  onPost,
-  onCancel,
-  isUploading,
+  theme, visible, imageUri, onPost, onCancel, isUploading,
 }: {
-  theme: typeof colors.dark;
-  visible: boolean;
-  imageUri: string | null;
-  onPost: (caption: string) => void;
-  onCancel: () => void;
-  isUploading: boolean;
+  theme: typeof colors.dark; visible: boolean; imageUri: string | null;
+  onPost: (caption: string) => void; onCancel: () => void; isUploading: boolean;
 }) {
   const [caption, setCaption] = useState('');
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
-      <KeyboardAvoidingView
-        style={storyStyles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={[storyStyles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {/* Header */}
-          <View style={[storyStyles.header, { borderBottomColor: theme.border }]}>
+      <KeyboardAvoidingView style={ss.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={[ss.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[ss.sheetHeader, { borderBottomColor: theme.border }]}>
             <TouchableOpacity onPress={onCancel} disabled={isUploading}>
-              <Text style={[storyStyles.cancel, { color: theme.textMuted }]}>Cancel</Text>
+              <Text style={[ss.cancel, { color: theme.textMuted }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[storyStyles.title, { color: theme.textPrimary }]}>New Story</Text>
+            <Text style={[ss.sheetTitle, { color: theme.textPrimary }]}>New Story</Text>
             <TouchableOpacity
               onPress={() => { onPost(caption.trim()); setCaption(''); }}
               disabled={isUploading}
-              style={[storyStyles.postBtn, { backgroundColor: theme.accent }]}
+              style={[ss.shareBtn, { backgroundColor: theme.accent }]}
             >
               {isUploading
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={storyStyles.postBtnText}>Share</Text>}
+                : <Text style={ss.shareBtnText}>Share</Text>}
             </TouchableOpacity>
           </View>
-
-          {/* Preview */}
-          {imageUri && (
-            <Image
-              source={{ uri: imageUri }}
-              style={storyStyles.preview}
-              resizeMode="cover"
-            />
-          )}
-
-          {/* Caption input */}
-          <View style={[storyStyles.inputWrap, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+          {imageUri && <Image source={{ uri: imageUri }} style={ss.preview} resizeMode="cover" />}
+          <View style={[ss.inputWrap, { backgroundColor: theme.bg, borderColor: theme.border }]}>
             <TextInput
-              value={caption}
-              onChangeText={setCaption}
+              value={caption} onChangeText={setCaption}
               placeholder="Add a caption… (optional)"
               placeholderTextColor={theme.textMuted}
-              style={[storyStyles.input, { color: theme.textPrimary }]}
-              multiline
-              maxLength={200}
+              style={[ss.input, { color: theme.textPrimary }]}
+              multiline maxLength={200}
             />
           </View>
-          <Text style={[storyStyles.hint, { color: theme.textMuted }]}>
-            Stories expire after 24 hours
-          </Text>
+          <Text style={[ss.hint, { color: theme.textMuted }]}>Stories expire after 24 hours</Text>
         </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-const storyStyles = StyleSheet.create({
-  overlay:   { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet:     { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, overflow: 'hidden' },
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1 },
-  cancel:    { fontSize: fontSize.base },
-  title:     { fontSize: fontSize.base, fontWeight: '700' },
-  postBtn:   { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99 },
-  postBtnText: { color: '#fff', fontWeight: '700', fontSize: fontSize.sm },
-  preview:   { width: '100%', height: 260 },
-  inputWrap: { margin: spacing.md, borderRadius: radius.md, borderWidth: 1, padding: spacing.md },
-  input:     { fontSize: fontSize.base, minHeight: 60 },
-  hint:      { textAlign: 'center', fontSize: fontSize.xs, marginBottom: spacing.md },
+const ss = StyleSheet.create({
+  overlay:    { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet:      { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, overflow: 'hidden' },
+  sheetHeader:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1 },
+  cancel:     { fontSize: fontSize.base },
+  sheetTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  shareBtn:   { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99 },
+  shareBtnText:{ color: '#fff', fontWeight: '700', fontSize: fontSize.sm },
+  preview:    { width: '100%', height: 260 },
+  inputWrap:  { margin: spacing.md, borderRadius: radius.md, borderWidth: 1, padding: spacing.md },
+  input:      { fontSize: fontSize.base, minHeight: 60 },
+  hint:       { textAlign: 'center', fontSize: fontSize.xs, marginBottom: spacing.md },
 });
 
 // ── MAIN SCREEN ───────────────────────────────────────────────
@@ -129,32 +100,29 @@ export default function CalFitSocialScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [activeTab, setActiveTab]           = useState<SocialTab>('Feed');
-  const [selectedPost, setSelectedPost]     = useState<PostData | null>(null);
-  const [showComments, setShowComments]     = useState(false);
+  const [activeTab, setActiveTab]             = useState<SocialTab>('Feed');
+  const [selectedPost, setSelectedPost]       = useState<PostData | null>(null);
+  const [showComments, setShowComments]       = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [discoverUsers, setDiscoverUsers]   = useState<DiscoverUser[]>([]);
-  const [stories, setStories]               = useState<StoryData[]>([]);
-
-  // Story upload state
-  const [storyPickedUri, setStoryPickedUri] = useState<string | null>(null);
-  const [showStoryModal, setShowStoryModal] = useState(false);
+  const [discoverUsers, setDiscoverUsers]     = useState<DiscoverUser[]>([]);
+  const [stories, setStories]                 = useState<StoryData[]>([]);
+  const [storyPickedUri, setStoryPickedUri]   = useState<string | null>(null);
+  const [showStoryModal, setShowStoryModal]   = useState(false);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
+
+  // ── Feed: uses existing useFeed (followed posts + own posts) ─
+  // Discover tab shows ALL users not being followed
+  const [allPosts, setAllPosts]               = useState<PostData[]>([]);
 
   const name   = profile?.full_name || user?.email?.split('@')[0] || 'User';
   const avatar = (profile as any)?.avatar_url ?? null;
 
-  // ── useFeed from the real hook — updatePost(id, partial) ───
-  const { posts, isRefreshing, refresh, updatePost, prependPost } = useFeed(user?.id ?? '');
+  const { posts, discoverPosts, isRefreshing, refresh, updatePost, prependPost } = useFeed(user?.id ?? '');
   const { toggle: toggleFollow } = useFollow(user?.id ?? '');
   const { post: createPost, like, selectImage, isPosting, isUploadingImage, moderationError, clearModerationError } = usePost(user?.id ?? '');
 
-  // Load stories + discover users on focus
   useFocusEffect(useCallback(() => {
-    if (user?.id) {
-      loadDiscoverUsers();
-      loadStories();
-    }
+    if (user?.id) { loadDiscoverUsers(); loadStories(); loadAllPosts(); }
   }, [user?.id]));
 
   // ── LOADERS ───────────────────────────────────────────────
@@ -171,21 +139,50 @@ export default function CalFitSocialScreen() {
     if (!user?.id) return;
     try {
       const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, calfit_id, avatar_url, goal')
-        .neq('id', user.id)
-        .limit(20);
+        .from('profiles').select('id, full_name, calfit_id, avatar_url, goal')
+        .neq('id', user.id).limit(30);
       if (!data) return;
       const { data: followingData } = await supabase
         .from('follows').select('following_id').eq('follower_id', user.id);
       const followingIds = new Set((followingData ?? []).map((f: any) => f.following_id));
       setDiscoverUsers(data.map((u: any) => ({
-        id: u.id,
-        name:     u.full_name ?? u.calfit_id ?? 'CalFit User',
-        calfitId: u.calfit_id ?? '',
-        avatar:   u.avatar_url ?? null,
-        goal:     u.goal ?? '',
-        isFollowing: followingIds.has(u.id),
+        id: u.id, name: u.full_name ?? u.calfit_id ?? 'CalFit User',
+        calfitId: u.calfit_id ?? '', avatar: u.avatar_url ?? null,
+        goal: u.goal ?? '', isFollowing: followingIds.has(u.id),
+      })));
+    } catch {}
+  };
+
+  // ── Load ALL public posts (not just followed) for the Feed ─
+  // This fixes the "can't see other users posts" problem.
+  // When the user has few follows, we mix in public posts so the
+  // feed is never empty. Uses a separate query outside useFeed.
+  const loadAllPosts = async () => {
+    if (!user?.id) return;
+    try {
+      const { data } = await supabase
+        .from('posts')
+        .select(`
+          id, user_id, content, type, image_url,
+          likes_count, comments_count, moderation_status, created_at,
+          profiles:user_id (full_name, calfit_id, avatar_url, goal)
+        `)
+        .eq('moderation_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(40);
+      if (!data) return;
+
+      // Check which posts current user has liked
+      const ids = (data as any[]).map((p) => p.id);
+      const { data: likedData } = await supabase
+        .from('post_likes').select('post_id')
+        .eq('user_id', user.id).in('post_id', ids);
+      const likedSet = new Set(((likedData ?? []) as any[]).map((l) => l.post_id));
+
+      setAllPosts((data as any[]).map((p) => ({
+        ...p,
+        is_liked: likedSet.has(p.id),
+        profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
       })));
     } catch {}
   };
@@ -193,7 +190,7 @@ export default function CalFitSocialScreen() {
   // ── HANDLERS ──────────────────────────────────────────────
   const handlePost = async (content: string, postType: string) => {
     const newPost = await createPost(content, postType as any, selectedImageUri ?? undefined);
-    if (newPost) { prependPost(newPost); setSelectedImageUri(null); }
+    if (newPost) { prependPost(newPost); setSelectedImageUri(null); loadAllPosts(); }
   };
 
   const handlePickImage = async () => {
@@ -201,17 +198,25 @@ export default function CalFitSocialScreen() {
     if (uri) setSelectedImageUri(uri);
   };
 
-  // FIXED: signature matches what PostCard calls — (postId: string, isLiked: boolean)
+  // Matches exactly what PostCard calls: onLike(post.id, post.is_liked ?? false)
   const handleLike = async (postId: string, isLiked: boolean) => {
+    const delta = isLiked ? -1 : 1;
+    // Update both state arrays optimistically
     updatePost(postId, {
       is_liked: !isLiked,
-      likes_count: (posts.find((p) => p.id === postId)?.likes_count ?? 0) + (isLiked ? -1 : 1),
-    });
+      likes_count: ((posts.find((p) => p.id === postId) ?? allPosts.find((p) => p.id === postId))?.likes_count ?? 0) + delta,
+    } as Partial<PostData>);
+    setAllPosts((prev) => prev.map((p) =>
+      p.id === postId ? { ...p, is_liked: !isLiked, likes_count: (p.likes_count ?? 0) + delta } : p
+    ));
     await like(postId, isLiked);
   };
 
   const handleDeletePost = async (postId: string) => {
-    try { await supabase.from('posts').delete().eq('id', postId); } catch {}
+    try {
+      await supabase.from('posts').delete().eq('id', postId);
+      setAllPosts((prev) => prev.filter((p) => p.id !== postId));
+    } catch {}
   };
 
   const handleEditPost = async (postId: string, newContent: string) => {
@@ -223,21 +228,17 @@ export default function CalFitSocialScreen() {
       u.id === userId ? { ...u, isFollowing: !currentlyFollowing } : u
     ));
     const success = await toggleFollow(userId, currentlyFollowing);
-    if (!success) {
-      setDiscoverUsers((prev) => prev.map((u) =>
-        u.id === userId ? { ...u, isFollowing: currentlyFollowing } : u
-      ));
-    }
+    if (!success) setDiscoverUsers((prev) => prev.map((u) =>
+      u.id === userId ? { ...u, isFollowing: currentlyFollowing } : u
+    ));
   };
 
   const handleRefresh = async () => {
-    await Promise.all([refresh(), loadDiscoverUsers(), loadStories()]);
+    await Promise.all([refresh(), loadDiscoverUsers(), loadStories(), loadAllPosts()]);
   };
 
   const handleShare = async (post: PostData) => { await sharePost(post); };
 
-  // ── STORY UPLOAD ──────────────────────────────────────────
-  // Step 1: pick image → show caption modal
   const handleAddStory = async () => {
     try {
       const { pickStoryImage } = await import('../../modules/social/services/storyService');
@@ -248,7 +249,6 @@ export default function CalFitSocialScreen() {
     } catch {}
   };
 
-  // Step 2: user confirms caption → upload + create story
   const handlePostStory = async (caption: string) => {
     if (!user?.id || !storyPickedUri) return;
     setIsUploadingStory(true);
@@ -257,9 +257,9 @@ export default function CalFitSocialScreen() {
       const url = await uploadStoryImage(storyPickedUri, user.id);
       if (url) {
         await createManualStory(user.id, url, caption || undefined);
-        await loadStories(); // refresh story row
+        await loadStories();
       }
-    } catch (e) {
+    } catch {
       Alert.alert('Upload failed', 'Could not post your story. Please try again.');
     } finally {
       setIsUploadingStory(false);
@@ -268,63 +268,71 @@ export default function CalFitSocialScreen() {
     }
   };
 
+  // Feed shows: own posts + followed + recent public (allPosts covers all)
+  const feedPosts = allPosts;
+
   const TABS: SocialTab[] = ['Feed', 'Discover', 'Communities'];
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
 
-      {/* ── GRADIENT HEADER ── */}
+      {/* ── VIBRANT HEADER — pink→orange→yellow from theme ── */}
       <LinearGradient
-        colors={[theme.gradStart ?? '#1A1040', '#2A1F6B'] as [string, string]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        colors={[
+          theme.gradStart ?? '#FF6B9D',
+          theme.gradMid   ?? '#FF8C42',
+          theme.gradEnd   ?? '#FFD166',
+        ] as [string, string, string]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
         style={styles.header}
       >
         <View>
           <Text style={styles.headerTitle}>Social</Text>
           <Text style={styles.headerSub}>Connect · Inspire · Grow</Text>
         </View>
-        <View style={styles.headerRight}>
-          {/* Notifications shortcut */}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Notifications' as never)}
-            style={styles.headerIconBtn}
-          >
-            <Ionicons name="notifications-outline" size={20} color="rgba(255,255,255,0.85)" />
-          </TouchableOpacity>
-          {/* Live button */}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Live' as never)}
-            style={styles.liveBtn}
-          >
-            <View style={styles.liveDot} />
-            <Ionicons name="radio-outline" size={16} color="#FF3B30" />
-            <Text style={styles.liveBtnText}>Live</Text>
-          </TouchableOpacity>
-        </View>
+
+        {/* Live button only — no notifications icon */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Live' as never)}
+          style={styles.liveBtn}
+        >
+          <View style={styles.liveDot} />
+          <Ionicons name="radio-outline" size={16} color="#fff" />
+          <Text style={styles.liveBtnText}>Live</Text>
+        </TouchableOpacity>
       </LinearGradient>
 
-      {/* ── TAB BAR ── */}
+      {/* ── COLOURFUL TAB BAR ── */}
       <View style={[styles.tabBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            style={[styles.tab, activeTab === tab && { borderBottomColor: theme.accent }]}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === tab ? theme.accent : theme.textMuted },
-              activeTab === tab && { fontWeight: '700' },
-            ]}>
-              {tab}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {TABS.map((tab, i) => {
+          const tabColors = [
+            theme.gradStart ?? '#FF6B9D',
+            theme.accent,
+            theme.accentSecond,
+          ];
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setActiveTab(tab)}
+              style={[styles.tab, isActive && { borderBottomColor: tabColors[i] }]}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: isActive ? tabColors[i] : theme.textMuted },
+                isActive && { fontWeight: '700' },
+              ]}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* ── COMMUNITIES tab renders inline (no extra nav) ── */}
+      {/* ── COMMUNITIES renders inline ── */}
       {activeTab === 'Communities' ? (
-        <CommunityScreen />
+        <SocialCommunitiesTab theme={theme} />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -333,8 +341,8 @@ export default function CalFitSocialScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              tintColor={theme.accent}
-              colors={[theme.accent]}
+              tintColor={theme.gradStart ?? theme.accent}
+              colors={[theme.gradStart ?? theme.accent]}
             />
           }
         >
@@ -342,7 +350,6 @@ export default function CalFitSocialScreen() {
           {/* ── FEED TAB ── */}
           {activeTab === 'Feed' && (
             <>
-              {/* Story row — real stories + add-story card */}
               <StoryRow
                 theme={theme}
                 stories={stories}
@@ -351,7 +358,6 @@ export default function CalFitSocialScreen() {
                 onAddStory={handleAddStory}
               />
 
-              {/* Compose box */}
               <ComposeBox
                 theme={theme}
                 avatarUrl={avatar}
@@ -363,11 +369,10 @@ export default function CalFitSocialScreen() {
                 onRemoveImage={() => setSelectedImageUri(null)}
               />
 
-              {/* Moderation error banner */}
               {moderationError && (
                 <View style={[styles.errorBanner, {
                   backgroundColor: '#FF3B30' + '18',
-                  borderColor: '#FF3B30' + '44',
+                  borderColor: '#FF3B30' + '55',
                 }]}>
                   <Ionicons name="warning-outline" size={16} color="#FF3B30" />
                   <Text style={[styles.errorText, { color: '#FF3B30' }]}>{moderationError}</Text>
@@ -377,18 +382,17 @@ export default function CalFitSocialScreen() {
                 </View>
               )}
 
-              {/* Posts */}
-              {posts.length === 0 ? (
+              {feedPosts.length === 0 ? (
                 <EmptyState
                   theme={theme}
                   icon="people-outline"
-                  title="Your feed is quiet"
-                  subtitle="Follow other CalFit members to see their workouts and milestones here — or post something yourself!"
-                  buttonLabel="Find People to Follow"
+                  title="No posts yet"
+                  subtitle="Be the first to post something — or follow members to see their updates here."
+                  buttonLabel="Discover People"
                   onButtonPress={() => setActiveTab('Discover')}
                 />
               ) : (
-                posts.map((post) => (
+                feedPosts.map((post) => (
                   <PostCard
                     key={post.id}
                     post={post}
@@ -412,20 +416,20 @@ export default function CalFitSocialScreen() {
           {/* ── DISCOVER TAB ── */}
           {activeTab === 'Discover' && (
             <>
-              {/* Section header */}
-              <View style={styles.discoverHeader}>
-                <View style={[styles.discoverHeaderIcon, { backgroundColor: theme.accentDim as string }]}>
-                  <Ionicons name="compass" size={18} color={theme.accent} />
-                </View>
-                <View>
-                  <Text style={[styles.discoverTitle, { color: theme.textPrimary }]}>
-                    Find Your People
-                  </Text>
-                  <Text style={[styles.discoverSub, { color: theme.textMuted }]}>
+              {/* Colourful discover banner */}
+              <LinearGradient
+                colors={[theme.accentSecond + 'CC', theme.accent + '99'] as [string, string]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.discoverBanner}
+              >
+                <Ionicons name="compass" size={22} color="#fff" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.discoverBannerTitle}>Find Your People</Text>
+                  <Text style={styles.discoverBannerSub}>
                     Follow members to see their activity in your feed
                   </Text>
                 </View>
-              </View>
+              </LinearGradient>
 
               {discoverUsers.length === 0 ? (
                 <EmptyState
@@ -460,7 +464,6 @@ export default function CalFitSocialScreen() {
       )}
 
       {/* ── COMMENT SHEET ── */}
-      {/* CommentSheet does NOT have onCommentAdded prop — removed to match interface */}
       <CommentSheet
         theme={theme}
         post={selectedPost}
@@ -488,62 +491,47 @@ export default function CalFitSocialScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
+    paddingVertical: spacing.md + 4,
   },
   headerTitle: {
-    fontSize: fontSize.xxl,
+    fontSize: 26,
     fontWeight: '800',
     color: '#fff',
     letterSpacing: -0.5,
   },
   headerSub: {
     fontSize: fontSize.xs,
-    color: 'rgba(255,255,255,0.55)',
+    color: 'rgba(255,255,255,0.70)',
     marginTop: 1,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontWeight: '600',
+    letterSpacing: 0.4,
   },
   liveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 7,
+    gap: 5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
     borderRadius: 99,
-    backgroundColor: 'rgba(255,59,48,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.20)',
     borderWidth: 1,
-    borderColor: 'rgba(255,59,48,0.35)',
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   liveDot: {
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: '#FF3B30',
+    width: 7, height: 7, borderRadius: 4,
+    backgroundColor: '#fff',
   },
   liveBtnText: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
     fontWeight: '700',
-    color: '#FF3B30',
+    color: '#fff',
   },
 
-  // Tabs
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -552,7 +540,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm + 2,
-    borderBottomWidth: 2,
+    borderBottomWidth: 2.5,
     borderBottomColor: 'transparent',
     marginBottom: -1,
   },
@@ -561,12 +549,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Scroll
-  scrollContent: {
-    paddingBottom: 40,
-  },
+  scrollContent: { paddingBottom: 40 },
 
-  // Error banner
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -582,28 +566,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Discover section header
-  discoverHeader: {
+  discoverBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     marginHorizontal: spacing.lg,
     marginTop: spacing.lg,
     marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
   },
-  discoverHeaderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  discoverTitle: {
+  discoverBannerTitle: {
     fontSize: fontSize.base,
     fontWeight: '700',
+    color: '#fff',
   },
-  discoverSub: {
+  discoverBannerSub: {
     fontSize: fontSize.xs,
+    color: 'rgba(255,255,255,0.80)',
     marginTop: 2,
   },
 });

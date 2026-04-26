@@ -1,530 +1,536 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity,
+  ActivityIndicator, ScrollView, Alert, Image, Modal,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useThemeStore } from '../../store/themeStore';
+import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { supabase } from '../../services/supabase';
 
-// ── FOOD LABEL TAG ────────────────────────────────────────────
-function FoodLabelTag({
-  label,
-  x,
-  y,
-}: {
-  label: string;
-  x: number;
-  y: number;
-}) {
+// ── SCAN RESULT TYPE ──────────────────────────────────────────
+interface ScanResult {
+  food: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fibre: number;
+  portion: string;
+  confidence: number;
+  withinGoal: boolean;
+  caloriesRemaining: number;
+}
+
+// ── CLAUDE VISION FOOD ANALYSIS ───────────────────────────────
+// Sends base64 image to Claude, gets back structured nutrition JSON.
+// Why JSON: easier to parse than free text, consistent structure for logging.
+async function analyseFood(base64: string, calorieGoal: number, consumed: number): Promise<ScanResult | null> {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
+            },
+            {
+              type: 'text',
+              text: `You are a nutrition expert analyzing a food photo for a fitness app.
+
+Identify all food items visible and estimate their nutritional content for a typical portion size.
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{
+  "food": "food name (be specific, e.g. 'Grilled Chicken Breast with Rice')",
+  "calories": <number>,
+  "protein": <number in grams>,
+  "carbs": <number in grams>,
+  "fats": <number in grams>,
+  "fibre": <number in grams>,
+  "portion": "portion description (e.g. '1 plate ~350g')",
+  "confidence": <percentage 0-100>
+}
+
+If you cannot identify food in the image, respond with:
+{"error": "No food detected"}`,
+            },
+          ],
+        }],
+      }),
+    });
+
+    const data = await response.json();
+    if (data.error) return null;
+
+    const text = data.content?.[0]?.text ?? '';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    const parsed = JSON.parse(match[0]);
+    if (parsed.error) return null;
+
+    const remaining = calorieGoal - consumed;
+    return {
+      ...parsed,
+      withinGoal: parsed.calories <= remaining,
+      caloriesRemaining: remaining,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── LOG TO SUPABASE ───────────────────────────────────────────
+async function logFoodEntry(
+  userId: string,
+  result: ScanResult,
+  mealType: string,
+): Promise<boolean> {
+  const today = new Date().toISOString().split('T')[0];
+  const { error } = await supabase.from('food_logs').insert({
+    user_id:   userId,
+    date:      today,
+    meal_type: mealType.toLowerCase(),
+    food_name: result.food,
+    calories:  result.calories,
+    protein_g: result.protein,
+    carbs_g:   result.carbs,
+    fats_g:    result.fats,
+    logged_at: new Date().toISOString(),
+  });
+  return !error;
+}
+
+// ── MACRO BAR ─────────────────────────────────────────────────
+function MacroBar({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
   return (
-    <View style={[styles.labelTag, { left: x, top: y }]}>
-      <Text style={styles.labelTagText}>{label}</Text>
+    <View style={mb.wrap}>
+      <Text style={[mb.label, { color: 'rgba(255,255,255,0.65)' }]}>{label}</Text>
+      <Text style={[mb.value, { color }]}>{value}{unit}</Text>
     </View>
   );
 }
+const mb = StyleSheet.create({
+  wrap:  { alignItems: 'center', flex: 1 },
+  label: { fontSize: 10, fontWeight: '600', marginBottom: 2 },
+  value: { fontSize: fontSize.lg, fontWeight: '800' },
+});
 
-// ── SCAN RESULT CARD ──────────────────────────────────────────
-function ScanResultCard({
-  theme,
+// ── RESULT CARD ───────────────────────────────────────────────
+function ResultCard({
   result,
   onLog,
-  onDismiss,
+  onRescan,
 }: {
-  theme: typeof colors.dark;
-  result: {
-    food: string;
-    confidence: number;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    withinGoal: boolean;
-    remaining: number;
-  };
+  result: ScanResult;
   onLog: (mealType: string) => void;
-  onDismiss: () => void;
+  onRescan: () => void;
 }) {
   const [showMealPicker, setShowMealPicker] = useState(false);
-  const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+  const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
   return (
-    <View style={styles.resultCard}>
-      {/* Food name + confidence */}
-      <View style={styles.resultHeader}>
-        <View>
-          <Text style={styles.resultFood}>{result.food}</Text>
-          <Text style={[styles.resultConf, { color: colors.dark.accent }]}>
-            {result.confidence}% confidence · Claude Vision AI
-          </Text>
+    <View style={rc.card}>
+      {/* Header */}
+      <View style={rc.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={rc.foodName} numberOfLines={2}>{result.food}</Text>
+          <View style={rc.confRow}>
+            <Ionicons name="sparkles" size={12} color="#2DDC8C" />
+            <Text style={rc.conf}>{result.confidence}% match · {result.portion}</Text>
+          </View>
         </View>
-        <TouchableOpacity onPress={onDismiss}>
-          <Ionicons name="close-circle" size={22} color="rgba(255,255,255,0.4)" />
-        </TouchableOpacity>
+        <View style={rc.calBadge}>
+          <Text style={rc.calNum}>{result.calories}</Text>
+          <Text style={rc.calUnit}>kcal</Text>
+        </View>
       </View>
-
-      {/* Calories */}
-      <Text style={[styles.resultCal, { color: colors.dark.accent }]}>
-        {result.calories} kcal
-      </Text>
 
       {/* Macros */}
-      <View style={styles.resultMacros}>
-        {[
-          { label: 'Protein', value: `${result.protein}g` },
-          { label: 'Carbs', value: `${result.carbs}g` },
-          { label: 'Fats', value: `${result.fats}g` },
-        ].map((m) => (
-          <View key={m.label} style={styles.macroItem}>
-            <Text style={styles.macroValue}>{m.value}</Text>
-            <Text style={styles.macroLabel}>{m.label}</Text>
-          </View>
-        ))}
+      <View style={rc.macros}>
+        <MacroBar label="Protein" value={result.protein} unit="g" color="#6699FF" />
+        <View style={rc.divider} />
+        <MacroBar label="Carbs"   value={result.carbs}   unit="g" color="#FFB347" />
+        <View style={rc.divider} />
+        <MacroBar label="Fats"    value={result.fats}    unit="g" color="#FF6B9D" />
+        <View style={rc.divider} />
+        <MacroBar label="Fibre"   value={result.fibre}   unit="g" color="#2DDC8C" />
       </View>
 
-      {/* Goal warning or OK */}
-      <View style={[styles.goalRow, {
-        backgroundColor: result.withinGoal
-          ? 'rgba(45,220,140,0.1)'
-          : 'rgba(255,89,89,0.1)',
+      {/* Goal status */}
+      <View style={[rc.goalRow, {
+        backgroundColor: result.withinGoal ? 'rgba(45,220,140,0.12)' : 'rgba(255,89,89,0.12)',
+        borderColor:     result.withinGoal ? 'rgba(45,220,140,0.30)' : 'rgba(255,89,89,0.30)',
       }]}>
         <Ionicons
           name={result.withinGoal ? 'checkmark-circle' : 'warning'}
-          size={16}
-          color={result.withinGoal ? colors.dark.accent : colors.dark.red}
+          size={14}
+          color={result.withinGoal ? '#2DDC8C' : '#FF5959'}
         />
-        <Text style={[styles.goalText, {
-          color: result.withinGoal ? colors.dark.accent : colors.dark.red,
-        }]}>
+        <Text style={[rc.goalText, { color: result.withinGoal ? '#2DDC8C' : '#FF5959' }]}>
           {result.withinGoal
-            ? `Within your daily goal — ${result.remaining} kcal remaining`
-            : `Exceeds goal by ${Math.abs(result.remaining)} kcal — consider a smaller portion`
-          }
+            ? `Fits your plan · ${result.caloriesRemaining - result.calories} kcal remaining after logging`
+            : `${result.calories - result.caloriesRemaining} kcal over your remaining budget`}
         </Text>
       </View>
 
-      {/* Log button */}
-      {!showMealPicker ? (
-        <TouchableOpacity
-          onPress={() => setShowMealPicker(true)}
-          style={[styles.logBtn, { backgroundColor: colors.dark.accent }]}
-        >
-          <Ionicons name="add-circle" size={18} color={colors.dark.bg} />
-          <Text style={[styles.logBtnText, { color: colors.dark.bg }]}>
-            Log as Meal
-          </Text>
+      {/* Actions */}
+      <View style={rc.actions}>
+        <TouchableOpacity onPress={onRescan} style={rc.rescanBtn}>
+          <Ionicons name="camera-outline" size={16} color="rgba(255,255,255,0.6)" />
+          <Text style={rc.rescanText}>Rescan</Text>
         </TouchableOpacity>
-      ) : (
-        <View style={styles.mealPicker}>
-          <Text style={styles.mealPickerLabel}>Choose meal type:</Text>
-          <View style={styles.mealPickerBtns}>
-            {mealTypes.map((mt) => (
+        <TouchableOpacity onPress={() => setShowMealPicker(true)} style={rc.logBtn}>
+          <LinearGradient
+            colors={['#2DDC8C', '#0DAE6C'] as [string, string]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={rc.logGrad}
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#fff" />
+            <Text style={rc.logText}>Log This Food</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* Meal type picker modal */}
+      <Modal visible={showMealPicker} transparent animationType="fade">
+        <View style={rc.pickerOverlay}>
+          <View style={rc.picker}>
+            <Text style={rc.pickerTitle}>Add to which meal?</Text>
+            {MEAL_TYPES.map((m) => (
               <TouchableOpacity
-                key={mt}
-                onPress={() => onLog(mt)}
-                style={[styles.mealPickerBtn, {
-                  borderColor: colors.dark.accent,
-                }]}
+                key={m}
+                onPress={() => { setShowMealPicker(false); onLog(m); }}
+                style={rc.pickerRow}
               >
-                <Text style={[styles.mealPickerBtnText, {
-                  color: colors.dark.accent,
-                }]}>
-                  {mt}
-                </Text>
+                <Text style={rc.pickerRowText}>{m}</Text>
+                <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
               </TouchableOpacity>
             ))}
+            <TouchableOpacity onPress={() => setShowMealPicker(false)} style={rc.pickerCancel}>
+              <Text style={rc.pickerCancelText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 }
 
-// ── MAIN SCREEN ──────────────────────────────────────────────
+const rc = StyleSheet.create({
+  card:       { backgroundColor: 'rgba(13,10,46,0.95)', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, gap: spacing.md },
+  header:     { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  foodName:   { fontSize: fontSize.lg, fontWeight: '800', color: '#fff', flex: 1 },
+  confRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  conf:       { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.55)' },
+  calBadge:   { alignItems: 'center', backgroundColor: 'rgba(45,220,140,0.15)', borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(45,220,140,0.30)' },
+  calNum:     { fontSize: 26, fontWeight: '900', color: '#2DDC8C' },
+  calUnit:    { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
+  macros:     { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.md, padding: spacing.md },
+  divider:    { width: 1, backgroundColor: 'rgba(255,255,255,0.10)', marginHorizontal: 4 },
+  goalRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
+  goalText:   { fontSize: fontSize.xs, fontWeight: '600', flex: 1 },
+  actions:    { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  rescanBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  rescanText: { color: 'rgba(255,255,255,0.6)', fontSize: fontSize.sm, fontWeight: '600' },
+  logBtn:     { flex: 1, borderRadius: radius.md, overflow: 'hidden' },
+  logGrad:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
+  logText:    { color: '#fff', fontSize: fontSize.base, fontWeight: '800' },
+  // Meal picker modal
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: spacing.xl },
+  picker:        { backgroundColor: '#161820', borderRadius: 20, overflow: 'hidden' },
+  pickerTitle:   { color: '#fff', fontSize: fontSize.base, fontWeight: '700', textAlign: 'center', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  pickerRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 2, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  pickerRowText: { color: '#fff', fontSize: fontSize.base, fontWeight: '600' },
+  pickerCancel:  { padding: spacing.lg, alignItems: 'center' },
+  pickerCancelText: { color: 'rgba(255,255,255,0.4)', fontSize: fontSize.sm },
+});
+
+// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function FoodScannerScreen() {
-  const navigation = useNavigation<any>();
+  const navigation  = useNavigation<any>();
   const { colorScheme } = useThemeStore();
+  const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const [activeMode, setActiveMode] = useState<'Scan Food' | 'Barcode' | 'Food Label'>('Scan Food');
-  const [flashOn, setFlashOn] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<null | {
-    food: string;
-    confidence: number;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    withinGoal: boolean;
-    remaining: number;
-  }>(null);
+  const [result, setResult]             = useState<ScanResult | null>(null);
+  const [capturedUri, setCapturedUri]   = useState<string | null>(null);
+  const [activeMode, setActiveMode]     = useState<'Camera' | 'Gallery'>('Camera');
+  const [logSuccess, setLogSuccess]     = useState(false);
+  const cameraRef = useRef<CameraView>(null);
 
-  const modes = ['Scan Food', 'Barcode', 'Food Label'] as const;
+  const calorieGoal = (profile as any)?.daily_calorie_goal ?? 2000;
 
-  // Simulate scan — will be replaced with real Claude Vision API in Phase 3
-  const handleScan = () => {
+  // Get today's consumed calories from Supabase for the goal check
+  const getConsumedToday = async (): Promise<number> => {
+    if (!user?.id) return 0;
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('food_logs').select('calories')
+      .eq('user_id', user.id).eq('date', today);
+    return (data ?? []).reduce((sum: number, r: any) => sum + (r.calories ?? 0), 0);
+  };
+
+  // Convert image URI → base64 for Claude
+  const uriToBase64 = async (uri: string): Promise<string> => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const processImage = async (uri: string) => {
+    setCapturedUri(uri);
     setIsProcessing(true);
-    setTimeout(() => {
-      setResult({
-        food: 'Caesar Salad',
-        confidence: 92,
-        calories: 380,
-        protein: 18,
-        carbs: 28,
-        fats: 22,
-        withinGoal: true,
-        remaining: 600,
-      });
+    setResult(null);
+    try {
+      const base64 = await uriToBase64(uri);
+      const consumed = await getConsumedToday();
+      const analysis = await analyseFood(base64, calorieGoal, consumed);
+      if (!analysis) {
+        Alert.alert(
+          'No food detected',
+          'Point the camera at a plate or food item and try again.',
+          [{ text: 'OK', onPress: () => setCapturedUri(null) }]
+        );
+      } else {
+        setResult(analysis);
+      }
+    } catch {
+      Alert.alert('Scan failed', 'Could not analyse the image. Please try again.');
+      setCapturedUri(null);
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
-  const handleLog = (mealType: string) => {
-    // Will connect to food_logs table in Phase 2
-    console.log(`Logging ${result?.food} as ${mealType}`);
-    navigation.goBack();
+  const handleTakePhoto = async () => {
+    if (!cameraRef.current) return;
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ base64: false, quality: 0.7 });
+      if (photo?.uri) await processImage(photo.uri);
+    } catch {
+      Alert.alert('Could not take photo', 'Please try again.');
+    }
   };
+
+  const handleGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo library access to scan food from your gallery.');
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (!res.canceled && res.assets[0]) await processImage(res.assets[0].uri);
+  };
+
+  const handleLog = async (mealType: string) => {
+    if (!result || !user?.id) return;
+    const success = await logFoodEntry(user.id, result, mealType);
+    if (success) {
+      setLogSuccess(true);
+      setTimeout(() => navigation.goBack(), 1200);
+    } else {
+      Alert.alert('Log failed', 'Could not save the food log. Please try again.');
+    }
+  };
+
+  const handleRescan = () => {
+    setResult(null);
+    setCapturedUri(null);
+    setLogSuccess(false);
+  };
+
+  // Permission not yet determined
+  if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+
+  // Permission denied
+  if (!permission.granted) {
+    return (
+      <View style={[styles.permissionScreen, { backgroundColor: theme.bg }]}>
+        <Ionicons name="camera-outline" size={64} color={theme.textMuted} />
+        <Text style={[styles.permTitle, { color: theme.textPrimary }]}>Camera Access Needed</Text>
+        <Text style={[styles.permSub, { color: theme.textMuted }]}>
+          CalFit needs camera access to scan your food and estimate calories using AI.
+        </Text>
+        <TouchableOpacity onPress={requestPermission} style={[styles.permBtn, { backgroundColor: theme.accent }]}>
+          <Text style={[styles.permBtnText, { color: theme.bg }]}>Allow Camera Access</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.permBack}>
+          <Text style={[styles.permBackText, { color: theme.textMuted }]}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.safe}>
-      {/* Status bar area */}
-      <View style={styles.statusBar}>
-        <Text style={styles.statusTime}>9:41</Text>
-      </View>
 
-      {/* Top controls */}
-      <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-       <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.closeBtn}
-        >
-          <Ionicons name="close" size={24} color="white" />
-        </TouchableOpacity>
-
-        <Text style={[styles.topLogo, { color: colors.dark.accent }]}>CalFit</Text>
-
-        <TouchableOpacity style={styles.helpBtn}>
-          <Ionicons name="help-circle-outline" size={24} color="white" />
-        </TouchableOpacity>
-      </AndroidSafeView>
-
-      {/* Camera viewfinder */}
-      <View style={styles.viewfinder}>
-        {/* Corner brackets */}
-        <View style={[styles.corner, styles.cornerTL]} />
-        <View style={[styles.corner, styles.cornerTR]} />
-        <View style={[styles.corner, styles.cornerBL]} />
-        <View style={[styles.corner, styles.cornerBR]} />
-
-        {/* Food label tags — shown after scan */}
-        {result && (
-          <>
-            <FoodLabelTag label="Lettuce" x={30} y={80} />
-            <FoodLabelTag label="Parmesan" x={220} y={60} />
-            <FoodLabelTag label="Cherry Tomatoes" x={20} y={220} />
-            <FoodLabelTag label="Croutons" x={200} y={240} />
-          </>
+      {/* ── CAMERA / PREVIEW ── */}
+      <View style={styles.cameraWrap}>
+        {capturedUri ? (
+          // Show captured image while processing or showing result
+          <Image source={{ uri: capturedUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
         )}
 
-        {/* Processing indicator */}
+        {/* Dark overlay when processing */}
         {isProcessing && (
           <View style={styles.processingOverlay}>
-            <ActivityIndicator size="large" color={colors.dark.accent} />
-            <Text style={styles.processingText}>
-              Analysing with Claude Vision...
-            </Text>
+            <View style={styles.processingCard}>
+              <ActivityIndicator size="large" color="#2DDC8C" />
+              <Text style={styles.processingTitle}>Analysing with Claude Vision</Text>
+              <Text style={styles.processingSubtext}>Identifying food and calculating macros...</Text>
+            </View>
           </View>
         )}
 
-        {/* Tap to scan prompt */}
-        {!result && !isProcessing && (
-          <TouchableOpacity
-            onPress={handleScan}
-            style={styles.tapToScan}
-          >
-            <View style={styles.tapToScanCircle}>
-              <Ionicons name="camera" size={32} color={colors.dark.accent} />
+        {/* Success overlay */}
+        {logSuccess && (
+          <View style={styles.processingOverlay}>
+            <View style={styles.processingCard}>
+              <Ionicons name="checkmark-circle" size={52} color="#2DDC8C" />
+              <Text style={styles.processingTitle}>Logged!</Text>
+              <Text style={styles.processingSubtext}>Added to your calorie tracker</Text>
             </View>
-            <Text style={styles.tapToScanText}>
-              Tap to scan
-            </Text>
+          </View>
+        )}
+
+        {/* ── HEADER ── */}
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.topBtn}>
+            <Ionicons name="close" size={22} color="#fff" />
           </TouchableOpacity>
+          <View style={styles.topCenter}>
+            <Ionicons name="sparkles" size={14} color="#2DDC8C" />
+            <Text style={styles.topLabel}>CalFit Vision</Text>
+          </View>
+          <TouchableOpacity onPress={handleGallery} style={styles.topBtn}>
+            <Ionicons name="images-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── VIEWFINDER BRACKETS ── */}
+        {!capturedUri && !isProcessing && (
+          <>
+            <View style={[styles.corner, styles.tl]} />
+            <View style={[styles.corner, styles.tr]} />
+            <View style={[styles.corner, styles.bl]} />
+            <View style={[styles.corner, styles.br]} />
+            <Text style={styles.scanHint}>Point camera at your food</Text>
+          </>
         )}
       </View>
 
-      {/* Result card */}
-      {result && (
-        <ScanResultCard
-          theme={theme}
-          result={result}
-          onLog={handleLog}
-          onDismiss={() => setResult(null)}
-        />
-      )}
-
-      {/* Bottom controls */}
-      {!result && (
-        <View style={styles.bottomControls}>
-          {/* Scan mode tabs */}
+      {/* ── BOTTOM PANEL ── */}
+      {result ? (
+        <ResultCard result={result} onLog={handleLog} onRescan={handleRescan} />
+      ) : !isProcessing ? (
+        <View style={styles.bottomPanel}>
+          {/* Mode toggle */}
           <View style={styles.modeTabs}>
-            {modes.map((mode) => (
+            {(['Camera', 'Gallery'] as const).map((m) => (
               <TouchableOpacity
-                key={mode}
-                onPress={() => setActiveMode(mode)}
-                style={[styles.modeTab, {
-                  backgroundColor: activeMode === mode
-                    ? colors.dark.accent
-                    : 'rgba(255,255,255,0.1)',
-                }]}
+                key={m}
+                onPress={() => { setActiveMode(m); if (m === 'Gallery') handleGallery(); }}
+                style={[styles.modeTab, activeMode === m && styles.modeTabActive]}
               >
-                <Text style={[styles.modeTabText, {
-                  color: activeMode === mode ? colors.dark.bg : 'white',
-                  fontWeight: activeMode === mode ? '700' : '400',
-                }]}>
-                  {mode}
-                </Text>
+                <Ionicons
+                  name={m === 'Camera' ? 'camera-outline' : 'images-outline'}
+                  size={16}
+                  color={activeMode === m ? '#0D0A2E' : 'rgba(255,255,255,0.6)'}
+                />
+                <Text style={[styles.modeTabText, activeMode === m && { color: '#0D0A2E' }]}>{m}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Flash + Gallery */}
-          <View style={styles.utilRow}>
-            <TouchableOpacity
-              onPress={() => setFlashOn(!flashOn)}
-              style={styles.utilBtn}
-            >
-              <Ionicons
-                name={flashOn ? 'flash' : 'flash-outline'}
-                size={20}
-                color={flashOn ? colors.dark.gold : 'rgba(255,255,255,0.6)'}
-              />
-              <Text style={[styles.utilText, {
-                color: flashOn ? colors.dark.gold : 'rgba(255,255,255,0.6)',
-              }]}>
-                Flash
-              </Text>
+          {/* Shutter */}
+          <View style={styles.shutterRow}>
+            <View style={{ width: 56 }} />
+            <TouchableOpacity onPress={handleTakePhoto} style={styles.shutter} activeOpacity={0.8}>
+              <View style={styles.shutterInner} />
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.utilBtn}>
-              <Ionicons
-                name="images-outline"
-                size={20}
-                color="rgba(255,255,255,0.6)"
-              />
-              <Text style={styles.utilText}>Gallery</Text>
+            <TouchableOpacity onPress={handleGallery} style={styles.galleryThumb}>
+              <Ionicons name="images-outline" size={24} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           </View>
+
+          <Text style={styles.bottomHint}>
+            Tap the button to scan · or pick from gallery
+          </Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
 
-// ── STYLES ───────────────────────────────────────────────────
+// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
-  },
-  statusBar: {
-    height: 44,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'center',
-    backgroundColor: '#111',
-  },
-  statusTime: { fontSize: 13, fontWeight: '600', color: 'white' },
+  safe:      { flex: 1, backgroundColor: '#000' },
+  cameraWrap:{ flex: 1, position: 'relative' },
 
-  // Top controls
-  topControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#111',
-  },
-  closeBtn: { padding: 4 },
-  topLogo: { fontSize: fontSize.xl, fontWeight: '700' },
-  helpBtn: { padding: 4 },
+  // Top bar
+  topBar:    { position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg },
+  topBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  topCenter: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
+  topLabel:  { color: '#fff', fontSize: fontSize.sm, fontWeight: '700' },
 
-  // Viewfinder
-  viewfinder: {
-    flex: 1,
-    backgroundColor: '#111',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // Viewfinder corners
+  corner:    { position: 'absolute', width: 28, height: 28, borderColor: '#2DDC8C', borderWidth: 3 },
+  tl:        { top: '30%', left: '15%', borderRightWidth: 0, borderBottomWidth: 0 },
+  tr:        { top: '30%', right: '15%', borderLeftWidth: 0, borderBottomWidth: 0 },
+  bl:        { bottom: '35%', left: '15%', borderRightWidth: 0, borderTopWidth: 0 },
+  br:        { bottom: '35%', right: '15%', borderLeftWidth: 0, borderTopWidth: 0 },
+  scanHint:  { position: 'absolute', bottom: '32%', alignSelf: 'center', color: 'rgba(255,255,255,0.55)', fontSize: fontSize.xs, fontWeight: '600' },
 
-  // Corners
-  corner: {
-    position: 'absolute',
-    width: 24, height: 24,
-    borderColor: 'white',
-    borderStyle: 'solid',
-  },
-  cornerTL: { top: 20, left: 20, borderTopWidth: 3, borderLeftWidth: 3 },
-  cornerTR: { top: 20, right: 20, borderTopWidth: 3, borderRightWidth: 3 },
-  cornerBL: { bottom: 20, left: 20, borderBottomWidth: 3, borderLeftWidth: 3 },
-  cornerBR: { bottom: 20, right: 20, borderBottomWidth: 3, borderRightWidth: 3 },
+  // Processing / success overlay
+  processingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
+  processingCard:    { alignItems: 'center', gap: spacing.md, padding: spacing.xl, backgroundColor: 'rgba(13,10,46,0.95)', borderRadius: 20, width: 260 },
+  processingTitle:   { color: '#fff', fontSize: fontSize.lg, fontWeight: '800', textAlign: 'center' },
+  processingSubtext: { color: 'rgba(255,255,255,0.5)', fontSize: fontSize.sm, textAlign: 'center' },
 
-  // Food label tags
-  labelTag: {
-    position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  labelTagText: { fontSize: 10, fontWeight: '600', color: 'white' },
+  // Bottom panel
+  bottomPanel:  { backgroundColor: '#0D0A2E', paddingTop: spacing.lg, paddingBottom: 36, paddingHorizontal: spacing.lg, gap: spacing.lg },
+  modeTabs:     { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 99, padding: 3 },
+  modeTab:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 99 },
+  modeTabActive:{ backgroundColor: '#2DDC8C' },
+  modeTabText:  { color: 'rgba(255,255,255,0.6)', fontSize: fontSize.sm, fontWeight: '600' },
+  shutterRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  shutter:      { width: 72, height: 72, borderRadius: 36, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  shutterInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#2DDC8C' },
+  galleryThumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  bottomHint:   { color: 'rgba(255,255,255,0.30)', fontSize: fontSize.xs, textAlign: 'center' },
 
-  // Processing
-  processingOverlay: {
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  processingText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: fontSize.base,
-    fontWeight: '500',
-  },
-
-  // Tap to scan
-  tapToScan: {
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  tapToScanCircle: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: 'rgba(45,220,140,0.15)',
-    borderWidth: 2,
-    borderColor: colors.dark.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tapToScanText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: fontSize.base,
-    fontWeight: '500',
-  },
-
-  // Result card
-  resultCard: {
-    backgroundColor: '#1a1f24',
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  resultFood: {
-    fontSize: fontSize.xl,
-    fontWeight: '700',
-    color: 'white',
-  },
-  resultConf: { fontSize: fontSize.sm, marginTop: 2 },
-  resultCal: {
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  resultMacros: {
-    flexDirection: 'row',
-    gap: spacing.xl,
-  },
-  macroItem: { alignItems: 'flex-start' },
-  macroValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.9)',
-  },
-  macroLabel: {
-    fontSize: fontSize.xs,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 2,
-  },
-  goalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  goalText: { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
-
-  // Log button
-  logBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginTop: spacing.xs,
-  },
-  logBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
-
-  // Meal picker
-  mealPicker: { gap: spacing.sm },
-  mealPickerLabel: {
-    fontSize: fontSize.sm,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: '500',
-  },
-  mealPickerBtns: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  mealPickerBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-  },
-  mealPickerBtnText: { fontSize: fontSize.base, fontWeight: '600' },
-
-  // Bottom controls
-  bottomControls: {
-    backgroundColor: '#111',
-    padding: spacing.md,
-    gap: spacing.md,
-    paddingBottom: spacing.xxl,
-  },
-  modeTabs: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  modeTab: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-  },
-  modeTabText: { fontSize: fontSize.sm },
-  utilRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-  },
-  utilBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  utilText: {
-    fontSize: fontSize.sm,
-    color: 'rgba(255,255,255,0.6)',
-  },
+  // Permission screen
+  permissionScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.lg },
+  permTitle:    { fontSize: fontSize.xl, fontWeight: '800', textAlign: 'center' },
+  permSub:      { fontSize: fontSize.base, textAlign: 'center', lineHeight: 22 },
+  permBtn:      { paddingHorizontal: 36, paddingVertical: 14, borderRadius: 99 },
+  permBtnText:  { fontSize: fontSize.base, fontWeight: '800' },
+  permBack:     { marginTop: spacing.sm },
+  permBackText: { fontSize: fontSize.sm },
 });

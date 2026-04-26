@@ -154,7 +154,7 @@
 
 ### High Priority
 
-- [ ] **Sleep tracker screen** — manual sleep logging, daily goal, sleep history, sleep consistency score. Feeds into dashboard sleep card, readiness score, and progress screen (all currently show 0)
+- [DONE] **Sleep tracker screen** — manual sleep logging, daily goal, sleep history, sleep consistency score. Feeds into dashboard sleep card, readiness score, and progress screen (all currently show 0)
 - [ ] **Notification reminder scheduling** — wire the toggle buttons in Settings to actually schedule local Expo Notifications for meal, water, workout, and sleep reminders at set times
 - [ ] **Save favourite meals** in calorie tracker — save a logged meal combination and re-add it in one tap
 - [ ] **Post like notification** — add to `postService.toggleLike` (when liking, not unliking, notify post owner)
@@ -237,7 +237,7 @@
 - [ ] Update `.env` with new Supabase URL and keys
 
 ### Requires Hostinger Email Setup
-- [ ] `dev@fabsdevelopment.com` — register Apple Developer, Google Play, Firebase, Supabase, GitHub, Expo, Anthropic
+- [DONE] `dev@bigcut.store` — register Apple Developer, Google Play, Firebase, Supabase, GitHub, Expo, Anthropic
 - [ ] `support@calfit.tech` — shown in App Store and Play Store as user support contact
 
 ### Requires Apple Health / Google Fit Entitlements

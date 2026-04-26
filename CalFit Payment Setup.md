@@ -1,5 +1,5 @@
 # CalFit — Payment Setup Guide
-### FABS Development (fabsdevelopment.com)
+### Bigcut (bigcut.store)
 ### Stack: React Native + Expo + react-native-iap
 
 ---
@@ -7,7 +7,7 @@
 ## Overview
 
 CalFit uses **Apple In-App Purchases (IAP)** for iOS and **Google Play Billing** for Android.
-Stripe was removed. All subscription payments go through the native store payment processors.
+Paystack for referral payments and withdrawals to users bank accounts. All subscription payments go through the native store payment processors.
 
 **Why native billing:**
 - Apple and Google require it for digital subscription apps
@@ -22,8 +22,8 @@ Stripe was removed. All subscription payments go through the native store paymen
 | Tier    | Price      | Product ID |
 |---------|------------|------------|
 | Free    | $0         | N/A — default |
-| Pro     | $9.99/month | `com.fabsdevelopment.calfit.pro.monthly` |
-| Premium | $19.99/month | `com.fabsdevelopment.calfit.premium.monthly` |
+| Pro     | $9.99/month | `store.bigcut.calfit.pro.monthly` |
+| Premium | $19.99/month | `store.bigcut.calfit.premium.monthly` |
 
 > **IMPORTANT:** These product IDs must match EXACTLY in:
 > - App Store Connect (iOS)
@@ -62,11 +62,11 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
     "slug": "calfit",
     "scheme": "calfit",
     "ios": {
-      "bundleIdentifier": "com.fabsdevelopment.calfit",
+      "bundleIdentifier": "store.bigcut.calfit",
       "usesAppleSignIn": true
     },
     "android": {
-      "package": "com.fabsdevelopment.calfit"
+      "package": "store.bigcut.calfit"
     }
   }
 }
@@ -78,9 +78,9 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 
 ### 3a — Create Developer Account
 1. Go to `play.google.com/console`
-2. Sign in with the FABS Development Google account (`@fabsdevelopment.com`)
+2. Sign in with the BigCut Google account (`@bigcut.store`)
 3. Pay the **$25 one-time** developer registration fee
-4. Fill in developer profile — use **FABS Development** as the developer name
+4. Fill in developer profile — use **Bigcut** as the developer name
 5. Complete account verification (takes 1–2 business days)
 
 ### 3b — Create the App
@@ -95,14 +95,14 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 1. In the left menu go to **Monetize → Subscriptions**
 2. Click **Create subscription**
 3. Create the first subscription:
-   - **Product ID:** `com.fabsdevelopment.calfit.pro.monthly`
+   - **Product ID:** `store.bigcut.calfit.pro.monthly`
    - **Name:** CalFit Pro
    - **Billing period:** Monthly
    - **Price:** $9.99 USD
    - **Free trial:** Optional (7 days recommended)
    - Click **Save**
 4. Create the second subscription:
-   - **Product ID:** `com.fabsdevelopment.calfit.premium.monthly`
+   - **Product ID:** `store.bigcut.calfit.premium.monthly`
    - **Name:** CalFit Premium
    - **Billing period:** Monthly
    - **Price:** $19.99 USD
@@ -120,7 +120,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 ### 3e — Get google-services.json
 1. Go to `console.firebase.google.com`
 2. Create a new project or use existing one
-3. Add an Android app with package name: `com.fabsdevelopment.calfit`
+3. Add an Android app with package name: `store.bigcut.calfit`
 4. Download `google-services.json`
 5. Place it in the **root of the CalFit project folder**
 
@@ -130,7 +130,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 
 ### 4a — Create Developer Account
 1. Go to `developer.apple.com`
-2. Sign in with the FABS Development Apple ID
+2. Sign in with the Bigcut Apple ID
 3. Enroll in the **Apple Developer Program**
 4. Pay the **$99/year** fee
 5. Verification takes 24–48 hours
@@ -142,7 +142,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
    - **Platform:** iOS
    - **Name:** CalFit
    - **Primary Language:** English
-   - **Bundle ID:** `com.fabsdevelopment.calfit` (must match app.json)
+   - **Bundle ID:** `store.bigcut.calfit` (must match app.json)
    - **SKU:** `calfit-ios-001` (any unique string)
 4. Click **Create**
 
@@ -156,7 +156,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
    - Reference name: `calfit-subscriptions`
 6. Inside the group add the first subscription:
    - **Reference name:** CalFit Pro Monthly
-   - **Product ID:** `com.fabsdevelopment.calfit.pro.monthly`
+   - **Product ID:** `store.bigcut.calfit.pro.monthly`
    - Click **Create**
    - Set **Price:** $9.99 USD
    - Add **Localization** (English):
@@ -166,7 +166,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
    - Click **Save**
 7. Add the second subscription:
    - **Reference name:** CalFit Premium Monthly
-   - **Product ID:** `com.fabsdevelopment.calfit.premium.monthly`
+   - **Product ID:** `store.bigcut.calfit.premium.monthly`
    - Click **Create**
    - Set **Price:** $19.99 USD
    - Add **Localization** (English):
@@ -186,7 +186,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 
 ### 4e — Get GoogleService-Info.plist (for iOS push notifications)
 1. Go to `console.firebase.google.com`
-2. Add an iOS app with bundle ID: `com.fabsdevelopment.calfit`
+2. Add an iOS app with bundle ID: `store.bigcut.calfit`
 3. Download `GoogleService-Info.plist`
 4. Add it to the project (AOT handles this)
 
@@ -198,8 +198,8 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 2. Create a new project named **CalFit**
 3. Go to **APIs & Services → Credentials**
 4. Click **Create Credentials → OAuth 2.0 Client ID**
-5. Application type: **iOS** → Bundle ID: `com.fabsdevelopment.calfit`
-6. Create another for **Android** → Package: `com.fabsdevelopment.calfit`
+5. Application type: **iOS** → Bundle ID: `store.bigcut.calfit`
+6. Create another for **Android** → Package: `store.bigcut.calfit`
 7. Copy the **Client IDs** and share with AOT
 8. In Supabase dashboard → Authentication → Providers → Google:
    - Enable Google
@@ -211,7 +211,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 ## Step 6 — Apple Sign In Credentials
 
 1. In Apple Developer portal go to **Identifiers**
-2. Find or create the `com.fabsdevelopment.calfit` identifier
+2. Find or create the `store.bigcut.calfit` identifier
 3. Enable **Sign In with Apple** capability
 4. Go to **Keys → Create a Key**
 5. Enable **Sign In with Apple**
@@ -223,22 +223,7 @@ Make sure `app.json` has the correct bundle ID before submitting to either store
 
 ---
 
-## Step 7 — Supabase Migration to FABS Development Account
-
-When FABS Development has their Supabase account ready:
-
-1. FABS Development creates account at `supabase.com` with `@fabsdevelopment.com` email
-2. FABS Development creates a new **Organisation** in their account
-3. AOT exports a complete SQL migration file from current project
-4. FABS Development creates a new Supabase **Project**
-5. AOT runs the migration SQL in the new project SQL editor
-6. AOT migrates Storage buckets (avatars, posts-media)
-7. AOT re-deploys the `delete-user` Edge Function with the new service role key
-8. AOT updates `.env` with new:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-9. Rebuild with EAS and run full end-to-end test
+## Step 7 — Rebuild with EAS and run full end-to-end test
 
 ---
 
@@ -250,7 +235,7 @@ Once all accounts are set up:
 # Install EAS CLI
 npm install -g eas-cli
 
-# Login with FABS Development Expo account
+# Login with BIGCUT Expo account
 eas login
 
 # Configure EAS
@@ -288,8 +273,8 @@ To qualify for the 15% reduced fee:
 
 ### Product IDs (must match stores exactly)
 ```typescript
-com.fabsdevelopment.calfit.pro.monthly      // $9.99/month
-com.fabsdevelopment.calfit.premium.monthly  // $19.99/month
+store.bigcut.calfit.pro.monthly      // $9.99/month
+store.bigcut.calfit.premium.monthly  // $19.99/month
 ```
 
 ### Key files
@@ -326,7 +311,7 @@ App.tsx                                     // Purchase listeners
 - [ ] Apple Sign In credentials created and added to Supabase
 - [ ] `google-services.json` added to project root (Android)
 - [ ] `GoogleService-Info.plist` added to project (iOS)
-- [ ] Supabase migrated to FABS Development account
+- [DONE] Supabase Added to Bigcut workspace
 - [ ] `.env` updated with new Supabase credentials
 - [ ] EAS build generated for both platforms
 - [ ] TestFlight build tested on iOS

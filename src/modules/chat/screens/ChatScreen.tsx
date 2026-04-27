@@ -15,6 +15,7 @@ import { MessageBubble } from '../components/MessageBubble';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { ProgressSnapshot } from '../components/progressSnapshot';
 import { useChat } from '../hooks/useChat';
+import { VoiceMicButton } from '../../../components/VoicemicButton';
 
 // Prefix so message bubbles can detect image messages vs plain text
 const IMAGE_PREFIX = '__IMAGE__:';
@@ -34,7 +35,6 @@ export default function ChatScreen() {
 
   const { messages, isLoading, send } = useChat(conversationId, user?.id ?? '');
   const [inputText, setInputText]     = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const formatTime = (dateStr: string) =>
@@ -74,9 +74,6 @@ export default function ChatScreen() {
 
   const handleVideoCall = () =>
     Alert.alert('Video Call', `Video calling ${otherUserName}...\n\nVideo calling requires camera permission and will be fully enabled in Settings once you're ready to test it.`);
-
-  const handleVoiceRecord = () =>
-    Alert.alert('Voice Message', 'Voice messages are coming soon. Hold to record when the feature is enabled.');
 
   // Render each message — detects image vs text
   const renderMessage = (msg: any) => {
@@ -189,15 +186,15 @@ export default function ChatScreen() {
             />
           </View>
 
-          {/* Voice */}
-          <TouchableOpacity onPress={handleVoiceRecord} activeOpacity={0.8}
-            style={[styles.mediaBtn, {
-              backgroundColor: isRecording ? theme.gradStart + '22' : theme.card,
-              borderColor: isRecording ? theme.gradStart : theme.border,
-            }]}>
-            <Ionicons name={isRecording ? 'stop-circle' : 'mic-outline'} size={20}
-              color={isRecording ? theme.gradStart : theme.accent} />
-          </TouchableOpacity>
+         {/* Voice — uses shared VoiceMicButton component */}
+          <VoiceMicButton
+            theme={theme}
+            size={40}
+            onTranscribed={(text) => {
+              setInputText(text);
+              // Don't auto-send in chat — let user review before sending
+            }}
+          />
 
           {/* ── SEND BUTTON ────────────────────────────────── */}
           <TouchableOpacity onPress={handleSend} disabled={!inputText.trim()}

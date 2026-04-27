@@ -49,16 +49,6 @@ export default function MessagesScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      <View style={[styles.privacyBanner, {
-        backgroundColor: theme.accentDim as string,
-        borderColor: theme.accent,
-      }]}>
-        <Ionicons name="shield-checkmark-outline" size={14} color={theme.accent} />
-        <Text style={[styles.privacyText, { color: theme.accent }]}>
-          Only CalFit IDs and fitness stats are visible. No personal info shared.
-        </Text>
-      </View>
-
       {isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={theme.accent} />
@@ -117,16 +107,5 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   backText: { fontSize: fontSize.lg, fontWeight: '400' },
   pageTitle: { fontSize: fontSize.lg, fontWeight: '700' },
-  privacyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-  },
-  privacyText: { fontSize: fontSize.xs, fontWeight: '600', flex: 1, lineHeight: 16 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

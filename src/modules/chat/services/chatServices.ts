@@ -9,6 +9,25 @@ export interface MessageData {
   created_at: string;
 }
 
+// ── CONVERSATION DATA TYPE ────────────────────────────────────
+// Returned by loadConversations() and used by MessageScreen + useConversations
+export interface ConversationData {
+  id: string;
+  participant_1: string;
+  participant_2: string;
+  last_message: string | null;
+  last_message_at: string | null;
+  other_user: {
+    id: string;
+    full_name: string;
+    calfit_id: string;
+    avatar_url: string | null;
+    goal: string;
+    streak_count: number;
+  } | null;
+  unread_count: number;
+}
+
 export const getOrCreateConversation = async (
   userId: string,
   otherUserId: string
@@ -39,7 +58,7 @@ export const getOrCreateConversation = async (
   return data.id;
 };
 
-export const loadConversations = async (userId: string) => {
+export const loadConversations = async (userId: string): Promise<ConversationData[]> => {
   const { data, error } = await supabase
     .from('conversations')
     .select('id, participant_1, participant_2, last_message, last_message_at')

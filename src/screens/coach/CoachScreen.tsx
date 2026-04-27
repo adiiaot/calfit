@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { VoiceMicButton } from '../../components/VoicemicButton';
 
 // ── PERSONALITIES ─────────────────────────────────────────────
 const PERSONALITIES = [
@@ -281,6 +282,18 @@ Keep responses concise and actionable. Max 3 sentences unless asked for more.`;
                 onSubmitEditing={() => sendMessage()}
               />
             </View>
+
+
+{/* Voice mic — transcribes and sends to coach */}
+            <VoiceMicButton
+              theme={theme}
+              size={40}
+              onTranscribed={(text) => {
+                setInput(text);
+                // Auto-send after transcription
+                sendMessage(text);
+              }}
+            />
 
             {/* Send button */}
             <TouchableOpacity onPress={() => sendMessage()} disabled={!input.trim() && !isTyping}

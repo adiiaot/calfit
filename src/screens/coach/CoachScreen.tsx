@@ -1,7 +1,7 @@
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal, KeyboardAvoidingView, Platform,
-  Image, Alert,
+  Image, Alert, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
@@ -100,26 +100,78 @@ export default function CoachScreen() {
 
   const firstName      = profile?.full_name?.split(' ')[0] ?? 'there';
   const activeP        = PERSONALITIES.find(p => p.id === coachPersonality) ?? PERSONALITIES[0];
-  const isFree         = !userTier || userTier === 'free';
+  const isFree         = false; // TESTING: bypassed — restore before release: !userTier || userTier === 'free'
 
   const scrollRef = useRef<ScrollView>(null);
-  const [messages, setMessages]         = useState<Message[]>([{
+  const hasLoaded = useRef(false);
+
+  const WELCOME: Message = {
     from: 'coach',
     text: `Hey ${firstName}! 👋 I'm your CalFit Coach.\n\nAsk me anything about nutrition, workouts, or your progress. You can also send a food photo for calorie analysis!`,
     time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-  }]);
-  const [input, setInput]               = useState('');
-  const [isTyping, setIsTyping]         = useState(false);
-  const [showPersonality, setShowPersonality] = useState(false);
-  const [usage, setUsage]               = useState<UsageStatus | null>(null);
-  const [cooldown, setCooldown]         = useState(0);
+  };
 
-  // Load usage on focus
+  const [messages, setMessages]               = useState<Message[]>([WELCOME]);
+  const [input, setInput]                     = useState('');
+  const [isTyping, setIsTyping]               = useState(false);
+  const [showPersonality, setShowPersonality] = useState(false);
+  const [usage, setUsage]                     = useState<UsageStatus | null>(null);
+  const [cooldown, setCooldown]               = useState(0);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // ── LOAD HISTORY + USAGE ON FOCUS ────────────────────────
+  // Uses a ref so history only loads once per mount, not on every focus.
+  // Usage refreshes every focus to keep the count accurate.
   useFocusEffect(useCallback(() => {
     if (user?.id && !isFree) {
-      checkUsage(user.id, userTier ?? 'pro').then(setUsage);
+      checkUsage(user.id, 'premium').then(setUsage); // TESTING: restore userTier ?? 'pro'
+    }
+    if (user?.id && !hasLoaded.current) {
+      hasLoaded.current = true;
+      loadHistory();
     }
   }, [user?.id, userTier]));
+
+  const loadHistory = async () => {
+    if (!user?.id) return;
+    setIsLoadingHistory(true);
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const { data } = await supabase
+        .from('coach_messages')
+        .select('from_role, text, image_uri, time_label, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (data && data.length > 0) {
+        const loaded: Message[] = data.map((r: any) => ({
+          from:  r.from_role as 'user' | 'coach',
+          text:  r.text,
+          image: r.image_uri ?? undefined,
+          time:  r.time_label ?? '',
+        }));
+        setMessages(loaded);
+        // Scroll to bottom after loading
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 150);
+      }
+    } catch {}
+    finally { setIsLoadingHistory(false); }
+  };
+
+  const saveMessage = async (msg: Message) => {
+    if (!user?.id) return;
+    try {
+      const { supabase } = await import('../../services/supabase');
+      await supabase.from('coach_messages').insert({
+        user_id:    user.id,
+        from_role:  msg.from,
+        text:       msg.text,
+        image_uri:  msg.image ?? null,
+        time_label: msg.time,
+      });
+    } catch {}
+  };
 
   // Cooldown countdown
   const startCooldown = () => {
@@ -146,7 +198,7 @@ export default function CoachScreen() {
     if (!user?.id) return;
 
     // Usage gate
-    const status = await checkUsage(user.id, userTier ?? 'pro');
+    const status = await checkUsage(user.id, 'premium'); // TESTING: using premium — restore: userTier ?? 'pro'
     setUsage(status);
 
     if (!status.allowed) {
@@ -168,6 +220,7 @@ export default function CoachScreen() {
       time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
     };
     setMessages(prev => [...prev, userMsg]);
+    saveMessage(userMsg);  // persist to Supabase
     setInput('');
     setIsTyping(true);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -190,13 +243,15 @@ export default function CoachScreen() {
         reply = await claudeChat(buildPrompt(status.isSoftLimit), history, msgText, status.isSoftLimit);
       }
 
-      setMessages(prev => [...prev, {
+      const coachMsg: Message = {
         from: 'coach',
         text: reply ?? (hasClaudeKey()
           ? "I didn't catch that. Could you rephrase?"
           : "AI Coach isn't connected yet. Add your Anthropic API key to activate it."),
         time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      }]);
+      };
+      setMessages(prev => [...prev, coachMsg]);
+      saveMessage(coachMsg);  // persist to Supabase
 
       // Track usage and start cooldown
       await incrementUsage(user.id);
@@ -256,10 +311,28 @@ export default function CoachScreen() {
             </View>
           </View>
         </View>
-        <TouchableOpacity onPress={() => setShowPersonality(true)}
-          style={[styles.personalityBtn, { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.20)' }]}>
-          <Text style={{ fontSize: 18 }}>{activeP.emoji}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => {
+              Alert.alert('Clear Chat', 'Delete all messages with your coach?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Clear', style: 'destructive', onPress: async () => {
+                  if (!user?.id) return;
+                  const { supabase } = await import('../../services/supabase');
+                  await supabase.from('coach_messages').delete().eq('user_id', user.id);
+                  hasLoaded.current = false;
+                  setMessages([WELCOME]);
+                }},
+              ]);
+            }}
+            style={[styles.personalityBtn, { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.20)' }]}>
+            <Ionicons name="trash-outline" size={16} color="rgba(255,255,255,0.70)" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowPersonality(true)}
+            style={[styles.personalityBtn, { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.20)' }]}>
+            <Text style={{ fontSize: 18 }}>{activeP.emoji}</Text>
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       {/* Free tier paywall */}
@@ -270,6 +343,12 @@ export default function CoachScreen() {
           <UsageBar status={usage} theme={theme} />
 
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
+            {isLoadingHistory && (
+              <View style={[styles.historyLoader, { backgroundColor: theme.bg }]}>
+                <ActivityIndicator color={theme.accent} />
+                <Text style={[styles.historyLoaderText, { color: theme.textMuted }]}>Loading conversation...</Text>
+              </View>
+            )}
             <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={styles.messageListContent}
               showsVerticalScrollIndicator={false}
               onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
@@ -431,6 +510,8 @@ const styles = StyleSheet.create({
   sendBtnWrap: { borderRadius: 20, overflow: 'hidden', flexShrink: 0 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   imageHint: { fontSize: fontSize.xs, textAlign: 'center', paddingBottom: spacing.sm },
+  historyLoader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
+  historyLoaderText: { fontSize: fontSize.xs, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, maxHeight: '80%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1 },

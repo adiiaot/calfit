@@ -16,9 +16,11 @@ import { UserAvatar } from '../../shared/UserAvatar';
 import { ProgressSnapshot } from '../components/progressSnapshot';
 import { useChat } from '../hooks/useChat';
 import { VoiceMicButton } from '../../../components/VoicemicButton';
+import { startRecording, stopRecording, cancelRecording, requestMicPermission } from '../../../services/VoiceRecorderService';
 
 // Prefix so message bubbles can detect image messages vs plain text
 const IMAGE_PREFIX = '__IMAGE__:';
+const AUDIO_PREFIX = '__AUDIO__:';  // ← Reserved prefix for future audio messages
 
 export default function ChatScreen() {
   const navigation = useNavigation<any>();
@@ -35,6 +37,7 @@ export default function ChatScreen() {
 
   const { messages, isLoading, send } = useChat(conversationId, user?.id ?? '');
   const [inputText, setInputText]     = useState('');
+  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const formatTime = (dateStr: string) =>
@@ -54,6 +57,31 @@ export default function ChatScreen() {
     await send(`${IMAGE_PREFIX}${uri}`);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
+
+  // Handle voice recording 
+  const handleVoiceRecord = async () => {
+  if (isRecording) {
+    // Stop recording and send
+    setIsRecording(false);
+    const uri = await stopRecording();
+    if (uri) {
+      await send(`${AUDIO_PREFIX}${uri}`);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  } else {
+    // Start recording
+    const granted = await requestMicPermission();
+    if (!granted) {
+      Alert.alert(
+        'Microphone Access Needed',
+        'Allow microphone access in Settings to send voice messages.'
+      );
+      return;
+    }
+    const started = await startRecording();
+    if (started) setIsRecording(true);
+  }
+};
 
   const handleSendImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -92,6 +120,29 @@ export default function ChatScreen() {
         </View>
       );
     }
+
+    // Audio message bubble
+const isAudio = typeof msg.content === 'string' && msg.content.startsWith(AUDIO_PREFIX);
+const audioUri = isAudio ? msg.content.replace(AUDIO_PREFIX, '') : null;
+
+if (isAudio && audioUri) {
+  return (
+    <View key={msg.id} style={[styles.bubbleWrap, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+      <View style={[styles.audioBubble, {
+        backgroundColor: isMe ? theme.accent : theme.card,
+        borderColor: theme.border,
+      }]}>
+        <Ionicons name="mic" size={16} color={isMe ? '#fff' : theme.accent} />
+        <Text style={[styles.audioText, { color: isMe ? '#fff' : theme.textPrimary }]}>
+          Voice message
+        </Text>
+        <Text style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.65)' : theme.textMuted }]}>
+          {time}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
     return (
       <View key={msg.id} style={styles.bubbleWrap}>
@@ -240,6 +291,13 @@ const styles = StyleSheet.create({
   imageBubble: { maxWidth: '75%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, padding: 4 },
   bubbleImage: { width: 220, height: 165, borderRadius: 12 },
   bubbleTime: { fontSize: fontSize.xs, paddingHorizontal: 6, paddingTop: 4, textAlign: 'right' },
+
+  audioBubble: {
+  flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+  paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+  borderRadius: radius.lg, borderWidth: 1, maxWidth: '70%',
+},
+audioText: { fontSize: fontSize.sm, fontWeight: '600' },
 
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',

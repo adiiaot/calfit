@@ -92,10 +92,13 @@ export function VoiceMicButton({
     if (text) {
       onTranscribed(text);
     } else {
-      // Voice-to-text not yet active — inform user
+      // Check if key is missing vs transcription genuinely failed
+      const hasKey = !!process.env.EXPO_PUBLIC_DEEPGRAM_KEY;
       Alert.alert(
-        'Voice Recorded ✓',
-        'Voice-to-text will be active once the Anthropic API key is connected. For now, please type your message.',
+        hasKey ? 'Could not transcribe' : 'Voice-to-text not active yet',
+        hasKey
+          ? 'Could not understand the audio. Please speak clearly and try again, or type your message.'
+          : 'Add your Deepgram API key to .env as EXPO_PUBLIC_DEEPGRAM_KEY. Get 200 hrs/month free at deepgram.com — no credit card needed.',
         [{ text: 'OK' }]
       );
     }

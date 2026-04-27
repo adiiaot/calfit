@@ -6,21 +6,26 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState, useRef, useCallback } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { VoiceMicButton } from '../../components/VoicemicButton';
+import {
+  claudeChat, claudeVision, checkUsage, incrementUsage,
+  buildCoachPrompt, hasClaudeKey, isOnCooldown, getCooldownRemaining,
+  PLAN_LIMITS, type UsageStatus,
+} from '../../services/ClaudeService';
 
 // ── PERSONALITIES ─────────────────────────────────────────────
 const PERSONALITIES = [
-  { id: 'balanced',    name: 'Balanced',     emoji: '⚖️', color: '#2DDC8C', description: 'Supportive and realistic — perfect for most people', tone: 'You are a balanced, supportive fitness coach. Be encouraging but realistic. Give practical advice.' },
-  { id: 'hype',        name: 'Hype Coach',   emoji: '🔥', color: '#FF6B35', description: 'High energy, motivational, never lets you quit',       tone: 'You are an extremely motivational, high-energy coach. Use energy and enthusiasm. Push the user to be their best!' },
-  { id: 'drill',       name: 'Drill Sergeant', emoji: '💪', color: '#F0427C', description: 'Tough love — no excuses, only results',              tone: 'You are a strict drill sergeant coach. Be direct, tough, no excuses. Short, punchy responses.' },
-  { id: 'zen',         name: 'Zen Guide',    emoji: '🧘', color: '#4A90E2', description: 'Calm and mindful — health is a lifestyle',             tone: 'You are a calm, mindful wellness guide. Focus on balance, sustainability, and mental wellbeing alongside physical health.' },
-  { id: 'scientist',   name: 'The Scientist', emoji: '🔬', color: '#9B6FE8', description: 'Evidence-based — data, not feelings',                 tone: 'You are a science-based fitness coach. Reference research, explain the why, give data-driven advice.' },
+  { id: 'balanced',  name: 'Balanced',      emoji: '⚖️', color: '#2DDC8C', description: 'Supportive and realistic — perfect for most people',   tone: 'You are a balanced, supportive fitness coach. Be encouraging but realistic.' },
+  { id: 'hype',      name: 'Hype Coach',    emoji: '🔥', color: '#FF6B35', description: 'High energy, motivational, never lets you quit',         tone: 'You are an extremely motivational, high-energy coach. Push the user to be their best!' },
+  { id: 'drill',     name: 'Drill Sergeant',emoji: '💪', color: '#F0427C', description: 'Tough love — no excuses, only results',                  tone: 'You are a strict drill sergeant coach. Be direct, no excuses. Short punchy responses.' },
+  { id: 'zen',       name: 'Zen Guide',     emoji: '🧘', color: '#4A90E2', description: 'Calm and mindful — health is a lifestyle',               tone: 'You are a calm, mindful wellness guide. Focus on balance and sustainability.' },
+  { id: 'scientist', name: 'The Scientist', emoji: '🔬', color: '#9B6FE8', description: 'Evidence-based — data, not feelings',                    tone: 'You are a science-based fitness coach. Reference research, give data-driven advice.' },
 ];
 
 const QUICK_CHIPS = [
@@ -28,103 +33,180 @@ const QUICK_CHIPS = [
   '😴 Sleep & recovery', '📊 Reading my macros', '🔥 Boost my metabolism',
 ];
 
-interface Message {
-  from: 'user' | 'coach';
-  text: string;
-  image?: string; // base64 or uri for image messages
-  time: string;
-}
+interface Message { from: 'user' | 'coach'; text: string; image?: string; time: string; }
 
+// ── USAGE BAR ─────────────────────────────────────────────────
+function UsageBar({ status, theme }: { status: UsageStatus | null; theme: typeof colors.dark }) {
+  if (!status || status.messagesLimit === 0) return null;
+  const pct = Math.min(status.messagesUsed / status.messagesLimit, 1);
+  const color = pct >= 0.9 ? '#FF5959' : pct >= 0.7 ? '#FFB347' : theme.accent;
+  return (
+    <View style={[ub.wrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[ub.label, { color: theme.textMuted }]}>
+        {status.messagesUsed}/{status.messagesLimit} messages today
+      </Text>
+      <View style={[ub.track, { backgroundColor: theme.border }]}>
+        <View style={[ub.fill, { width: `${pct * 100}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+const ub = StyleSheet.create({
+  wrap:  { marginHorizontal: spacing.lg, marginBottom: spacing.xs, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, gap: 4 },
+  label: { fontSize: 10, fontWeight: '600' },
+  track: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  fill:  { height: '100%', borderRadius: 2 },
+});
+
+// ── PAYWALL CARD ──────────────────────────────────────────────
+function PaywallCard({ theme, onUpgrade }: { theme: typeof colors.dark; onUpgrade: () => void }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.lg }}>
+      <LinearGradient colors={['#2DDC8C22', '#6699FF22'] as [string, string]} style={pw.card}>
+        <Text style={pw.emoji}>🤖</Text>
+        <Text style={[pw.title, { color: theme.textPrimary }]}>CalFit Coach</Text>
+        <Text style={[pw.sub, { color: theme.textMuted }]}>
+          Get personalised fitness and nutrition guidance powered by AI. Available on Pro and Premium plans.
+        </Text>
+        <View style={pw.features}>
+          {['💪 Workout advice', '🥗 Nutrition guidance', '📷 Food photo analysis', '🎤 Voice questions'].map(f => (
+            <Text key={f} style={[pw.feature, { color: theme.textSecondary }]}>{f}</Text>
+          ))}
+        </View>
+        <TouchableOpacity onPress={onUpgrade} style={[pw.btn, { backgroundColor: theme.accent }]}>
+          <Text style={[pw.btnText, { color: theme.bg }]}>Upgrade to Pro</Text>
+        </TouchableOpacity>
+      </LinearGradient>
+    </View>
+  );
+}
+const pw = StyleSheet.create({
+  card:     { borderRadius: radius.lg, padding: spacing.xl, alignItems: 'center', gap: spacing.md, width: '100%' },
+  emoji:    { fontSize: 48 },
+  title:    { fontSize: fontSize.xl, fontWeight: '800' },
+  sub:      { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
+  features: { gap: spacing.sm, alignSelf: 'stretch' },
+  feature:  { fontSize: fontSize.sm, fontWeight: '500' },
+  btn:      { paddingHorizontal: 32, paddingVertical: 14, borderRadius: 99, marginTop: spacing.sm },
+  btnText:  { fontSize: fontSize.base, fontWeight: '800' },
+});
+
+// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function CoachScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { profile, coachPersonality, setCoachPersonality } = useAuthStore();
+  const { profile, userTier, coachPersonality, setCoachPersonality, user } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
-  const activePersonality = PERSONALITIES.find((p) => p.id === coachPersonality) ?? PERSONALITIES[0];
+  const firstName      = profile?.full_name?.split(' ')[0] ?? 'there';
+  const activeP        = PERSONALITIES.find(p => p.id === coachPersonality) ?? PERSONALITIES[0];
+  const isFree         = !userTier || userTier === 'free';
 
   const scrollRef = useRef<ScrollView>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      from: 'coach',
-      text: `Hey ${firstName}! 👋 I'm your CalFit Coach — here to help you hit your goals.\n\nAsk me anything about nutrition, workouts, sleep, or your progress. You can also send me a photo of your food and I'll analyse it for you!`,
-      time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-    },
-  ]);
-  const [input, setInput]                 = useState('');
-  const [isTyping, setIsTyping]           = useState(false);
+  const [messages, setMessages]         = useState<Message[]>([{
+    from: 'coach',
+    text: `Hey ${firstName}! 👋 I'm your CalFit Coach.\n\nAsk me anything about nutrition, workouts, or your progress. You can also send a food photo for calorie analysis!`,
+    time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+  }]);
+  const [input, setInput]               = useState('');
+  const [isTyping, setIsTyping]         = useState(false);
   const [showPersonality, setShowPersonality] = useState(false);
-  const [pendingImage, setPendingImage]   = useState<string | null>(null);
+  const [usage, setUsage]               = useState<UsageStatus | null>(null);
+  const [cooldown, setCooldown]         = useState(0);
 
-  const buildSystemPrompt = () =>
-    `${activePersonality.tone}
-The user's name is ${firstName}.
-Their fitness goal is: ${(profile as any)?.goal ?? 'general fitness'}.
-Their current streak is: ${(profile as any)?.streak_count ?? 0} days.
-Current calorie goal: ${(profile as any)?.daily_calorie_goal ?? 2000} kcal/day.
-Always be helpful, safe, and never recommend anything dangerous.
-Keep responses concise and actionable. Max 3 sentences unless asked for more.`;
+  // Load usage on focus
+  useFocusEffect(useCallback(() => {
+    if (user?.id && !isFree) {
+      checkUsage(user.id, userTier ?? 'pro').then(setUsage);
+    }
+  }, [user?.id, userTier]));
+
+  // Cooldown countdown
+  const startCooldown = () => {
+    setCooldown(getCooldownRemaining());
+    const t = setInterval(() => {
+      const rem = getCooldownRemaining();
+      setCooldown(rem);
+      if (rem <= 0) clearInterval(t);
+    }, 1000);
+  };
+
+  const buildPrompt = (isSoft = false) =>
+    buildCoachPrompt(
+      (profile as any)?.goal ?? 'general fitness',
+      (profile as any)?.streak_count ?? 0,
+      (profile as any)?.daily_calorie_goal ?? 2000,
+      activeP.tone,
+      isSoft
+    );
 
   const sendMessage = async (text?: string, imageBase64?: string) => {
-    const messageText = text ?? input.trim();
-    if (!messageText && !imageBase64) return;
+    const msgText = text ?? input.trim();
+    if (!msgText && !imageBase64) return;
+    if (!user?.id) return;
+
+    // Usage gate
+    const status = await checkUsage(user.id, userTier ?? 'pro');
+    setUsage(status);
+
+    if (!status.allowed) {
+      if (status.reason === 'free_plan') return;
+      if (status.reason === 'cooldown') {
+        Alert.alert('Please wait', `Send another message in ${getCooldownRemaining()}s`);
+        return;
+      }
+      if (status.reason === 'limit_reached') {
+        Alert.alert('Daily limit reached', `You've used all ${PLAN_LIMITS.pro} messages for today. Resets at midnight.\n\nUpgrade to Premium for more.`);
+        return;
+      }
+    }
 
     const userMsg: Message = {
       from: 'user',
-      text: messageText || (imageBase64 ? '📷 Image sent' : ''),
+      text: msgText || '📷 Image sent',
       image: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : undefined,
       time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
     };
-
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
-    setPendingImage(null);
     setIsTyping(true);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      const conversationHistory = messages.map((m) => ({
-        role: m.from === 'user' ? 'user' as const : 'assistant' as const,
-        content: m.text,
-      }));
+      let reply: string | null = null;
 
-      // Build content for this message — text + optional image (Claude Vision)
-      let userContent: any;
       if (imageBase64) {
-        userContent = [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
-          { type: 'text', text: messageText || 'Please analyse this image and provide nutritional information and fitness advice.' },
-        ];
+        reply = await claudeVision(
+          buildPrompt(status.isSoftLimit),
+          imageBase64,
+          msgText || 'Analyse this food image — estimate calories and macros.'
+        );
       } else {
-        userContent = messageText;
+        // Only pass last 4 messages (2 exchanges) to control cost
+        const history = messages.slice(-4).map(m => ({
+          role: m.from === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.text,
+        }));
+        reply = await claudeChat(buildPrompt(status.isSoftLimit), history, msgText, status.isSoftLimit);
       }
 
-      conversationHistory.push({ role: 'user', content: userContent });
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: buildSystemPrompt(),
-          messages: conversationHistory,
-        }),
-      });
-
-      const data = await response.json();
-      const replyText = data?.content?.[0]?.text ?? "I'm here to help! Could you rephrase that?";
-
-      setMessages((prev) => [...prev, {
+      setMessages(prev => [...prev, {
         from: 'coach',
-        text: replyText,
+        text: reply ?? (hasClaudeKey()
+          ? "I didn't catch that. Could you rephrase?"
+          : "AI Coach isn't connected yet. Add your Anthropic API key to activate it."),
         time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
       }]);
+
+      // Track usage and start cooldown
+      await incrementUsage(user.id);
+      setUsage(prev => prev ? { ...prev, messagesUsed: prev.messagesUsed + 1 } : prev);
+      startCooldown();
+
     } catch {
-      setMessages((prev) => [...prev, {
+      setMessages(prev => [...prev, {
         from: 'coach',
-        text: "I'm analysing your data now. Based on your current progress, you're doing great — keep it consistent!",
+        text: "Having trouble connecting right now. Please try again.",
         time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
       }]);
     } finally {
@@ -135,186 +217,154 @@ Keep responses concise and actionable. Max 3 sentences unless asked for more.`;
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow photo access to send images to your coach.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      base64: true,
-      quality: 0.7,
-      allowsEditing: true,
-    });
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow photo access to send images.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, base64: true, quality: 0.6 });
     if (!result.canceled && result.assets[0].base64) {
-      await sendMessage('Please analyse this food image and tell me the estimated calories and macros.', result.assets[0].base64);
+      await sendMessage('Analyse this food image — estimate calories and macros.', result.assets[0].base64);
     }
   };
 
   const handleCameraImage = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow camera access to scan food with your coach.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      base64: true,
-      quality: 0.7,
-    });
+    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow camera access.'); return; }
+    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.6 });
     if (!result.canceled && result.assets[0].base64) {
-      await sendMessage('Please analyse this food and estimate the calories and macros.', result.assets[0].base64);
+      await sendMessage('Analyse this food and estimate calories and macros.', result.assets[0].base64);
     }
   };
 
-  return (
-   <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+  const canSend = input.trim().length > 0 && !isTyping && cooldown === 0;
 
-      {/* ── HEADER ─────────────────────────────────────────── */}
-      <LinearGradient colors={[theme.heroCard, theme.heroCard + 'EE'] as [string, string]} style={[styles.header, { borderBottomColor: 'rgba(255,255,255,0.10)' }]}>
-        {/* Back button */}
+  return (
+    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
+
+      {/* Header */}
+      <LinearGradient colors={[theme.heroCard ?? '#1A1445', theme.heroCard + 'EE'] as [string, string]}
+        style={[styles.header, { borderBottomColor: 'rgba(255,255,255,0.10)' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={26} color="#fff" />
         </TouchableOpacity>
-
-        {/* Coach identity */}
         <View style={styles.headerCenter}>
-          <View style={[styles.coachAvatar, { backgroundColor: theme.accent + '33', borderColor: theme.accent }]}>
-            <Text style={[styles.coachAvatarEmoji]}>{activePersonality.emoji}</Text>
+          <View style={[styles.coachAvatar, { backgroundColor: activeP.color + '33', borderColor: activeP.color }]}>
+            <Text style={{ fontSize: 16 }}>{activeP.emoji}</Text>
           </View>
           <View>
-            {/* CHANGED: "CalFit Coach" not "AI Coach powered by Claude API" */}
             <Text style={styles.coachName}>CalFit Coach</Text>
             <View style={styles.onlineRow}>
-              <View style={[styles.onlineDot, { backgroundColor: theme.accent }]} />
-              <Text style={[styles.onlineSub, { color: theme.accent }]}>{activePersonality.name} · Online</Text>
+              <View style={[styles.onlineDot, { backgroundColor: '#2DDC8C' }]} />
+              <Text style={[styles.onlineSub, { color: '#2DDC8C' }]}>{activeP.name} · Online</Text>
             </View>
           </View>
         </View>
-
-        {/* Personality selector */}
         <TouchableOpacity onPress={() => setShowPersonality(true)}
           style={[styles.personalityBtn, { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.20)' }]}>
-          <Text style={styles.personalityEmoji}>{activePersonality.emoji}</Text>
+          <Text style={{ fontSize: 18 }}>{activeP.emoji}</Text>
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* ── MESSAGES ───────────────────────────────────────── */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
-        <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={styles.messageListContent}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
+      {/* Free tier paywall */}
+      {isFree ? (
+        <PaywallCard theme={theme} onUpgrade={() => navigation.navigate('Subscription' as never)} />
+      ) : (
+        <>
+          <UsageBar status={usage} theme={theme} />
 
-          {messages.map((msg, i) => {
-            const isUser = msg.from === 'user';
-            return (
-              <View key={i} style={[styles.bubbleWrap, isUser ? styles.bubbleWrapUser : styles.bubbleWrapCoach]}>
-                {!isUser && (
-                  <View style={[styles.coachAvatarSmall, { backgroundColor: theme.accent + '22', borderColor: theme.accent + '44' }]}>
-                    <Text style={{ fontSize: 12 }}>{activePersonality.emoji}</Text>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
+            <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={styles.messageListContent}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
+
+              {messages.map((msg, i) => {
+                const isUser = msg.from === 'user';
+                return (
+                  <View key={i} style={[styles.bubbleWrap, isUser ? styles.bubbleWrapUser : styles.bubbleWrapCoach]}>
+                    {!isUser && (
+                      <View style={[styles.coachAvatarSmall, { backgroundColor: activeP.color + '22', borderColor: activeP.color + '44' }]}>
+                        <Text style={{ fontSize: 12 }}>{activeP.emoji}</Text>
+                      </View>
+                    )}
+                    <View style={[styles.bubble,
+                      isUser
+                        ? { backgroundColor: theme.accent }
+                        : { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }
+                    ]}>
+                      {msg.image && <Image source={{ uri: msg.image }} style={styles.bubbleImage} resizeMode="cover" />}
+                      {msg.text ? <Text style={[styles.bubbleText, { color: isUser ? '#fff' : theme.textPrimary }]}>{msg.text}</Text> : null}
+                      <Text style={[styles.bubbleTime, { color: isUser ? 'rgba(255,255,255,0.60)' : theme.textMuted }]}>{msg.time}</Text>
+                    </View>
                   </View>
-                )}
-                <View style={[
-                  styles.bubble,
-                  isUser
-                    ? { backgroundColor: theme.accent }
-                    : { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 },
-                ]}>
-                  {msg.image && (
-                    <Image source={{ uri: msg.image }} style={styles.bubbleImage} resizeMode="cover" />
-                  )}
-                  {msg.text ? (
-                    <Text style={[styles.bubbleText, { color: isUser ? '#fff' : theme.textPrimary }]}>{msg.text}</Text>
-                  ) : null}
-                  <Text style={[styles.bubbleTime, { color: isUser ? 'rgba(255,255,255,0.60)' : theme.textMuted }]}>{msg.time}</Text>
+                );
+              })}
+
+              {isTyping && (
+                <View style={[styles.bubbleWrap, styles.bubbleWrapCoach]}>
+                  <View style={[styles.coachAvatarSmall, { backgroundColor: activeP.color + '22', borderColor: activeP.color + '44' }]}>
+                    <Text style={{ fontSize: 12 }}>{activeP.emoji}</Text>
+                  </View>
+                  <View style={[styles.bubble, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}>
+                    <Text style={[styles.bubbleText, { color: theme.textMuted }]}>Thinking...</Text>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              )}
+            </ScrollView>
 
-          {/* Typing indicator */}
-          {isTyping && (
-            <View style={[styles.bubbleWrap, styles.bubbleWrapCoach]}>
-              <View style={[styles.coachAvatarSmall, { backgroundColor: theme.accent + '22', borderColor: theme.accent + '44' }]}>
-                <Text style={{ fontSize: 12 }}>{activePersonality.emoji}</Text>
+            {/* Bottom bar */}
+            <View style={[styles.bottomContainer, { backgroundColor: theme.bg, borderTopColor: theme.border }]}>
+              {/* Quick chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                {QUICK_CHIPS.map(chip => (
+                  <TouchableOpacity key={chip} onPress={() => sendMessage(chip)} activeOpacity={0.8}
+                    style={[styles.chip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <Text style={[styles.chipText, { color: theme.textSecondary }]}>{chip}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Input row */}
+              <View style={styles.inputRow}>
+                <TouchableOpacity onPress={handleCameraImage} activeOpacity={0.8}
+                  style={[styles.mediaBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <Ionicons name="camera-outline" size={20} color={theme.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8}
+                  style={[styles.mediaBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <Ionicons name="image-outline" size={20} color={theme.accent} />
+                </TouchableOpacity>
+
+                <View style={[styles.inputField, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <TextInput
+                    value={input} onChangeText={setInput}
+                    placeholder={cooldown > 0 ? `Wait ${cooldown}s...` : 'Ask your coach anything...'}
+                    placeholderTextColor={theme.textMuted}
+                    style={[styles.inputText, { color: theme.textPrimary }]}
+                    multiline maxLength={300}
+                    editable={cooldown === 0}
+                    onSubmitEditing={() => canSend && sendMessage()}
+                  />
+                </View>
+
+                <VoiceMicButton theme={theme} size={40}
+                  onTranscribed={(text) => { setInput(text); sendMessage(text); }} />
+
+                <TouchableOpacity onPress={() => sendMessage()} disabled={!canSend}
+                  activeOpacity={0.85} style={styles.sendBtnWrap}>
+                  <LinearGradient
+                    colors={canSend ? [theme.accent, '#0A9A5E'] as [string, string] : [theme.border, theme.border] as [string, string]}
+                    style={styles.sendBtn}>
+                    <Ionicons name="send" size={18} color={canSend ? '#fff' : theme.textMuted} />
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
-              <View style={[styles.bubble, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}>
-                <Text style={[styles.bubbleText, { color: theme.textMuted }]}>Thinking...</Text>
-              </View>
+
+              <Text style={[styles.imageHint, { color: theme.textMuted }]}>
+                📷 Send a food photo for calorie analysis
+              </Text>
             </View>
-          )}
-        </ScrollView>
+          </KeyboardAvoidingView>
+        </>
+      )}
 
-        {/* ── BOTTOM BAR ─────────────────────────────────────── */}
-        <View style={[styles.bottomContainer, { backgroundColor: theme.bg, borderTopColor: theme.border }]}>
-          {/* Quick chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-            {QUICK_CHIPS.map((chip) => (
-              <TouchableOpacity key={chip} onPress={() => sendMessage(chip)} activeOpacity={0.8}
-                style={[styles.chip, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <Text style={[styles.chipText, { color: theme.textSecondary }]}>{chip}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Input row */}
-          <View style={styles.inputRow}>
-            {/* Camera button — sends image to Claude Vision */}
-            <TouchableOpacity onPress={handleCameraImage} activeOpacity={0.8}
-              style={[styles.mediaBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Ionicons name="camera-outline" size={20} color={theme.accent} />
-            </TouchableOpacity>
-
-            {/* Gallery button */}
-            <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8}
-              style={[styles.mediaBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Ionicons name="image-outline" size={20} color={theme.accent} />
-            </TouchableOpacity>
-
-            {/* Text input */}
-            <View style={[styles.inputField, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <TextInput
-                value={input}
-                onChangeText={setInput}
-                placeholder="Ask your coach anything..."
-                placeholderTextColor={theme.textMuted}
-                style={[styles.inputText, { color: theme.textPrimary }]}
-                multiline
-                maxLength={500}
-                onSubmitEditing={() => sendMessage()}
-              />
-            </View>
-
-
-{/* Voice mic — transcribes and sends to coach */}
-            <VoiceMicButton
-              theme={theme}
-              size={40}
-              onTranscribed={(text) => {
-                setInput(text);
-                // Auto-send after transcription
-                sendMessage(text);
-              }}
-            />
-
-            {/* Send button */}
-            <TouchableOpacity onPress={() => sendMessage()} disabled={!input.trim() && !isTyping}
-              activeOpacity={0.85} style={styles.sendBtnWrap}>
-              <LinearGradient
-                colors={input.trim() ? [theme.accent, '#0A9A5E'] as [string, string] : [theme.border, theme.border] as [string, string]}
-                style={styles.sendBtn}
-              >
-                <Ionicons name="send" size={18} color={input.trim() ? '#fff' : theme.textMuted} />
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          {/* Image hint */}
-          <Text style={[styles.imageHint, { color: theme.textMuted }]}>
-            📷 Send a food photo — coach will estimate calories & macros
-          </Text>
-        </View>
-      </KeyboardAvoidingView>
-
-      {/* ── PERSONALITY MODAL ───────────────────────────────── */}
+      {/* Personality modal */}
       <Modal visible={showPersonality} transparent animationType="slide" onRequestClose={() => setShowPersonality(false)}>
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowPersonality(false)} />
@@ -325,21 +375,21 @@ Keep responses concise and actionable. Max 3 sentences unless asked for more.`;
                 <Text style={[styles.modalDone, { color: theme.accent }]}>Done</Text>
               </TouchableOpacity>
             </View>
-            <Text style={[styles.modalSub, { color: theme.textMuted }]}>Choose how your CalFit Coach speaks to you. Takes effect on your next message.</Text>
+            <Text style={[styles.modalSub, { color: theme.textMuted }]}>Takes effect on your next message.</Text>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.personalityList}>
-              {PERSONALITIES.map((p) => (
-                <TouchableOpacity key={p.id} onPress={() => { setCoachPersonality(p.id as any); setShowPersonality(false); }} activeOpacity={0.8}
+              {PERSONALITIES.map(p => (
+                <TouchableOpacity key={p.id} onPress={() => { setCoachPersonality(p.id as any); setShowPersonality(false); }}
                   style={[styles.personalityCard, {
                     backgroundColor: coachPersonality === p.id ? p.color + '18' : theme.bg,
                     borderColor: coachPersonality === p.id ? p.color : theme.border,
                     borderWidth: coachPersonality === p.id ? 2 : 1,
                   }]}>
-                  <Text style={styles.pEmoji}>{p.emoji}</Text>
+                  <Text style={[styles.pEmoji]}>{p.emoji}</Text>
                   <View style={styles.pInfo}>
                     <Text style={[styles.pName, { color: coachPersonality === p.id ? p.color : theme.textPrimary }]}>{p.name}</Text>
                     <Text style={[styles.pDesc, { color: theme.textMuted }]}>{p.description}</Text>
                   </View>
-                  {coachPersonality === p.id && <Ionicons name="checkmark-circle" size={22} color={p.color} />}
+                  {coachPersonality === p.id && <Ionicons name="checkmark-circle" size={20} color={p.color} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -350,24 +400,18 @@ Keep responses concise and actionable. Max 3 sentences unless asked for more.`;
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, justifyContent: 'center' },
-  coachAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, flexShrink: 0 },
-  coachAvatarEmoji: { fontSize: 20 },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  coachAvatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
   coachName: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   onlineDot: { width: 6, height: 6, borderRadius: 3 },
   onlineSub: { fontSize: fontSize.xs, fontWeight: '600' },
-  personalityBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
-  personalityEmoji: { fontSize: 18 },
-
+  personalityBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   messageList: { flex: 1 },
   messageListContent: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.lg },
-
   bubbleWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginBottom: spacing.xs },
   bubbleWrapUser: { justifyContent: 'flex-end' },
   bubbleWrapCoach: { justifyContent: 'flex-start' },
@@ -376,12 +420,10 @@ const styles = StyleSheet.create({
   bubbleImage: { width: '100%', height: 180, borderRadius: 10, marginBottom: spacing.xs },
   bubbleText: { fontSize: fontSize.base, lineHeight: 22 },
   bubbleTime: { fontSize: fontSize.xs, marginTop: 2 },
-
   bottomContainer: { borderTopWidth: 1 },
   chipsRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
-  chip: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1 },
+  chip: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
   chipText: { fontSize: fontSize.xs, fontWeight: '500' },
-
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: spacing.md, paddingBottom: spacing.md, gap: spacing.sm },
   mediaBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
   inputField: { flex: 1, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxHeight: 100 },
@@ -389,7 +431,6 @@ const styles = StyleSheet.create({
   sendBtnWrap: { borderRadius: 20, overflow: 'hidden', flexShrink: 0 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   imageHint: { fontSize: fontSize.xs, textAlign: 'center', paddingBottom: spacing.sm },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, maxHeight: '80%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1 },

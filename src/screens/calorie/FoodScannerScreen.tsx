@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, ScrollView, Alert, Image, Modal,
+  ActivityIndicator, Alert, Image, Modal,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useState, useRef } from 'react';
@@ -13,102 +13,47 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
+import { claudeVision, hasClaudeKey } from '../../services/ClaudeService';
 
 // ── SCAN RESULT TYPE ──────────────────────────────────────────
 interface ScanResult {
-  food: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  fibre: number;
-  portion: string;
-  confidence: number;
-  withinGoal: boolean;
-  caloriesRemaining: number;
+  food: string; calories: number; protein: number;
+  carbs: number; fats: number; fibre: number;
+  portion: string; confidence: number;
+  withinGoal: boolean; caloriesRemaining: number;
 }
 
-// ── CLAUDE VISION FOOD ANALYSIS ───────────────────────────────
-// Sends base64 image to Claude, gets back structured nutrition JSON.
-// Why JSON: easier to parse than free text, consistent structure for logging.
-async function analyseFood(base64: string, calorieGoal: number, consumed: number): Promise<ScanResult | null> {
+// ── ANALYSE FOOD WITH CLAUDE VISION ──────────────────────────
+async function analyseFood(
+  base64: string, calorieGoal: number, consumed: number
+): Promise<ScanResult | null> {
+  if (!hasClaudeKey()) return null;
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
-            },
-            {
-              type: 'text',
-              text: `You are a nutrition expert analyzing a food photo for a fitness app.
-
-Identify all food items visible and estimate their nutritional content for a typical portion size.
-
-Respond ONLY with valid JSON (no markdown, no explanation):
-{
-  "food": "food name (be specific, e.g. 'Grilled Chicken Breast with Rice')",
-  "calories": <number>,
-  "protein": <number in grams>,
-  "carbs": <number in grams>,
-  "fats": <number in grams>,
-  "fibre": <number in grams>,
-  "portion": "portion description (e.g. '1 plate ~350g')",
-  "confidence": <percentage 0-100>
-}
-
-If you cannot identify food in the image, respond with:
-{"error": "No food detected"}`,
-            },
-          ],
-        }],
-      }),
-    });
-
-    const data = await response.json();
-    if (data.error) return null;
-
-    const text = data.content?.[0]?.text ?? '';
+    const text = await claudeVision(
+      'You are a nutrition expert analyzing food photos. Always respond with valid JSON only. No markdown.',
+      base64,
+      `Identify all food visible and estimate nutrition for a typical portion.
+Respond ONLY with valid JSON:
+{"food":"specific name e.g. Jollof Rice with Chicken","calories":number,"protein":number,"carbs":number,"fats":number,"fibre":number,"portion":"e.g. 1 plate ~400g","confidence":0-100}
+If no food visible: {"error":"No food detected"}`,
+    );
+    if (!text) return null;
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
-
     const parsed = JSON.parse(match[0]);
     if (parsed.error) return null;
-
     const remaining = calorieGoal - consumed;
-    return {
-      ...parsed,
-      withinGoal: parsed.calories <= remaining,
-      caloriesRemaining: remaining,
-    };
-  } catch {
-    return null;
-  }
+    return { ...parsed, withinGoal: parsed.calories <= remaining, caloriesRemaining: remaining };
+  } catch { return null; }
 }
 
 // ── LOG TO SUPABASE ───────────────────────────────────────────
-async function logFoodEntry(
-  userId: string,
-  result: ScanResult,
-  mealType: string,
-): Promise<boolean> {
-  const today = new Date().toISOString().split('T')[0];
+async function logFoodEntry(userId: string, result: ScanResult, mealType: string): Promise<boolean> {
   const { error } = await supabase.from('food_logs').insert({
-    user_id:   userId,
-    date:      today,
-    meal_type: mealType.toLowerCase(),
-    food_name: result.food,
-    calories:  result.calories,
-    protein_g: result.protein,
-    carbs_g:   result.carbs,
-    fats_g:    result.fats,
+    user_id: userId, date: new Date().toISOString().split('T')[0],
+    meal_type: mealType.toLowerCase(), food_name: result.food,
+    calories: result.calories, protein_g: result.protein,
+    carbs_g: result.carbs, fats_g: result.fats,
     logged_at: new Date().toISOString(),
   });
   return !error;
@@ -130,21 +75,13 @@ const mb = StyleSheet.create({
 });
 
 // ── RESULT CARD ───────────────────────────────────────────────
-function ResultCard({
-  result,
-  onLog,
-  onRescan,
-}: {
-  result: ScanResult;
-  onLog: (mealType: string) => void;
-  onRescan: () => void;
+function ResultCard({ result, onLog, onRescan }: {
+  result: ScanResult; onLog: (mealType: string) => void; onRescan: () => void;
 }) {
-  const [showMealPicker, setShowMealPicker] = useState(false);
-  const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
-
+  const [showPicker, setShowPicker] = useState(false);
+  const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
   return (
     <View style={rc.card}>
-      {/* Header */}
       <View style={rc.header}>
         <View style={{ flex: 1 }}>
           <Text style={rc.foodName} numberOfLines={2}>{result.food}</Text>
@@ -158,8 +95,6 @@ function ResultCard({
           <Text style={rc.calUnit}>kcal</Text>
         </View>
       </View>
-
-      {/* Macros */}
       <View style={rc.macros}>
         <MacroBar label="Protein" value={result.protein} unit="g" color="#6699FF" />
         <View style={rc.divider} />
@@ -169,58 +104,43 @@ function ResultCard({
         <View style={rc.divider} />
         <MacroBar label="Fibre"   value={result.fibre}   unit="g" color="#2DDC8C" />
       </View>
-
-      {/* Goal status */}
       <View style={[rc.goalRow, {
         backgroundColor: result.withinGoal ? 'rgba(45,220,140,0.12)' : 'rgba(255,89,89,0.12)',
         borderColor:     result.withinGoal ? 'rgba(45,220,140,0.30)' : 'rgba(255,89,89,0.30)',
       }]}>
-        <Ionicons
-          name={result.withinGoal ? 'checkmark-circle' : 'warning'}
-          size={14}
-          color={result.withinGoal ? '#2DDC8C' : '#FF5959'}
-        />
+        <Ionicons name={result.withinGoal ? 'checkmark-circle' : 'warning'} size={14}
+          color={result.withinGoal ? '#2DDC8C' : '#FF5959'} />
         <Text style={[rc.goalText, { color: result.withinGoal ? '#2DDC8C' : '#FF5959' }]}>
           {result.withinGoal
             ? `Fits your plan · ${result.caloriesRemaining - result.calories} kcal remaining after logging`
             : `${result.calories - result.caloriesRemaining} kcal over your remaining budget`}
         </Text>
       </View>
-
-      {/* Actions */}
-      <View style={rc.actions}>
-        <TouchableOpacity onPress={onRescan} style={rc.rescanBtn}>
-          <Ionicons name="camera-outline" size={16} color="rgba(255,255,255,0.6)" />
-          <Text style={rc.rescanText}>Rescan</Text>
+      {/* Edit / Perfect buttons */}
+      <View style={rc.epRow}>
+        <TouchableOpacity onPress={onRescan} style={rc.editBtn}>
+          <Ionicons name="create-outline" size={16} color="rgba(255,255,255,0.7)" />
+          <Text style={rc.editText}>Edit Result</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShowMealPicker(true)} style={rc.logBtn}>
-          <LinearGradient
-            colors={['#2DDC8C', '#0DAE6C'] as [string, string]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={rc.logGrad}
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#fff" />
-            <Text style={rc.logText}>Log This Food</Text>
+        <TouchableOpacity onPress={() => setShowPicker(true)} style={rc.perfectBtn}>
+          <LinearGradient colors={['#2DDC8C', '#0DAE6C'] as [string, string]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={rc.perfectGrad}>
+            <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+            <Text style={rc.perfectText}>Perfect ✓</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
-
-      {/* Meal type picker modal */}
-      <Modal visible={showMealPicker} transparent animationType="fade">
+      <Modal visible={showPicker} transparent animationType="fade">
         <View style={rc.pickerOverlay}>
           <View style={rc.picker}>
             <Text style={rc.pickerTitle}>Add to which meal?</Text>
-            {MEAL_TYPES.map((m) => (
-              <TouchableOpacity
-                key={m}
-                onPress={() => { setShowMealPicker(false); onLog(m); }}
-                style={rc.pickerRow}
-              >
+            {MEALS.map((m) => (
+              <TouchableOpacity key={m} onPress={() => { setShowPicker(false); onLog(m); }} style={rc.pickerRow}>
                 <Text style={rc.pickerRowText}>{m}</Text>
                 <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
               </TouchableOpacity>
             ))}
-            <TouchableOpacity onPress={() => setShowMealPicker(false)} style={rc.pickerCancel}>
+            <TouchableOpacity onPress={() => setShowPicker(false)} style={rc.pickerCancel}>
               <Text style={rc.pickerCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -229,7 +149,6 @@ function ResultCard({
     </View>
   );
 }
-
 const rc = StyleSheet.create({
   card:       { backgroundColor: 'rgba(13,10,46,0.95)', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, gap: spacing.md },
   header:     { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
@@ -243,13 +162,12 @@ const rc = StyleSheet.create({
   divider:    { width: 1, backgroundColor: 'rgba(255,255,255,0.10)', marginHorizontal: 4 },
   goalRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
   goalText:   { fontSize: fontSize.xs, fontWeight: '600', flex: 1 },
-  actions:    { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  rescanBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  rescanText: { color: 'rgba(255,255,255,0.6)', fontSize: fontSize.sm, fontWeight: '600' },
-  logBtn:     { flex: 1, borderRadius: radius.md, overflow: 'hidden' },
-  logGrad:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
-  logText:    { color: '#fff', fontSize: fontSize.base, fontWeight: '800' },
-  // Meal picker modal
+  epRow:      { flexDirection: 'row', gap: spacing.md },
+  editBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  editText:   { color: 'rgba(255,255,255,0.7)', fontSize: fontSize.sm, fontWeight: '600' },
+  perfectBtn: { flex: 1, borderRadius: radius.md, overflow: 'hidden' },
+  perfectGrad:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
+  perfectText:{ color: '#fff', fontSize: fontSize.base, fontWeight: '800' },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: spacing.xl },
   picker:        { backgroundColor: '#161820', borderRadius: 20, overflow: 'hidden' },
   pickerTitle:   { color: '#fff', fontSize: fontSize.base, fontWeight: '700', textAlign: 'center', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
@@ -261,7 +179,7 @@ const rc = StyleSheet.create({
 
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function FoodScannerScreen() {
-  const navigation  = useNavigation<any>();
+  const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
@@ -276,17 +194,14 @@ export default function FoodScannerScreen() {
 
   const calorieGoal = (profile as any)?.daily_calorie_goal ?? 2000;
 
-  // Get today's consumed calories from Supabase for the goal check
   const getConsumedToday = async (): Promise<number> => {
     if (!user?.id) return 0;
     const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
-      .from('food_logs').select('calories')
+    const { data } = await supabase.from('food_logs').select('calories')
       .eq('user_id', user.id).eq('date', today);
     return (data ?? []).reduce((sum: number, r: any) => sum + (r.calories ?? 0), 0);
   };
 
-  // Convert image URI → base64 for Claude
   const uriToBase64 = async (uri: string): Promise<string> => {
     const response = await fetch(uri);
     const blob = await response.blob();
@@ -299,28 +214,27 @@ export default function FoodScannerScreen() {
   };
 
   const processImage = async (uri: string) => {
+    if (!hasClaudeKey()) {
+      Alert.alert('AI not connected', 'Add your Anthropic API key to enable food scanning.');
+      return;
+    }
     setCapturedUri(uri);
     setIsProcessing(true);
     setResult(null);
     try {
-      const base64 = await uriToBase64(uri);
+      const base64   = await uriToBase64(uri);
       const consumed = await getConsumedToday();
       const analysis = await analyseFood(base64, calorieGoal, consumed);
       if (!analysis) {
-        Alert.alert(
-          'No food detected',
-          'Point the camera at a plate or food item and try again.',
-          [{ text: 'OK', onPress: () => setCapturedUri(null) }]
-        );
+        Alert.alert('No food detected', 'Point the camera at a plate or food item and try again.',
+          [{ text: 'OK', onPress: () => setCapturedUri(null) }]);
       } else {
         setResult(analysis);
       }
     } catch {
       Alert.alert('Scan failed', 'Could not analyse the image. Please try again.');
       setCapturedUri(null);
-    } finally {
-      setIsProcessing(false);
-    }
+    } finally { setIsProcessing(false); }
   };
 
   const handleTakePhoto = async () => {
@@ -328,9 +242,7 @@ export default function FoodScannerScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({ base64: false, quality: 0.7 });
       if (photo?.uri) await processImage(photo.uri);
-    } catch {
-      Alert.alert('Could not take photo', 'Please try again.');
-    }
+    } catch { Alert.alert('Could not take photo', 'Please try again.'); }
   };
 
   const handleGallery = async () => {
@@ -339,41 +251,28 @@ export default function FoodScannerScreen() {
       Alert.alert('Permission needed', 'Allow photo library access to scan food from your gallery.');
       return;
     }
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-    });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
     if (!res.canceled && res.assets[0]) await processImage(res.assets[0].uri);
   };
 
   const handleLog = async (mealType: string) => {
     if (!result || !user?.id) return;
     const success = await logFoodEntry(user.id, result, mealType);
-    if (success) {
-      setLogSuccess(true);
-      setTimeout(() => navigation.goBack(), 1200);
-    } else {
-      Alert.alert('Log failed', 'Could not save the food log. Please try again.');
-    }
+    if (success) { setLogSuccess(true); setTimeout(() => navigation.goBack(), 1200); }
+    else Alert.alert('Log failed', 'Could not save. Please try again.');
   };
 
-  const handleRescan = () => {
-    setResult(null);
-    setCapturedUri(null);
-    setLogSuccess(false);
-  };
+  const handleRescan = () => { setResult(null); setCapturedUri(null); setLogSuccess(false); };
 
-  // Permission not yet determined
   if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 
-  // Permission denied
   if (!permission.granted) {
     return (
       <View style={[styles.permissionScreen, { backgroundColor: theme.bg }]}>
         <Ionicons name="camera-outline" size={64} color={theme.textMuted} />
         <Text style={[styles.permTitle, { color: theme.textPrimary }]}>Camera Access Needed</Text>
         <Text style={[styles.permSub, { color: theme.textMuted }]}>
-          CalFit needs camera access to scan your food and estimate calories using AI.
+          CalFit needs camera access to scan food and estimate calories using AI.
         </Text>
         <TouchableOpacity onPress={requestPermission} style={[styles.permBtn, { backgroundColor: theme.accent }]}>
           <Text style={[styles.permBtnText, { color: theme.bg }]}>Allow Camera Access</Text>
@@ -387,17 +286,11 @@ export default function FoodScannerScreen() {
 
   return (
     <View style={styles.safe}>
-
-      {/* ── CAMERA / PREVIEW ── */}
       <View style={styles.cameraWrap}>
-        {capturedUri ? (
-          // Show captured image while processing or showing result
-          <Image source={{ uri: capturedUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        ) : (
-          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
-        )}
+        {capturedUri
+          ? <Image source={{ uri: capturedUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          : <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />}
 
-        {/* Dark overlay when processing */}
         {isProcessing && (
           <View style={styles.processingOverlay}>
             <View style={styles.processingCard}>
@@ -408,7 +301,6 @@ export default function FoodScannerScreen() {
           </View>
         )}
 
-        {/* Success overlay */}
         {logSuccess && (
           <View style={styles.processingOverlay}>
             <View style={styles.processingCard}>
@@ -419,7 +311,6 @@ export default function FoodScannerScreen() {
           </View>
         )}
 
-        {/* ── HEADER ── */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.topBtn}>
             <Ionicons name="close" size={22} color="#fff" />
@@ -433,7 +324,6 @@ export default function FoodScannerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── VIEWFINDER BRACKETS ── */}
         {!capturedUri && !isProcessing && (
           <>
             <View style={[styles.corner, styles.tl]} />
@@ -445,30 +335,21 @@ export default function FoodScannerScreen() {
         )}
       </View>
 
-      {/* ── BOTTOM PANEL ── */}
       {result ? (
         <ResultCard result={result} onLog={handleLog} onRescan={handleRescan} />
       ) : !isProcessing ? (
         <View style={styles.bottomPanel}>
-          {/* Mode toggle */}
           <View style={styles.modeTabs}>
             {(['Camera', 'Gallery'] as const).map((m) => (
-              <TouchableOpacity
-                key={m}
+              <TouchableOpacity key={m}
                 onPress={() => { setActiveMode(m); if (m === 'Gallery') handleGallery(); }}
-                style={[styles.modeTab, activeMode === m && styles.modeTabActive]}
-              >
-                <Ionicons
-                  name={m === 'Camera' ? 'camera-outline' : 'images-outline'}
-                  size={16}
-                  color={activeMode === m ? '#0D0A2E' : 'rgba(255,255,255,0.6)'}
-                />
+                style={[styles.modeTab, activeMode === m && styles.modeTabActive]}>
+                <Ionicons name={m === 'Camera' ? 'camera-outline' : 'images-outline'} size={16}
+                  color={activeMode === m ? '#0D0A2E' : 'rgba(255,255,255,0.6)'} />
                 <Text style={[styles.modeTabText, activeMode === m && { color: '#0D0A2E' }]}>{m}</Text>
               </TouchableOpacity>
             ))}
           </View>
-
-          {/* Shutter */}
           <View style={styles.shutterRow}>
             <View style={{ width: 56 }} />
             <TouchableOpacity onPress={handleTakePhoto} style={styles.shutter} activeOpacity={0.8}>
@@ -478,42 +359,30 @@ export default function FoodScannerScreen() {
               <Ionicons name="images-outline" size={24} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           </View>
-
-          <Text style={styles.bottomHint}>
-            Tap the button to scan · or pick from gallery
-          </Text>
+          <Text style={styles.bottomHint}>Tap to scan · or pick from gallery</Text>
         </View>
       ) : null}
     </View>
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: '#000' },
   cameraWrap:{ flex: 1, position: 'relative' },
-
-  // Top bar
   topBar:    { position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg },
   topBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   topCenter: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   topLabel:  { color: '#fff', fontSize: fontSize.sm, fontWeight: '700' },
-
-  // Viewfinder corners
   corner:    { position: 'absolute', width: 28, height: 28, borderColor: '#2DDC8C', borderWidth: 3 },
   tl:        { top: '30%', left: '15%', borderRightWidth: 0, borderBottomWidth: 0 },
   tr:        { top: '30%', right: '15%', borderLeftWidth: 0, borderBottomWidth: 0 },
   bl:        { bottom: '35%', left: '15%', borderRightWidth: 0, borderTopWidth: 0 },
   br:        { bottom: '35%', right: '15%', borderLeftWidth: 0, borderTopWidth: 0 },
   scanHint:  { position: 'absolute', bottom: '32%', alignSelf: 'center', color: 'rgba(255,255,255,0.55)', fontSize: fontSize.xs, fontWeight: '600' },
-
-  // Processing / success overlay
   processingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
   processingCard:    { alignItems: 'center', gap: spacing.md, padding: spacing.xl, backgroundColor: 'rgba(13,10,46,0.95)', borderRadius: 20, width: 260 },
   processingTitle:   { color: '#fff', fontSize: fontSize.lg, fontWeight: '800', textAlign: 'center' },
   processingSubtext: { color: 'rgba(255,255,255,0.5)', fontSize: fontSize.sm, textAlign: 'center' },
-
-  // Bottom panel
   bottomPanel:  { backgroundColor: '#0D0A2E', paddingTop: spacing.lg, paddingBottom: 36, paddingHorizontal: spacing.lg, gap: spacing.lg },
   modeTabs:     { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 99, padding: 3 },
   modeTab:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 99 },
@@ -524,8 +393,6 @@ const styles = StyleSheet.create({
   shutterInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#2DDC8C' },
   galleryThumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   bottomHint:   { color: 'rgba(255,255,255,0.30)', fontSize: fontSize.xs, textAlign: 'center' },
-
-  // Permission screen
   permissionScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.lg },
   permTitle:    { fontSize: fontSize.xl, fontWeight: '800', textAlign: 'center' },
   permSub:      { fontSize: fontSize.base, textAlign: 'center', lineHeight: 22 },

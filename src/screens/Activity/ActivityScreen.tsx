@@ -21,6 +21,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import * as Speech from 'expo-speech';
 import { useSteps } from '../../hooks/useSteps';
+import { claudeJSON, hasClaudeKey } from '../../services/ClaudeService';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -476,18 +477,21 @@ function CoachRoutineModal({ visible, theme, onClose, onSave }: {
     const newAnswers = { ...answers, [questions[qIndex].key]: answer };
     setAnswers(newAnswers);
     if (qIndex < questions.length - 1) { setQIndex(qIndex + 1); return; }
-    setLoading(true);
+  setLoading(true);
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514', max_tokens: 1000,
-          messages: [{ role: 'user', content: `Generate workout routine. Goal:${newAnswers.goal} Style:${newAnswers.style} Location:${newAnswers.location} Level:${newAnswers.level} Area:${newAnswers.area} Duration:${newAnswers.duration} Equipment:${newAnswers.equipment} Count:${newAnswers.count}. ONLY JSON: {"name":"...","description":"...","exercises":[{"name":"...","calories_per_minute":8,"category":"..."}],"duration_est":30,"calories_est":250}` }],
-        }),
-      });
-      const data = await res.json();
-      setGenerated(JSON.parse((data.content?.[0]?.text ?? '').replace(/```json|```/g, '').trim()));
-    } catch { Alert.alert('Error', 'Could not generate routine.'); reset(); }
+      if (!hasClaudeKey()) {
+        Alert.alert('AI not connected', 'Add your Anthropic API key to generate routines.');
+        reset(); return;
+      }
+      const result = await claudeJSON<any>(
+        'You are a fitness coach. Generate workout routines as JSON only. No markdown, no explanation.',
+        `Generate a workout routine. Goal:${newAnswers.goal} Style:${newAnswers.style} Location:${newAnswers.location} Level:${newAnswers.level} Area:${newAnswers.area} Duration:${newAnswers.duration} Equipment:${newAnswers.equipment} Count:${newAnswers.count}
+JSON only: {"name":"Routine Name","description":"One sentence","exercises":[{"name":"Exercise","calories_per_minute":8,"category":"Cardio"}],"duration_est":30,"calories_est":250}`,
+        600
+      );
+      if (!result) throw new Error('No result');
+      setGenerated(result);
+    } catch { Alert.alert('Error', 'Could not generate routine. Try again.'); reset(); }
     finally { setLoading(false); }
   };
 

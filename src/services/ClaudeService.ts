@@ -9,8 +9,8 @@
 // COST TARGET: < $20/month for early users
 // ─────────────────────────────────────────────────────────────
 
-const HAIKU_MODEL  = 'claude-haiku-4-5-20251001';  // chat, Q&A
-const SONNET_MODEL = 'claude-sonnet-4-20250514';    // vision only
+const HAIKU_MODEL  = 'claude-haiku-4-5-20251001';  // chat, Q&A — fastest & cheapest
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';  // vision only
 const API_URL      = 'https://api.anthropic.com/v1/messages';
 
 // ── DAILY LIMITS PER PLAN ─────────────────────────────────────

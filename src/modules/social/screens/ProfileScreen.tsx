@@ -16,6 +16,7 @@ import { isFollowing, followUser, unfollowUser, getFollowCounts } from '../servi
 import { loadUserPosts, PostData } from '../services/postService';
 import { getOrCreateConversation } from '../../chat/services/chatServices';
 import { supabase } from '../../../services/supabase';
+import PRShowcaseCard from '../../../components/Prshowcasecard';
 
 const GRID_SIZE = (Dimensions.get('window').width - spacing.lg * 2 - spacing.xs * 2) / 3;
 
@@ -35,9 +36,6 @@ export default function ProfileScreen() {
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Re-run load every time this screen comes into focus.
-  // This ensures follow state and profile data are always fresh
-  // whether navigating from Leaderboard, Discover, or anywhere else.
   useFocusEffect(
     useCallback(() => {
       load();
@@ -48,7 +46,6 @@ export default function ProfileScreen() {
     setIsLoading(true);
 
     if (isCurrentUser && currentProfile) {
-      // Own profile — use Zustand data for speed, still fetch counts from DB
       const counts = await getFollowCounts(user!.id);
       setProfileData({
         id: user?.id,
@@ -66,16 +63,12 @@ export default function ProfileScreen() {
       return;
     }
 
-    // ── Viewing someone else's profile ─────────────────────────
-    // Fetch profile, posts, follow counts, and follow status in parallel.
-    // The profiles table RLS must allow authenticated reads — if full_name
-    // still shows as null here, the RLS policy needs: FOR SELECT USING (true)
     const [profileRes, postsRes, counts] = await Promise.all([
       supabase
-  .from('profiles')
-  .select('id, full_name, calfit_id, avatar_url, goal, streak_count')
-  .eq('id', targetUserId)
-  .single(),
+        .from('profiles')
+        .select('id, full_name, calfit_id, avatar_url, goal, streak_count')
+        .eq('id', targetUserId)
+        .single(),
       loadUserPosts(targetUserId),
       getFollowCounts(targetUserId),
     ]);
@@ -84,23 +77,19 @@ export default function ProfileScreen() {
       console.error('ProfileScreen load error:', profileRes.error.message);
     }
 
-    // Guarantee we always have a display name — fall back chain:
-    // full_name → calfit_id → first 8 chars of UUID
     const rawProfile = profileRes.data;
     setProfileData(rawProfile
-  ? {
-      ...rawProfile,
-      full_name: rawProfile.full_name
-        || rawProfile.calfit_id
-        || targetUserId.slice(0, 8),
-    }
-  : null
-);
+      ? {
+          ...rawProfile,
+          full_name: rawProfile.full_name
+            || rawProfile.calfit_id
+            || targetUserId.slice(0, 8),
+        }
+      : null
+    );
     setPosts(postsRes);
     setFollowCounts(counts);
 
-    // Always re-check follow state on focus so it stays in sync
-    // when the user follows/unfollows from Discover and comes back here
     if (user?.id) {
       const isF = await isFollowing(user.id, targetUserId);
       setFollowingUser(isF);
@@ -164,25 +153,29 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-       <ProfileHeader
-  theme={theme}
-  name={profileData?.full_name ?? 'CalFit User'}
-  calfitId={profileData?.calfit_id ?? ''}
-  avatarUrl={profileData?.avatar_url ?? null}
-  goal={profileData?.goal ?? 'Get Fit'}
-  bio=""
-  streakCount={profileData?.streak_count ?? 0}
-  followersCount={followCounts.followers}
-  followingCount={followCounts.following}
-  postsCount={posts.length}
-  isCurrentUser={isCurrentUser}
-  isFollowing={followingUser}
-  onFollowPress={handleFollow}
-  onMessagePress={handleMessage}
-  onEditPress={() => navigation.navigate('EditProfile')}
-/>
+        <ProfileHeader
+          theme={theme}
+          name={profileData?.full_name ?? 'CalFit User'}
+          calfitId={profileData?.calfit_id ?? ''}
+          avatarUrl={profileData?.avatar_url ?? null}
+          goal={profileData?.goal ?? 'Get Fit'}
+          bio=""
+          streakCount={profileData?.streak_count ?? 0}
+          followersCount={followCounts.followers}
+          followingCount={followCounts.following}
+          postsCount={posts.length}
+          isCurrentUser={isCurrentUser}
+          isFollowing={followingUser}
+          onFollowPress={handleFollow}
+          onMessagePress={handleMessage}
+          onEditPress={() => navigation.navigate('EditProfile')}
+        />
 
-        {/* Post grid */}
+        {/* ── PERSONAL RECORDS SHOWCASE ─────────────────────── */}
+        {/* Shows only when the user has completed workouts with PRs */}
+        <PRShowcaseCard userId={targetUserId} theme={theme} />
+
+        {/* ── POST GRID ─────────────────────────────────────── */}
         <View style={styles.gridSection}>
           <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>
             Posts

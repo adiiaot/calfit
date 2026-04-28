@@ -22,6 +22,7 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import * as Speech from 'expo-speech';
 import { useSteps } from '../../hooks/useSteps';
 import { claudeJSON, hasClaudeKey } from '../../services/ClaudeService';
+import { checkAndSavePRs } from '../../services/personalRecordsService';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -42,6 +43,13 @@ interface SavedRoutine {
   exercises: { name: string; calories_per_minute: number; category: string }[];
   duration_est?: number; calories_est?: number; created_at: string;
 }
+interface PRResult {
+  isNewPR: boolean;
+  newRecords: { type: string; label: string; value: string; improvement: string }[];
+}
+interface MealSuggestion {
+  name: string; why: string; calories: number;
+}
 
 const speak = (text: string) => { Speech.stop(); Speech.speak(text, { language: 'en-US', pitch: 1.05, rate: 0.92 }); };
 
@@ -52,21 +60,17 @@ const CAT_COLORS: Record<string, string> = {
   Arms: '#34D98A', Flexibility: '#FF8C42', Custom: '#6B7280', All: '#2DDC8C',
 };
 
-// ── SVG ILLUSTRATIONS ─────────────────────────────────────────
+const EQUIPMENT_OPTIONS = ['All', 'none', 'dumbbells', 'barbell', 'resistance band', 'machine'];
 
-// Empty routines illustration — barbell with sparkles
+// ── SVG ILLUSTRATIONS ─────────────────────────────────────────
 function BarbellSvg({ color }: { color: string }) {
   return (
     <Svg width={120} height={80} viewBox="0 0 120 80">
-      {/* Bar */}
       <Rect x="20" y="37" width="80" height="6" rx="3" fill={color} opacity={0.9} />
-      {/* Left weight plate */}
       <Rect x="8" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
       <Rect x="4" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
-      {/* Right weight plate */}
       <Rect x="96" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
       <Rect x="108" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
-      {/* Sparkles */}
       <Path d="M60 10 L62 14 L66 14 L63 17 L64 21 L60 18 L56 21 L57 17 L54 14 L58 14Z" fill={color} opacity={0.4} />
       <Circle cx="95" cy="12" r="3" fill={color} opacity={0.3} />
       <Circle cx="25" cy="65" r="2" fill={color} opacity={0.25} />
@@ -74,52 +78,39 @@ function BarbellSvg({ color }: { color: string }) {
   );
 }
 
-// Runner SVG for active workout
 function RunnerSvg({ color }: { color: string }) {
   return (
     <Svg width={80} height={80} viewBox="0 0 80 80">
-      {/* Head */}
       <Circle cx="50" cy="14" r="8" fill={color} opacity={0.85} />
-      {/* Body */}
       <Path d="M50 22 L44 42 L32 58" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity={0.85} />
-      {/* Arms */}
       <Path d="M46 30 L30 22" stroke={color} strokeWidth="4" strokeLinecap="round" fill="none" opacity={0.70} />
       <Path d="M48 34 L60 28" stroke={color} strokeWidth="4" strokeLinecap="round" fill="none" opacity={0.70} />
-      {/* Legs */}
       <Path d="M44 42 L36 60 L24 68" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity={0.85} />
       <Path d="M44 42 L54 56 L62 64" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity={0.85} />
-      {/* Motion lines */}
       <Line x1="10" y1="40" x2="22" y2="40" stroke={color} strokeWidth="2.5" strokeLinecap="round" opacity={0.30} />
       <Line x1="6" y1="50" x2="18" y2="50" stroke={color} strokeWidth="2" strokeLinecap="round" opacity={0.20} />
     </Svg>
   );
 }
 
-// Flame SVG for calories
 function FlameSvg({ color }: { color: string }) {
   return (
     <Svg width={60} height={80} viewBox="0 0 60 80">
-      <Path d="M30 4 C30 4 44 20 44 36 C44 48 36 56 30 60 C24 56 16 48 16 36 C16 20 30 4 30 4Z"
-        fill={color} opacity={0.90} />
-      <Path d="M30 24 C30 24 38 34 38 42 C38 50 34 54 30 58 C26 54 22 50 22 42 C22 34 30 24 30 24Z"
-        fill="#FFB830" opacity={0.80} />
-      <Path d="M30 38 C30 38 34 42 34 46 C34 50 32 52 30 54 C28 52 26 50 26 46 C26 42 30 38 30 38Z"
-        fill="#fff" opacity={0.60} />
+      <Path d="M30 4 C30 4 44 20 44 36 C44 48 36 56 30 60 C24 56 16 48 16 36 C16 20 30 4 30 4Z" fill={color} opacity={0.90} />
+      <Path d="M30 24 C30 24 38 34 38 42 C38 50 34 54 30 58 C26 54 22 50 22 42 C22 34 30 24 30 24Z" fill="#FFB830" opacity={0.80} />
+      <Path d="M30 38 C30 38 34 42 34 46 C34 50 32 52 30 54 C28 52 26 50 26 46 C26 42 30 38 30 38Z" fill="#fff" opacity={0.60} />
     </Svg>
   );
 }
 
-// Footprint SVG for steps
 function FootprintSvg({ color }: { color: string }) {
   return (
     <Svg width={80} height={80} viewBox="0 0 80 80">
-      {/* Left foot */}
       <Ellipse cx="25" cy="55" rx="10" ry="16" fill={color} opacity={0.70} />
       <Circle cx="18" cy="36" r="4" fill={color} opacity={0.60} />
       <Circle cx="25" cy="33" r="4.5" fill={color} opacity={0.60} />
       <Circle cx="32" cy="35" r="3.5" fill={color} opacity={0.60} />
       <Circle cx="37" cy="40" r="3" fill={color} opacity={0.55} />
-      {/* Right foot */}
       <Ellipse cx="55" cy="28" rx="10" ry="16" fill={color} opacity={0.40} />
       <Circle cx="48" cy="10" r="3.5" fill={color} opacity={0.35} />
       <Circle cx="55" cy="7" r="4" fill={color} opacity={0.35} />
@@ -129,7 +120,6 @@ function FootprintSvg({ color }: { color: string }) {
   );
 }
 
-// History clock SVG
 function HistorySvg({ color }: { color: string }) {
   return (
     <Svg width={80} height={80} viewBox="0 0 80 80">
@@ -137,13 +127,10 @@ function HistorySvg({ color }: { color: string }) {
       <Circle cx="40" cy="40" r="4" fill={color} opacity={0.8} />
       <Line x1="40" y1="40" x2="40" y2="18" stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity={0.8} />
       <Line x1="40" y1="40" x2="58" y2="48" stroke={color} strokeWidth="3" strokeLinecap="round" opacity={0.7} />
-      {/* Tick marks */}
       {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg, i) => {
         const rad = (deg * Math.PI) / 180;
-        const x1 = 40 + 28 * Math.sin(rad);
-        const y1 = 40 - 28 * Math.cos(rad);
-        const x2 = 40 + 32 * Math.sin(rad);
-        const y2 = 40 - 32 * Math.cos(rad);
+        const x1 = 40 + 28 * Math.sin(rad); const y1 = 40 - 28 * Math.cos(rad);
+        const x2 = 40 + 32 * Math.sin(rad); const y2 = 40 - 32 * Math.cos(rad);
         return <Line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={i % 3 === 0 ? 2.5 : 1} opacity={0.4} />;
       })}
     </Svg>
@@ -152,9 +139,7 @@ function HistorySvg({ color }: { color: string }) {
 
 // ── DIFFICULTY BADGE ──────────────────────────────────────────
 function DifficultyBadge({ level, theme }: { level: string; theme: typeof colors.light }) {
-  const colorMap: Record<string, string> = {
-    beginner: theme.accent, intermediate: theme.amber, advanced: theme.red,
-  };
+  const colorMap: Record<string, string> = { beginner: theme.accent, intermediate: theme.amber, advanced: theme.red };
   const c = colorMap[level] ?? theme.accent;
   return (
     <View style={[styles.diffBadge, { backgroundColor: c + '22' }]}>
@@ -163,22 +148,17 @@ function DifficultyBadge({ level, theme }: { level: string; theme: typeof colors
   );
 }
 
-// ── EXERCISE CARD — with category colour left border ──────────
+// ── EXERCISE CARD ─────────────────────────────────────────────
 function ExerciseCard({ exercise, theme, isSelected, onToggle }: {
   exercise: Exercise; theme: typeof colors.light; isSelected: boolean; onToggle: () => void;
 }) {
   const catColor = CAT_COLORS[exercise.category] ?? theme.accent;
   return (
     <TouchableOpacity onPress={onToggle} activeOpacity={0.8}
-      style={[styles.exerciseCard, {
-        backgroundColor: isSelected ? catColor + '18' : theme.card,
-        borderColor: isSelected ? catColor : theme.border,
-      }]}>
-      {/* Category colour left bar */}
+      style={[styles.exerciseCard, { backgroundColor: isSelected ? catColor + '18' : theme.card, borderColor: isSelected ? catColor : theme.border }]}>
       <View style={[styles.exerciseCatBar, { backgroundColor: catColor }]} />
       <View style={styles.exerciseCardInner}>
         <View style={styles.exerciseCardLeft}>
-          {/* Category icon circle */}
           <View style={[styles.exerciseIconCircle, { backgroundColor: catColor + '22' }]}>
             <Ionicons name={catIconName(exercise.category)} size={18} color={catColor} />
           </View>
@@ -218,17 +198,13 @@ function ActiveExerciseRow({ exercise, theme, isActive, onStart, onComplete }: {
     <View style={[styles.activeRow, {
       backgroundColor: exercise.done ? theme.accent + '12' : theme.card,
       borderColor: exercise.done ? theme.accent : isActive ? catColor : theme.border,
-      borderWidth: isActive ? 2 : 1,
-      borderLeftWidth: 4,
-      borderLeftColor: catColor,
+      borderWidth: isActive ? 2 : 1, borderLeftWidth: 4, borderLeftColor: catColor,
     }]}>
       <View style={styles.activeRowLeft}>
         <Text style={[styles.activeRowName, { color: exercise.done ? theme.accent : theme.textPrimary }]}>{exercise.name}</Text>
         <Text style={[styles.activeRowMeta, { color: theme.textMuted }]}>{exercise.muscle_group} · {exercise.calories_per_minute} kcal/min</Text>
         {exercise.seconds > 0 && (
-          <Text style={[styles.activeRowTime, { color: catColor }]}>
-            ⏱ {mins}:{secs.toString().padStart(2, '0')} · {exercise.calories_burned} kcal
-          </Text>
+          <Text style={[styles.activeRowTime, { color: catColor }]}>⏱ {mins}:{secs.toString().padStart(2, '0')} · {exercise.calories_burned} kcal</Text>
         )}
       </View>
       {exercise.done ? (
@@ -258,7 +234,7 @@ function WorkoutTimer({ theme, seconds, calories }: { theme: typeof colors.light
   const secs = seconds % 60;
   const timeStr = hrs > 0
     ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    : `${mins.toString().padStart(2, '00')}:${secs.toString().padStart(2, '0')}`;
   return (
     <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.timerCard}>
       <View style={styles.timerSide}>
@@ -275,6 +251,76 @@ function WorkoutTimer({ theme, seconds, calories }: { theme: typeof colors.light
   );
 }
 
+// ── POST-WORKOUT MODAL ────────────────────────────────────────
+// Shows after workout completes — PRs achieved + Claude meal suggestion.
+function PostWorkoutModal({ visible, onClose, prResult, meal, loadingMeal, theme }: {
+  visible: boolean; onClose: () => void;
+  prResult: PRResult | null;
+  meal: MealSuggestion | null; loadingMeal: boolean;
+  theme: typeof colors.light;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.postWorkoutSheet, { backgroundColor: theme.surface }]}>
+          {/* Header */}
+          <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.postWorkoutHeader}>
+            <Text style={styles.postWorkoutEmoji}>🎉</Text>
+            <Text style={styles.postWorkoutTitle}>Workout Complete!</Text>
+            <Text style={styles.postWorkoutSub}>You crushed it. Time to recover.</Text>
+          </LinearGradient>
+
+          <ScrollView style={{ padding: spacing.lg }} showsVerticalScrollIndicator={false}>
+
+            {/* PR Section — only shows if new records were set */}
+            {prResult?.isNewPR && prResult.newRecords.length > 0 && (
+              <View style={[styles.prSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.postSectionTitle, { color: theme.textPrimary }]}>🏅 New Personal Records!</Text>
+                {prResult.newRecords.slice(0, 3).map((pr, i) => (
+                  <View key={i} style={[styles.prRow, { borderTopColor: theme.border }]}>
+                    <Text style={[styles.prLabel, { color: theme.textPrimary }]}>{pr.label}</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[styles.prValue, { color: theme.accent }]}>{pr.value}</Text>
+                      <Text style={[styles.prImprovement, { color: theme.textMuted }]}>{pr.improvement}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Meal Suggestion */}
+            <View style={[styles.mealSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[styles.postSectionTitle, { color: theme.textPrimary }]}>🍽️ Recovery Meal Suggestion</Text>
+              {loadingMeal ? (
+                <ActivityIndicator color={theme.accent} style={{ marginVertical: spacing.md }} />
+              ) : meal ? (
+                <View style={{ gap: spacing.xs }}>
+                  <Text style={[styles.mealName, { color: theme.textPrimary }]}>{meal.name}</Text>
+                  <Text style={[styles.mealWhy, { color: theme.textSecondary }]}>{meal.why}</Text>
+                  <Text style={[styles.mealCal, { color: theme.accent }]}>~{meal.calories} kcal</Text>
+                </View>
+              ) : (
+                <Text style={[styles.mealWhy, { color: theme.textMuted }]}>No suggestion available</Text>
+              )}
+            </View>
+
+            <View style={{ height: spacing.lg }} />
+          </ScrollView>
+
+          {/* Close button */}
+          <View style={styles.postWorkoutClose}>
+            <TouchableOpacity onPress={onClose} activeOpacity={0.85} style={styles.postWorkoutCloseWrap}>
+              <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.postWorkoutCloseBtn}>
+                <Text style={styles.postWorkoutCloseBtnText}>Done</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── MY ROUTINES TAB ───────────────────────────────────────────
 function MyRoutinesTab({ theme, routines, onCreateManual, onCreateWithCoach, onStartRoutine, onDeleteRoutine }: {
   theme: typeof colors.light; routines: SavedRoutine[];
@@ -284,28 +330,22 @@ function MyRoutinesTab({ theme, routines, onCreateManual, onCreateWithCoach, onS
   if (routines.length === 0) {
     return (
       <ScrollView contentContainerStyle={[styles.tabContent, styles.emptyContainer]}>
-        {/* Hero illustration */}
         <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.emptyHeroCard}>
           <BarbellSvg color={theme.accent} />
           <Text style={styles.emptyHeroTitle}>No routines yet</Text>
           <Text style={styles.emptyHeroSub}>Create a workout set to quickly access your saved workouts anytime</Text>
         </LinearGradient>
-
-        {/* Create options */}
         <TouchableOpacity onPress={onCreateManual} activeOpacity={0.85} style={styles.createBtnWrap}>
           <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.createBtn}>
             <Ionicons name="add-circle-outline" size={20} color="#fff" />
             <Text style={styles.createBtnText}>Create Workout Set</Text>
           </LinearGradient>
         </TouchableOpacity>
-
         <TouchableOpacity onPress={onCreateWithCoach} activeOpacity={0.85}
           style={[styles.coachBtnOutline, { borderColor: theme.accent, backgroundColor: theme.accentDim as string }]}>
           <Ionicons name="sparkles-outline" size={18} color={theme.accent} />
           <Text style={[styles.coachBtnOutlineText, { color: theme.accent }]}>Let CalFit Coach Create It</Text>
         </TouchableOpacity>
-
-        {/* Quick workout inspiration cards */}
         <Text style={[styles.inspirationLabel, { color: theme.textSecondary }]}>Popular workout types</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inspirationRow}>
           {[
@@ -329,22 +369,16 @@ function MyRoutinesTab({ theme, routines, onCreateManual, onCreateWithCoach, onS
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       <View style={styles.routinesTopRow}>
-        <Text style={[styles.routinesCount, { color: theme.textSecondary }]}>
-          {routines.length} routine{routines.length !== 1 ? 's' : ''}
-        </Text>
-        <TouchableOpacity onPress={onCreateManual}
-          style={[styles.addRoutineBtn, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
+        <Text style={[styles.routinesCount, { color: theme.textSecondary }]}>{routines.length} routine{routines.length !== 1 ? 's' : ''}</Text>
+        <TouchableOpacity onPress={onCreateManual} style={[styles.addRoutineBtn, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
           <Ionicons name="add" size={16} color={theme.accent} />
           <Text style={[styles.addRoutineBtnText, { color: theme.accent }]}>New Routine</Text>
         </TouchableOpacity>
       </View>
-
-      {routines.map((routine, idx) => {
-        // Pick a dominant colour from first exercise category
+      {routines.map((routine) => {
         const firstCat = routine.exercises[0]?.category ?? 'All';
         const cardColor = CAT_COLORS[firstCat] ?? theme.accent;
         const gradColors: [string, string] = [cardColor + 'DD', cardColor + '88'];
-
         return (
           <View key={routine.id} style={[styles.routineCard, { borderColor: cardColor + '44' }]}>
             <LinearGradient colors={gradColors} style={styles.routineCardTop}>
@@ -353,37 +387,19 @@ function MyRoutinesTab({ theme, routines, onCreateManual, onCreateWithCoach, onS
                   <Text style={styles.routineCardName}>{routine.name}</Text>
                   {routine.description ? <Text style={styles.routineCardDesc}>{routine.description}</Text> : null}
                 </View>
-                <TouchableOpacity
-                  onPress={() => Alert.alert('Delete?', `Remove "${routine.name}"?`, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => onDeleteRoutine(routine.id) },
-                  ])}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <TouchableOpacity onPress={() => Alert.alert('Delete?', `Remove "${routine.name}"?`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => onDeleteRoutine(routine.id) },
+                ])} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="trash-outline" size={18} color="rgba(255,255,255,0.60)" />
                 </TouchableOpacity>
               </View>
-              {/* Stats row on gradient */}
               <View style={styles.routineStatsBadgeRow}>
-                {routine.duration_est ? (
-                  <View style={styles.routineStatBadge}>
-                    <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.80)" />
-                    <Text style={styles.routineStatBadgeText}>~{routine.duration_est} min</Text>
-                  </View>
-                ) : null}
-                {routine.calories_est ? (
-                  <View style={styles.routineStatBadge}>
-                    <Ionicons name="flame-outline" size={12} color="rgba(255,255,255,0.80)" />
-                    <Text style={styles.routineStatBadgeText}>~{routine.calories_est} kcal</Text>
-                  </View>
-                ) : null}
-                <View style={styles.routineStatBadge}>
-                  <Ionicons name="barbell-outline" size={12} color="rgba(255,255,255,0.80)" />
-                  <Text style={styles.routineStatBadgeText}>{routine.exercises.length} exercises</Text>
-                </View>
+                {routine.duration_est ? <View style={styles.routineStatBadge}><Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.80)" /><Text style={styles.routineStatBadgeText}>~{routine.duration_est} min</Text></View> : null}
+                {routine.calories_est ? <View style={styles.routineStatBadge}><Ionicons name="flame-outline" size={12} color="rgba(255,255,255,0.80)" /><Text style={styles.routineStatBadgeText}>~{routine.calories_est} kcal</Text></View> : null}
+                <View style={styles.routineStatBadge}><Ionicons name="barbell-outline" size={12} color="rgba(255,255,255,0.80)" /><Text style={styles.routineStatBadgeText}>{routine.exercises.length} exercises</Text></View>
               </View>
             </LinearGradient>
-
-            {/* Exercise list */}
             <View style={[styles.routineCardBody, { backgroundColor: theme.card }]}>
               {routine.exercises.slice(0, 3).map((ex, i) => (
                 <View key={i} style={styles.routineExRow}>
@@ -392,10 +408,7 @@ function MyRoutinesTab({ theme, routines, onCreateManual, onCreateWithCoach, onS
                   <Text style={[styles.routineExCal, { color: theme.textMuted }]}>{ex.calories_per_minute} kcal/min</Text>
                 </View>
               ))}
-              {routine.exercises.length > 3 && (
-                <Text style={[styles.routineMoreText, { color: theme.textMuted }]}>+{routine.exercises.length - 3} more exercises</Text>
-              )}
-
+              {routine.exercises.length > 3 && <Text style={[styles.routineMoreText, { color: theme.textMuted }]}>+{routine.exercises.length - 3} more exercises</Text>}
               <TouchableOpacity onPress={() => onStartRoutine(routine)} activeOpacity={0.85} style={styles.startRoutineWrap}>
                 <LinearGradient colors={[cardColor, cardColor + 'BB'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.startRoutineBtn}>
                   <Ionicons name="play-circle" size={18} color="#fff" />
@@ -406,8 +419,6 @@ function MyRoutinesTab({ theme, routines, onCreateManual, onCreateWithCoach, onS
           </View>
         );
       })}
-
-      {/* Coach card */}
       <TouchableOpacity onPress={onCreateWithCoach} activeOpacity={0.8}
         style={[styles.coachCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <LinearGradient colors={[theme.accent + '22', theme.gradStart + '22'] as [string, string]} style={styles.coachCardIconWrap}>
@@ -477,12 +488,9 @@ function CoachRoutineModal({ visible, theme, onClose, onSave }: {
     const newAnswers = { ...answers, [questions[qIndex].key]: answer };
     setAnswers(newAnswers);
     if (qIndex < questions.length - 1) { setQIndex(qIndex + 1); return; }
-  setLoading(true);
+    setLoading(true);
     try {
-      if (!hasClaudeKey()) {
-        Alert.alert('AI not connected', 'Add your Anthropic API key to generate routines.');
-        reset(); return;
-      }
+      if (!hasClaudeKey()) { Alert.alert('AI not connected', 'Add your Anthropic API key to generate routines.'); reset(); return; }
       const result = await claudeJSON<any>(
         'You are a fitness coach. Generate workout routines as JSON only. No markdown, no explanation.',
         `Generate a workout routine. Goal:${newAnswers.goal} Style:${newAnswers.style} Location:${newAnswers.location} Level:${newAnswers.level} Area:${newAnswers.area} Duration:${newAnswers.duration} Equipment:${newAnswers.equipment} Count:${newAnswers.count}
@@ -563,12 +571,9 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
 }) {
   const doneCount = exercises.filter(e => e.done).length;
   const progress = exercises.length > 0 ? doneCount / exercises.length : 0;
-
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       {workoutStarted && <WorkoutTimer theme={theme} seconds={workoutSeconds} calories={exercises.reduce((s, e) => s + e.calories_burned, 0)} />}
-
-      {/* Progress bar */}
       {exercises.length > 0 && (
         <View style={[styles.workoutProgressWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.workoutProgressRow}>
@@ -581,12 +586,9 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
           </View>
         </View>
       )}
-
       <View style={styles.todayHeader}>
         <Text style={[styles.todayTitle, { color: theme.textPrimary }]}>Active Workout</Text>
-        <TouchableOpacity onPress={onOpenCatalogue}>
-          <Text style={[styles.addMoreText, { color: theme.accent }]}>+ Add</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={onOpenCatalogue}><Text style={[styles.addMoreText, { color: theme.accent }]}>+ Add</Text></TouchableOpacity>
       </View>
       {exercises.map((ex, i) => (
         <ActiveExerciseRow key={ex.id} exercise={ex} theme={theme}
@@ -603,20 +605,27 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
   );
 }
 
-// ── CATALOGUE TAB ─────────────────────────────────────────────
-function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout, routineName }: {
+// ── CATALOGUE TAB — now with equipment filter ─────────────────
+function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout, routineName, equipmentFilter, onEquipmentChange }: {
   theme: typeof colors.light; exercises: Exercise[]; selectedIds: Set<string>;
   onToggle: (ex: Exercise) => void; onAddToWorkout: () => void; routineName?: string;
+  equipmentFilter: string; onEquipmentChange: (eq: string) => void;
 }) {
   const categories = ['All', 'Cardio', 'Chest', 'Back', 'Core', 'Legs', 'Shoulders', 'Arms', 'Flexibility'];
   const [activeCategory, setActiveCategory] = useState('All');
   const [customName, setCustomName] = useState('');
-  const filtered = activeCategory === 'All' ? exercises : exercises.filter((e) => e.category === activeCategory);
+
+  // Filter by both category AND equipment
+  const filtered = exercises.filter((e) => {
+    const catMatch = activeCategory === 'All' || e.category === activeCategory;
+    const eqMatch  = equipmentFilter === 'All' || e.equipment === equipmentFilter;
+    return catMatch && eqMatch;
+  });
   const catColor = CAT_COLORS[activeCategory] ?? theme.accent;
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Category pills with colour */}
+      {/* Category pills */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
         {categories.map((cat) => {
           const cc = CAT_COLORS[cat] ?? theme.accent;
@@ -630,7 +639,21 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
         })}
       </ScrollView>
 
-      {/* Category hero bar */}
+      {/* Equipment filter pills */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.categoryRow, { paddingTop: 0 }]}>
+        {EQUIPMENT_OPTIONS.map((eq) => {
+          const isActive = equipmentFilter === eq;
+          return (
+            <TouchableOpacity key={eq} onPress={() => onEquipmentChange(eq)}
+              style={[styles.eqPill, { backgroundColor: isActive ? theme.accentSecond : theme.card, borderColor: isActive ? theme.accentSecond : theme.border }]}>
+              <Text style={[styles.eqPillText, { color: isActive ? '#fff' : theme.textMuted }]}>
+                {eq === 'none' ? 'Bodyweight' : eq.charAt(0).toUpperCase() + eq.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
       {activeCategory !== 'All' && (
         <View style={[styles.catHeroBar, { backgroundColor: catColor + '15', borderColor: catColor + '44' }]}>
           <Ionicons name={catIconName(activeCategory)} size={16} color={catColor} />
@@ -650,7 +673,6 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
         {filtered.map((ex) => (
           <ExerciseCard key={ex.id} exercise={ex} theme={theme} isSelected={selectedIds.has(ex.id)} onToggle={() => onToggle(ex)} />
         ))}
-        {/* Add manually */}
         <View style={[styles.addManuallyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.addManuallyLabel, { color: theme.textSecondary }]}>Can't find it? Add manually:</Text>
           <View style={styles.addManuallyRow}>
@@ -675,7 +697,6 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: { theme: typeof color
   const max = Math.max(...weeklyData, 1);
   const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
   const pct = Math.min((totalCalories / 500) * 100, 100);
-
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.calorieHero}>
@@ -688,7 +709,6 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: { theme: typeof color
         </View>
         <Text style={styles.calorieBarSub}>{Math.round(pct)}% of 500 kcal daily burn goal</Text>
       </LinearGradient>
-
       <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>This Week</Text>
       <View style={[styles.barChartCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.barChart}>
@@ -719,10 +739,8 @@ function StepsTab({ theme, userId, goalSteps }: { theme: typeof colors.light; us
     const save = async () => { const { saveStepsToSupabase } = await import('../../services/stepService'); await saveStepsToSupabase(userId, steps, goalSteps); };
     save();
   }, [steps]);
-
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
-      {/* Steps hero with footprint SVG */}
       <LinearGradient colors={['#C8E6FF', '#D8F4F4'] as [string, string]} style={styles.stepsHero}>
         <FootprintSvg color="#2BBCB0" />
         <Text style={styles.stepsHeroValue}>{isLoading ? '...' : steps >= 1000 ? `${(steps / 1000).toFixed(1)}K` : steps.toString()}</Text>
@@ -733,13 +751,11 @@ function StepsTab({ theme, userId, goalSteps }: { theme: typeof colors.light; us
         </View>
         <Text style={styles.stepsBarSub}>{steps.toLocaleString()} of {goalSteps.toLocaleString()} · {percentage}%</Text>
       </LinearGradient>
-
       <LinearGradient colors={['#FF6B35' + '18', '#FFB830' + '18'] as [string, string]}
         style={[styles.stepsCalPill, { borderColor: '#FF6B35' + '44' }]}>
         <Ionicons name="flame-outline" size={16} color="#FF6B35" />
         <Text style={[styles.stepsCalText, { color: '#FF6B35' }]}>{calories} kcal burned from steps</Text>
       </LinearGradient>
-
       {!isAvailable ? (
         <View style={[styles.stepsSensorCard, { backgroundColor: theme.amber + '18', borderColor: theme.amber }]}>
           <Ionicons name="warning-outline" size={20} color={theme.amber} />
@@ -842,21 +858,27 @@ export default function WorkoutScreen() {
   const goalSteps = (profile as any)?.step_goal ?? 10000;
 
   const tabs = ['My Routines', 'Catalogue', 'Calories', 'Steps', 'History'];
-  const [activeTab, setActiveTab]                     = useState('My Routines');
-  const [catalogue, setCatalogue]                     = useState<Exercise[]>([]);
-  const [selectedIds, setSelectedIds]                 = useState<Set<string>>(new Set());
-  const [workoutExercises, setWorkoutExercises]       = useState<ActiveExercise[]>([]);
-  const [activeExerciseIndex, setActiveExerciseIndex] = useState(-1);
-  const [workoutStarted, setWorkoutStarted]           = useState(false);
-  const [workoutSeconds, setWorkoutSeconds]           = useState(0);
-  const [sessions, setSessions]                       = useState<WorkoutSession[]>([]);
-  const [weeklyCalories, setWeeklyCalories]           = useState([0, 0, 0, 0, 0, 0, 0]);
-  const [totalCaloriesBurned, setTotalCaloriesBurned] = useState(0);
-  const [savedRoutines, setSavedRoutines]             = useState<SavedRoutine[]>([]);
-  const [pendingRoutineName, setPendingRoutineName]   = useState('');
-  const [showCreateModal, setShowCreateModal]         = useState(false);
-  const [showCoachModal, setShowCoachModal]           = useState(false);
-  const [isInActiveWorkout, setIsInActiveWorkout]     = useState(false);
+  const [activeTab, setActiveTab]                       = useState('My Routines');
+  const [catalogue, setCatalogue]                       = useState<Exercise[]>([]);
+  const [selectedIds, setSelectedIds]                   = useState<Set<string>>(new Set());
+  const [workoutExercises, setWorkoutExercises]         = useState<ActiveExercise[]>([]);
+  const [activeExerciseIndex, setActiveExerciseIndex]   = useState(-1);
+  const [workoutStarted, setWorkoutStarted]             = useState(false);
+  const [workoutSeconds, setWorkoutSeconds]             = useState(0);
+  const [sessions, setSessions]                         = useState<WorkoutSession[]>([]);
+  const [weeklyCalories, setWeeklyCalories]             = useState([0, 0, 0, 0, 0, 0, 0]);
+  const [totalCaloriesBurned, setTotalCaloriesBurned]   = useState(0);
+  const [savedRoutines, setSavedRoutines]               = useState<SavedRoutine[]>([]);
+  const [pendingRoutineName, setPendingRoutineName]     = useState('');
+  const [showCreateModal, setShowCreateModal]           = useState(false);
+  const [showCoachModal, setShowCoachModal]             = useState(false);
+  const [isInActiveWorkout, setIsInActiveWorkout]       = useState(false);
+  // ── NEW STATE ──────────────────────────────────────────────
+  const [equipmentFilter, setEquipmentFilter]           = useState('All');
+  const [showPostWorkoutModal, setShowPostWorkoutModal] = useState(false);
+  const [prResult, setPrResult]                         = useState<PRResult | null>(null);
+  const [postWorkoutMeal, setPostWorkoutMeal]           = useState<MealSuggestion | null>(null);
+  const [loadingMealSuggestion, setLoadingMealSuggestion] = useState(false);
 
   const workoutTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -954,25 +976,86 @@ export default function WorkoutScreen() {
     setActiveExerciseIndex(-1);
   };
 
+  // ── UPDATED handleCompleteWorkout — now checks PRs + shows modal ──
   const handleCompleteWorkout = async () => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
+
     const totalCal = workoutExercises.reduce((s, e) => s + e.calories_burned, 0);
     const sessionName = workoutExercises[0]?.category ? `${workoutExercises[0].category} Workout` : 'Workout Session';
-    const hrs = Math.floor(workoutSeconds / 3600); const mins = Math.floor((workoutSeconds % 3600) / 60); const secs = workoutSeconds % 60;
-    const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    const hrs = Math.floor(workoutSeconds / 3600);
+    const mins = Math.floor((workoutSeconds % 3600) / 60);
+    const secs = workoutSeconds % 60;
+
     speak(`Workout complete! ${workoutExercises.length} exercises, ${totalCal} calories. Be proud!`);
+
     try {
-      if (user?.id) { const { supabase } = await import('../../services/supabase'); await supabase.from('workout_sessions').insert({ user_id: user.id, name: sessionName, completed_at: new Date().toISOString(), duration_seconds: workoutSeconds, calories_burned: totalCal, exercises: workoutExercises.map(e => ({ name: e.name, seconds: e.seconds, calories: e.calories_burned })), status: 'completed' }); }
-    } catch {}
-    setIsInActiveWorkout(false); setWorkoutExercises([]); setWorkoutStarted(false); setWorkoutSeconds(0); setActiveExerciseIndex(-1);
-    Alert.alert('🎉 Workout Complete!', `Time: ${timeStr}\nCalories: ${totalCal} kcal\nExercises: ${workoutExercises.length}`, [{ text: 'Awesome!' }]);
+      if (user?.id) {
+        const { supabase } = await import('../../services/supabase');
+        await supabase.from('workout_sessions').insert({
+          user_id: user.id, name: sessionName,
+          completed_at: new Date().toISOString(),
+          duration_seconds: workoutSeconds, calories_burned: totalCal,
+          exercises: workoutExercises.map(e => ({ name: e.name, seconds: e.seconds, calories: e.calories_burned })),
+          status: 'completed',
+        });
+
+        // ── Check Personal Records ────────────────────────────
+        const result = await checkAndSavePRs(
+          user.id, sessionName, workoutSeconds, totalCal,
+          workoutExercises.map(e => ({ name: e.name, seconds: e.seconds, calories: e.calories_burned }))
+        );
+        setPrResult(result);
+      }
+    } catch (e) {
+      console.error('handleCompleteWorkout error:', e);
+    }
+
+    // Reset workout state
+    setIsInActiveWorkout(false);
+    setWorkoutExercises([]);
+    setWorkoutStarted(false);
+    setWorkoutSeconds(0);
+    setActiveExerciseIndex(-1);
+
+    // ── Show post-workout modal + load meal suggestion ────────
+    setShowPostWorkoutModal(true);
+    loadPostWorkoutMeal(workoutExercises, totalCal);
     loadHistory();
+  };
+
+  // ── Load Claude meal suggestion after workout ─────────────
+  const loadPostWorkoutMeal = async (exercises: ActiveExercise[], totalCal: number) => {
+    setLoadingMealSuggestion(true);
+    setPostWorkoutMeal(null);
+    try {
+      const fallbacks: MealSuggestion[] = [
+        { name: 'Grilled Chicken + Rice', why: 'High protein to repair muscles, carbs to replenish glycogen.', calories: 520 },
+        { name: 'Egg & Avocado Toast', why: 'Healthy fats + protein for recovery. Quick and easy.', calories: 380 },
+        { name: 'Greek Yoghurt + Banana', why: 'Fast carbs + protein — ideal within 30 min of training.', calories: 290 },
+        { name: 'Jollof Rice + Grilled Fish', why: 'Great carb and protein balance for Nigerian recovery.', calories: 580 },
+      ];
+
+      if (!hasClaudeKey()) {
+        setPostWorkoutMeal(fallbacks[Math.floor(Math.random() * fallbacks.length)]);
+        return;
+      }
+
+      const categories = [...new Set(exercises.map(e => e.category))].join(', ');
+      const result = await claudeJSON<MealSuggestion>(
+        'You are a sports nutritionist. Suggest a post-workout recovery meal. Return JSON only: { "name": string, "why": string (max 15 words), "calories": number }',
+        `Workout: ${categories || 'mixed'} training, ${totalCal} kcal burned. Suggest one recovery meal suitable for Nigeria or globally.`
+      );
+      setPostWorkoutMeal(result ?? fallbacks[0]);
+    } catch {
+      setPostWorkoutMeal({ name: 'Grilled Chicken + Rice', why: 'High protein to repair muscles, carbs to replenish glycogen.', calories: 520 });
+    } finally {
+      setLoadingMealSuggestion(false);
+    }
   };
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      {/* HEADER — tight, no gap */}
       <View style={[styles.header, { backgroundColor: theme.bg }]}>
         <View>
           <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Activity</Text>
@@ -988,7 +1071,6 @@ export default function WorkoutScreen() {
         )}
       </View>
 
-      {/* TAB BAR — directly under header, no gap */}
       <InnerTabs
         tabs={tabs}
         active={activeTab}
@@ -1009,7 +1091,8 @@ export default function WorkoutScreen() {
       )}
       {activeTab === 'Catalogue' && (
         <CatalogueTab theme={theme} exercises={catalogue} selectedIds={selectedIds}
-          onToggle={handleToggleExercise} onAddToWorkout={handleAddToWorkout} routineName={pendingRoutineName} />
+          onToggle={handleToggleExercise} onAddToWorkout={handleAddToWorkout} routineName={pendingRoutineName}
+          equipmentFilter={equipmentFilter} onEquipmentChange={setEquipmentFilter} />
       )}
       {activeTab === 'Calories' && <CaloriesTab theme={theme} totalCalories={totalCaloriesBurned} weeklyData={weeklyCalories} />}
       {activeTab === 'Steps' && <StepsTab theme={theme} userId={user?.id ?? ''} goalSteps={goalSteps} />}
@@ -1018,6 +1101,16 @@ export default function WorkoutScreen() {
       <CreateRoutineModal visible={showCreateModal} theme={theme} onClose={() => setShowCreateModal(false)}
         onConfirm={(name) => { setPendingRoutineName(name); setShowCreateModal(false); setActiveTab('Catalogue'); }} />
       <CoachRoutineModal visible={showCoachModal} theme={theme} onClose={() => setShowCoachModal(false)} onSave={saveRoutine} />
+
+      {/* ── POST-WORKOUT MODAL — PRs + Meal Suggestion ────── */}
+      <PostWorkoutModal
+        visible={showPostWorkoutModal}
+        onClose={() => { setShowPostWorkoutModal(false); setPrResult(null); setPostWorkoutMeal(null); }}
+        prResult={prResult}
+        meal={postWorkoutMeal}
+        loadingMeal={loadingMealSuggestion}
+        theme={theme}
+      />
     </AndroidSafeView>
   );
 }
@@ -1025,53 +1118,32 @@ export default function WorkoutScreen() {
 // ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-
-  // FIXED: header has no bottom padding that creates gap
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs, // minimal — tab bar sits right below
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xs },
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
   pageSubtitle: { fontSize: fontSize.xs, marginTop: 1 },
   cancelWorkoutBtn: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
   cancelWorkoutText: { fontSize: fontSize.sm, fontWeight: '700' },
-
-  // FIXED: tab bar has no margin/padding gap
   innerTabBar: { borderBottomWidth: 1, maxHeight: 42 },
   innerTabBarContent: { paddingHorizontal: spacing.sm },
-  innerTab: {
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
-    borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -1,
-  },
+  innerTab: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -1 },
   innerTabText: { fontSize: fontSize.sm },
-
   tabContent: { paddingBottom: 100, paddingTop: spacing.md },
   emptyContainer: { flexGrow: 1 },
   sectionLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm },
-
-  // Empty hero
   emptyHeroCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: 28, borderRadius: 20, alignItems: 'center', gap: spacing.sm },
   emptyHeroTitle: { fontSize: fontSize.xl, fontWeight: '700', color: '#fff', textAlign: 'center' },
   emptyHeroSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 20 },
-
-  // Inspiration cards
   inspirationLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   inspirationRow: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.sm },
   inspirationCard: { width: 130, padding: spacing.md, borderRadius: 16, borderWidth: 1, gap: 4 },
   inspirationEmoji: { fontSize: 28 },
   inspirationName: { fontSize: fontSize.sm, fontWeight: '800' },
   inspirationDesc: { fontSize: 11, lineHeight: 15 },
-
-  // Create buttons
   createBtnWrap: { marginHorizontal: spacing.lg, borderRadius: 16, overflow: 'hidden', marginBottom: spacing.sm },
   createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
   createBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
   coachBtnOutline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.md, borderRadius: 16, borderWidth: 1.5 },
   coachBtnOutlineText: { fontSize: fontSize.base, fontWeight: '700' },
-
-  // Routine cards
   routinesTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   routinesCount: { fontSize: fontSize.sm, fontWeight: '600' },
   addRoutineBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
@@ -1097,8 +1169,6 @@ const styles = StyleSheet.create({
   coachCardIconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   coachCardTitle: { fontSize: fontSize.base, fontWeight: '700' },
   coachCardSub: { fontSize: fontSize.sm, marginTop: 2 },
-
-  // Active workout
   workoutProgressWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: 12, borderWidth: 1, gap: 8 },
   workoutProgressRow: { flexDirection: 'row', justifyContent: 'space-between' },
   workoutProgressLabel: { fontSize: fontSize.sm },
@@ -1108,11 +1178,7 @@ const styles = StyleSheet.create({
   todayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   todayTitle: { fontSize: fontSize.lg, fontWeight: '700' },
   addMoreText: { fontSize: fontSize.sm, fontWeight: '600' },
-  activeRow: {
-    flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm, padding: spacing.md, borderRadius: 12, gap: spacing.md,
-    overflow: 'hidden',
-  },
+  activeRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: 12, gap: spacing.md, overflow: 'hidden' },
   activeRowLeft: { flex: 1 },
   activeRowName: { fontSize: fontSize.base, fontWeight: '700' },
   activeRowMeta: { fontSize: fontSize.xs, marginTop: 2 },
@@ -1125,26 +1191,23 @@ const styles = StyleSheet.create({
   completeWorkoutWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 16, overflow: 'hidden' },
   completeWorkoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
   completeWorkoutBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
-
-  // Timer
   timerCard: { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.sm, padding: spacing.lg, borderRadius: 20 },
   timerSide: { flex: 1, alignItems: 'center' },
   timerDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: spacing.md },
   timerLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.5, marginBottom: 4 },
   timerValue: { fontSize: 24, fontWeight: '900', color: '#fff' },
   timerUnit: { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
-
-  // Catalogue
   categoryRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
   categoryPill: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1, height: 32, justifyContent: 'center' },
   categoryPillText: { fontSize: fontSize.sm },
+  // Equipment filter pills
+  eqPill: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: 99, borderWidth: 1, height: 28, justifyContent: 'center' },
+  eqPillText: { fontSize: 11, fontWeight: '600' },
   catHeroBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: 10, borderRadius: 10, borderWidth: 1 },
   catHeroText: { fontSize: fontSize.sm, fontWeight: '600' },
   addSelectedWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 12, overflow: 'hidden' },
   addSelectedBar: { padding: spacing.md, alignItems: 'center' },
   addSelectedText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-
-  // Exercise cards
   exerciseCard: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   exerciseCatBar: { width: 4, flexShrink: 0 },
   exerciseCardInner: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: spacing.md, gap: spacing.md },
@@ -1163,8 +1226,6 @@ const styles = StyleSheet.create({
   addManuallyInput: { flex: 1, borderWidth: 1, borderRadius: 8, padding: spacing.sm, fontSize: fontSize.base },
   addManuallyBtnWrap: { borderRadius: 8, overflow: 'hidden' },
   addManuallyBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-
-  // Calories
   calorieHero: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.xl, borderRadius: 20, alignItems: 'center', gap: 6 },
   calorieHeroValue: { fontSize: 56, fontWeight: '900', color: '#fff', lineHeight: 60 },
   calorieHeroLabel: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.65)', marginBottom: 12 },
@@ -1178,8 +1239,6 @@ const styles = StyleSheet.create({
   bar: { width: '100%', borderRadius: 4 },
   barLabel: { fontSize: 9 },
   weeklyTotal: { fontSize: fontSize.xs, textAlign: 'right', marginTop: spacing.sm },
-
-  // Steps
   stepsHero: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.xl, borderRadius: 20, alignItems: 'center', gap: 6 },
   stepsHeroValue: { fontSize: 52, fontWeight: '900', color: '#2BBCB0', lineHeight: 56 },
   stepsHeroLabel: { fontSize: fontSize.sm, color: '#2BBCB0', fontWeight: '600', marginBottom: 8 },
@@ -1190,8 +1249,6 @@ const styles = StyleSheet.create({
   stepsCalText: { fontSize: fontSize.sm, fontWeight: '600' },
   stepsSensorCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: 12, borderWidth: 1 },
   stepsSensorText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
-
-  // History
   historyCard: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 16, overflow: 'hidden', borderWidth: 1 },
   historyCardTop: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg },
   historyName: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
@@ -1203,8 +1260,7 @@ const styles = StyleSheet.create({
   historyStats: { flexDirection: 'row', gap: spacing.lg },
   historyStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   historyStatText: { fontSize: fontSize.xs },
-
-  // Modals
+  // Modals (shared)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, paddingBottom: 40, gap: spacing.md },
   modalTitle: { fontSize: fontSize.xl, fontWeight: '800' },
@@ -1229,4 +1285,25 @@ const styles = StyleSheet.create({
   coachQOptions: { gap: spacing.sm },
   coachQOption: { padding: spacing.md, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
   coachQOptionText: { fontSize: fontSize.base, fontWeight: '600' },
+  // Post-workout modal
+  postWorkoutSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', maxHeight: '85%' },
+  postWorkoutHeader: { padding: spacing.xl, alignItems: 'center', gap: spacing.xs },
+  postWorkoutEmoji: { fontSize: 40 },
+  postWorkoutTitle: { fontSize: fontSize.xxl, fontWeight: '900', color: '#fff' },
+  postWorkoutSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.70)' },
+  postWorkoutClose: { padding: spacing.lg, paddingTop: 0 },
+  postWorkoutCloseWrap: { borderRadius: radius.lg, overflow: 'hidden' },
+  postWorkoutCloseBtn: { padding: spacing.md, alignItems: 'center' },
+  postWorkoutCloseBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
+  // PR section inside modal
+  prSection: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
+  mealSection: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
+  postSectionTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.xs },
+  prRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
+  prLabel: { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
+  prValue: { fontSize: fontSize.base, fontWeight: '800', textAlign: 'right' },
+  prImprovement: { fontSize: fontSize.xs, textAlign: 'right', marginTop: 2 },
+  mealName: { fontSize: fontSize.lg, fontWeight: '800', marginBottom: 4 },
+  mealWhy: { fontSize: fontSize.sm, lineHeight: 20, marginBottom: spacing.sm },
+  mealCal: { fontSize: fontSize.base, fontWeight: '700' },
 });

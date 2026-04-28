@@ -732,13 +732,16 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: { theme: typeof color
 }
 
 // ── STEPS TAB ─────────────────────────────────────────────────
+// FIX: reads liveSteps from Zustand (written by useSteps in HomeScreen)
+// instead of calling useSteps() again which creates a second independent
+// hook instance that starts from 0 and diverges from the Home screen value.
 function StepsTab({ theme, userId, goalSteps }: { theme: typeof colors.light; userId: string; goalSteps: number }) {
-  const { steps, calories, percentage, isAvailable, hasPermission, isLoading } = useSteps(goalSteps);
-  useEffect(() => {
-    if (!userId || steps === 0) return;
-    const save = async () => { const { saveStepsToSupabase } = await import('../../services/stepService'); await saveStepsToSupabase(userId, steps, goalSteps); };
-    save();
-  }, [steps]);
+  const { liveSteps: steps } = useAuthStore();
+  const calories   = Math.round(steps * 0.04); // ~0.04 kcal per step
+  const percentage = Math.round(Math.min(steps / goalSteps, 1) * 100);
+  const isAvailable   = true;
+  const hasPermission = true;
+  const isLoading     = false;
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       <LinearGradient colors={['#C8E6FF', '#D8F4F4'] as [string, string]} style={styles.stepsHero}>

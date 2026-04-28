@@ -29,7 +29,6 @@ export const uploadPostImage = async (
   try {
     const response = await fetch(imageUri);
     const blob = await response.blob();
-    const { decode } = await import('base64-arraybuffer');
 
     const reader = new FileReader();
     const base64 = await new Promise<string>((resolve, reject) => {
@@ -39,6 +38,7 @@ export const uploadPostImage = async (
       reader.readAsDataURL(blob);
     });
 
+    const { decode } = await import('base64-arraybuffer');
     const filePath = `${userId}/${Date.now()}.jpg`;
     const { error } = await supabase.storage
       .from('posts-media')
@@ -62,6 +62,14 @@ export const uploadPostImage = async (
 export const moderateImage = async (
   imageUri: string
 ): Promise<ModerationResult> => {
+  // If no API key, skip moderation and allow the post
+  // (moderation is best-effort, not a hard blocker without the key)
+  const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.warn('moderateImage: no API key — skipping moderation');
+    return { safe: true };
+  }
+
   try {
     const response = await fetch(imageUri);
     const blob = await response.blob();
@@ -75,10 +83,16 @@ export const moderateImage = async (
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // FIX: these two headers were missing — causing silent auth failures
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 200,
+        model: 'claude-haiku-4-5-20251001', // Haiku is fine for moderation
+        max_tokens: 60,
         messages: [{
           role: 'user',
           content: [
@@ -88,31 +102,52 @@ export const moderateImage = async (
             },
             {
               type: 'text',
-              text: `You are a content moderator for CalFit, a fitness app used by all ages including minors.
+              // FIX: old prompt was blocking legitimate gym/fitness content.
+              // New prompt explicitly approves fitness-appropriate attire
+              // (sports bras, gym shorts, tank tops) which are expected on
+              // a fitness platform. Only blocks actual NSFW content.
+              text: `You are a content moderator for CalFit, a fitness and health app.
 
-Review this image and respond ONLY with a JSON object:
-{"safe": true} or {"safe": false, "reason": "brief reason"}
+Respond ONLY with JSON: {"safe": true} or {"safe": false, "reason": "brief reason"}
 
-Reject if it contains: nudity, sexual content, revealing clothing exposing intimate areas, graphic violence, hateful content, or anything unrelated to fitness/food/health.
+APPROVE (safe: true):
+- Workouts, gym sessions, exercise equipment
+- Food, meals, healthy eating
+- Progress photos (before/after)
+- Fitness attire: sports bras, tank tops, gym shorts, leggings — normal for fitness
+- Outdoor activities, running, sports
+- Motivational fitness content
 
-Approve if it shows: gym equipment, workouts, food/meals, fitness activities, progress photos with appropriate clothing, healthy lifestyle content.
+REJECT (safe: false):
+- Nudity or sexually explicit content
+- Graphic violence or gore
+- Hateful symbols or content
+- Content completely unrelated to health/fitness/food
 
-Be strict — protect younger users.`,
+Be permissive for genuine fitness content.`,
             },
           ],
         }],
       }),
     });
 
+    if (!claudeResponse.ok) {
+      // If Claude API fails (rate limit, server error etc), allow the post
+      // Don't block users because of API issues on our end
+      console.warn('moderateImage: API error', claudeResponse.status);
+      return { safe: true };
+    }
+
     const claudeData = await claudeResponse.json();
-    const text = claudeData.content?.[0]?.text ?? '{"safe":false}';
+    const text = claudeData.content?.[0]?.text ?? '{"safe":true}';
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return { safe: false, reason: 'Could not verify image safety' };
+    if (!match) return { safe: true }; // can't parse = allow
 
     return JSON.parse(match[0]);
   } catch (err) {
+    // Network error or parse error — don't block the user
     console.error('moderateImage error:', err);
-    return { safe: false, reason: 'Image verification failed. Please try again.' };
+    return { safe: true };
   }
 };
 

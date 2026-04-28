@@ -255,12 +255,28 @@ export default function FoodScannerScreen() {
     if (!res.canceled && res.assets[0]) await processImage(res.assets[0].uri);
   };
 
-  const handleLog = async (mealType: string) => {
-    if (!result || !user?.id) return;
-    const success = await logFoodEntry(user.id, result, mealType);
-    if (success) { setLogSuccess(true); setTimeout(() => navigation.goBack(), 1200); }
-    else Alert.alert('Log failed', 'Could not save. Please try again.');
-  };
+const handleLog = async (mealType: string) => {
+  if (!result || !user?.id) return;
+  const success = await logFoodEntry(user.id, result, mealType);
+  if (success) {
+    setLogSuccess(true);
+    setTimeout(() => {
+      // Always navigate to Calorie tab explicitly — this triggers
+      // useFocusEffect on CalorieScreen which reloads the food list.
+      // goBack() alone is not reliable because:
+      // a) it may have no screen to go back to (GO_BACK error)
+      // b) CalorieScreen may not re-fetch if it's already mounted
+      try {
+        navigation.navigate('Main', { screen: 'Calorie' });
+      } catch {
+        // Fallback if navigate fails for any reason
+        if (navigation.canGoBack()) navigation.goBack();
+      }
+    }, 1200);
+  } else {
+    Alert.alert('Log failed', 'Could not save. Please try again.');
+  }
+};
 
   const handleRescan = () => { setResult(null); setCapturedUri(null); setLogSuccess(false); };
 

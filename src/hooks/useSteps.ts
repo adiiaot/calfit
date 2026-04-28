@@ -23,22 +23,44 @@ import { supabase } from '../services/supabase';
 // where the pedometer starts and where it ends, and add that delta
 // to the Supabase baseline. This means steps always accumulate
 // correctly across sessions and login/logouts.
+//
+// ── WHY STEPS DON'T SYNC BETWEEN HOME AND ACTIVITY ───────────
+// Both HomeScreen and ActivityScreen called useSteps() independently,
+// creating two separate hook instances with separate state. They both
+// read from Supabase on init but then diverge as live pedometer
+// deltas are tracked per-instance.
+//
+// FIX: Steps are now written into Zustand (authStore) so any screen
+// reading `useAuthStore().liveSteps` gets the same live value.
+// useSteps() is the single source of truth — it updates Zustand.
+// All other screens just read from Zustand, not the hook directly.
 
 export function useSteps(goalSteps = 10000) {
-  const { user, profile } = useAuthStore();
-  const [steps, setSteps]               = useState(0);
+  const { user, profile, setLiveSteps } = useAuthStore();
+  const [steps, setStepsLocal]          = useState(0);
   const [isAvailable, setIsAvailable]   = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [isLoading, setIsLoading]       = useState(true);
 
   const unsubscribeRef    = useRef<(() => void) | null>(null);
   const saveTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pedometerBaseRef  = useRef<number | null>(null); // first reading from pedometer this session
-  const supabaseBaseRef   = useRef<number>(0);           // steps already saved in DB today
+  const pedometerBaseRef  = useRef<number | null>(null);
+  const supabaseBaseRef   = useRef<number>(0);
   const goalNotifiedRef   = useRef(false);
 
   const trackingEnabled =
     (profile as any)?.tracking_preferences?.includes('Steps') ?? false;
+
+  // Sync steps to Zustand whenever local steps value changes.
+  // We do this in a useEffect, NOT inside the state setter, because
+  // calling setLiveSteps() inside a setState callback triggers a
+  // "Cannot update a component while rendering a different component" error.
+  useEffect(() => {
+    if (setLiveSteps) setLiveSteps(steps);
+  }, [steps]);
+
+  // Simple alias — just updates local state
+  const setSteps = setStepsLocal;
 
   useEffect(() => {
     init();
@@ -58,8 +80,6 @@ export function useSteps(goalSteps = 10000) {
     setIsAvailable(available);
 
     if (!available || !trackingEnabled) {
-      // Even if pedometer unavailable, load saved steps so the card
-      // still shows today's previously-saved value rather than 0
       if (user?.id) {
         const saved = await loadSavedSteps(user.id);
         setSteps(saved);
@@ -77,30 +97,25 @@ export function useSteps(goalSteps = 10000) {
       return;
     }
 
-    // ── Step 1: Load today's baseline from Supabase ───────────
-    // This is how many steps were already logged today before this
-    // session started. It persists across logins.
+    // Step 1: Load today's baseline from Supabase
     const savedBase = user?.id ? await loadSavedSteps(user.id) : 0;
     supabaseBaseRef.current = savedBase;
-    setSteps(savedBase); // Show saved value immediately (no flash to 0)
+    setSteps(savedBase);
 
-    // ── Step 2: Get current pedometer reading as our session base ─
-    // We don't use this directly — we use it to track deltas only.
+    // Step 2: Get current pedometer reading as session base
     const pedometerNow = await getTodaySteps();
     pedometerBaseRef.current = pedometerNow;
 
-    // ── Step 3: Subscribe to live pedometer updates ───────────
+    // Step 3: Subscribe to live pedometer updates
     unsubscribeRef.current = subscribeToSteps(async (newPedometerSteps) => {
       if (pedometerBaseRef.current === null) {
         pedometerBaseRef.current = newPedometerSteps;
       }
-      // Delta = steps taken THIS SESSION only
       const sessionDelta = Math.max(0, newPedometerSteps - pedometerBaseRef.current);
       const totalToday   = supabaseBaseRef.current + sessionDelta;
 
       setSteps(totalToday);
 
-      // Notify once when goal is crossed
       if (user?.id && !goalNotifiedRef.current && totalToday >= goalSteps) {
         goalNotifiedRef.current = true;
         try {
@@ -115,11 +130,9 @@ export function useSteps(goalSteps = 10000) {
       }
     });
 
-    // ── Step 4: Save to Supabase every 5 minutes ─────────────
-    // Also save immediately so the value is fresh for other screens
+    // Step 4: Save to Supabase every 5 minutes
     if (user?.id) {
-      const currentTotal = supabaseBaseRef.current + Math.max(0, pedometerNow - pedometerNow);
-      await saveStepsToSupabase(user.id, currentTotal, goalSteps);
+      await saveStepsToSupabase(user.id, savedBase, goalSteps);
 
       saveTimerRef.current = setInterval(async () => {
         const live = await getTodaySteps();
@@ -127,7 +140,6 @@ export function useSteps(goalSteps = 10000) {
         const delta = Math.max(0, live - pedometerBaseRef.current);
         const total = supabaseBaseRef.current + delta;
         await saveStepsToSupabase(user.id, total, goalSteps);
-        // Update our in-memory base so future deltas are correct
         supabaseBaseRef.current = total;
         pedometerBaseRef.current = live;
       }, 5 * 60 * 1000);
@@ -143,8 +155,7 @@ export function useSteps(goalSteps = 10000) {
   return { steps, calories, progress, percentage, isAvailable, hasPermission, isLoading, goalSteps };
 }
 
-// ── Load today's step count from Supabase ────────────────────
-// Uses maybeSingle() — safe when no row exists yet (returns null)
+// ── Load today's step count from Supabase ─────────────────────
 async function loadSavedSteps(userId: string): Promise<number> {
   try {
     const today = new Date().toISOString().split('T')[0];

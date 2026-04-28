@@ -13,6 +13,12 @@ interface AuthState {
   isOnboarding: boolean;
   userTier: 'free' | 'pro' | 'premium';
   coachPersonality: CoachPersonality;
+  // ── LIVE STEPS — shared across all screens ─────────────────
+  // useSteps() hook is the single writer. HomeScreen, ActivityScreen,
+  // ProgressScreen all read this value so they stay in sync without
+  // each mounting their own hook instance.
+  liveSteps: number;
+  setLiveSteps: (steps: number) => void;
   setSession: (session: Session | null) => void;
   setOnboarding: (v: boolean) => void;
   loadProfile: (userId: string) => Promise<void>;
@@ -32,6 +38,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isOnboarding: false,
   userTier: 'free',
   coachPersonality: 'balanced',
+  liveSteps: 0,
+
+  setLiveSteps: (steps: number) => set({ liveSteps: steps }),
 
   setOnboarding: (v) => set({ isOnboarding: v }),
 
@@ -97,6 +106,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isOnboarding: false,
       userTier: 'free',
       coachPersonality: 'balanced',
+      liveSteps: 0,
     });
   },
 }));

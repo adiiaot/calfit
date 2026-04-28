@@ -14,6 +14,7 @@ import { getTodayCalories, getTodayWater, logFood, logWater } from '../../servic
 import { supabase } from '../../services/supabase';
 import { searchFoods } from '../../services/foodSearchService';
 
+
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 
 interface FoodEntry {

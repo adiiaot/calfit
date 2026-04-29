@@ -28,13 +28,24 @@ async function loadStats(userId: string, period: Period) {
   const since = new Date(); since.setDate(since.getDate() - days);
   const sinceStr = since.toISOString().split('T')[0];
 
+  // ── BUG FIXES in this query list: ────────────────────────────
+  // 1. workout_logs → workout_sessions (correct table name)
+  // 2. sleep_logs column is `hours` not `duration_hours`
+  // 3. profiles also fetches height_cm for BMI calculation
   const [food, workouts, water, sleep, steps, profile, measurements] = await Promise.all([
     supabase.from('food_logs').select('calories,logged_at').eq('user_id', userId).gte('logged_at', sinceStr),
-    supabase.from('workout_logs').select('calories_burned,completed_at,exercise_name,duration_minutes').eq('user_id', userId).gte('completed_at', sinceStr),
+    supabase.from('workout_sessions')
+      .select('calories_burned,completed_at,name,duration_seconds,exercises')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .gte('completed_at', sinceStr)
+      .order('completed_at', { ascending: false }),
     supabase.from('water_logs').select('amount_ml,logged_at').eq('user_id', userId).gte('logged_at', sinceStr),
-    supabase.from('sleep_logs').select('duration_hours,date').eq('user_id', userId).gte('date', sinceStr),
+    supabase.from('sleep_logs').select('hours,date').eq('user_id', userId).gte('date', sinceStr),
     supabase.from('step_logs').select('steps,date').eq('user_id', userId).gte('date', sinceStr),
-    supabase.from('profiles').select('streak_count,weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml').eq('id', userId).single(),
+    supabase.from('profiles')
+      .select('streak_count,weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml,height_cm')
+      .eq('id', userId).single(),
     supabase.from('body_measurements').select('*').eq('user_id', userId).order('measured_at', { ascending: false }).limit(2),
   ]);
 
@@ -50,8 +61,9 @@ async function loadStats(userId: string, period: Period) {
   const totalBurned = workoutData.reduce((s:number,r:any)=>s+(r.calories_burned??0),0);
   const totalWater  = waterData.reduce((s:number,r:any)=>s+(r.amount_ml??0),0);
   const totalSteps  = stepsData.reduce((s:number,r:any)=>s+(r.steps??0),0);
+  // FIX: sleep column is `hours` not `duration_hours`
   const avgSleep    = sleepData.length > 0
-    ? sleepData.reduce((s:number,r:any)=>s+(r.duration_hours??0),0)/sleepData.length : 0;
+    ? sleepData.reduce((s:number,r:any)=>s+(r.hours??0),0)/sleepData.length : 0;
 
   const calorieByDay: Record<string, number> = {};
   foodData.forEach((r:any) => {
@@ -64,6 +76,16 @@ async function loadStats(userId: string, period: Period) {
     return { date: key, calories: calorieByDay[key] ?? 0, label: d.toLocaleDateString('en',{weekday:'short'}).slice(0,2) };
   });
 
+  // Shape recent workouts from workout_sessions structure
+  // workout_sessions stores: name, calories_burned, completed_at, duration_seconds, exercises (JSON array)
+  const recentWorkouts = workoutData.slice(0, 5).map((w: any) => ({
+    name:             w.name ?? 'Workout',
+    calories_burned:  w.calories_burned ?? 0,
+    completed_at:     w.completed_at,
+    duration_seconds: w.duration_seconds ?? 0,
+    exercise_count:   Array.isArray(w.exercises) ? w.exercises.length : 0,
+  }));
+
   return {
     totalCal, totalBurned, totalWater, totalSteps, avgSleep,
     daysTracked: new Set(foodData.map((r:any)=>r.logged_at?.split('T')[0])).size,
@@ -73,7 +95,8 @@ async function loadStats(userId: string, period: Period) {
     targetWeight: p?.target_weight_kg ?? null,
     calorieGoal: p?.daily_calorie_goal ?? 2000,
     waterGoal: p?.water_goal_ml ?? 2500,
-    recentWorkouts: workoutData.slice(0,5),
+    heightCm: p?.height_cm ?? null,
+    recentWorkouts,
     chartDays,
     latestMeasurement: measData[0] ?? null,
     prevMeasurement: measData[1] ?? null,
@@ -249,8 +272,8 @@ export default function ProgressScreen() {
                 )}
                 <View style={[styles.bmiChip, { backgroundColor: PINK + '18' }]}>
                   <Text style={[styles.bmiText, { color: PINK }]}>
-                    BMI {data.weight && (profile as any)?.height_cm
-                      ? ((data.weight / ((profile as any).height_cm / 100) ** 2)).toFixed(1)
+                    BMI {data.weight && data.heightCm
+                      ? ((data.weight / ((data.heightCm / 100) ** 2))).toFixed(1)
                       : '—'}
                   </Text>
                 </View>
@@ -333,12 +356,12 @@ export default function ProgressScreen() {
                     <Ionicons name="barbell-outline" size={14} color={PINK} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.workoutName, { color: theme.textPrimary }]}>{w.exercise_name}</Text>
+                    <Text style={[styles.workoutName, { color: theme.textPrimary }]}>{w.name}</Text>
                     <Text style={[styles.workoutMeta, { color: theme.textMuted }]}>
-                      {w.completed_at?.split('T')[0]} · {w.duration_minutes ?? '?'} min
+                      {w.completed_at?.split('T')[0]} · {w.exercise_count} exercise{w.exercise_count !== 1 ? 's' : ''} · {Math.round((w.duration_seconds ?? 0) / 60)} min
                     </Text>
                   </View>
-                  <Text style={[styles.workoutCal, { color: ORANGE }]}>{w.calories_burned ?? 0} kcal</Text>
+                  <Text style={[styles.workoutCal, { color: ORANGE }]}>{w.calories_burned} kcal</Text>
                 </View>
               ))}
             </View>

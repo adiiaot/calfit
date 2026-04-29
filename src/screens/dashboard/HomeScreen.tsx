@@ -19,7 +19,6 @@ import { colors, dayRingColors, spacing, radius, fontSize } from '../../theme';
 import Avatar from '../../components/Avatar';
 import FoodIllustration from '../../components/FoodIllustration';
 import { getTodayCalories, getTodayWater, logWater } from '../../services/profileService';
-import { useSteps } from '../../hooks/useSteps';
 import { supabase } from '../../services/supabase';
 
 // ── NEW: Comeback Banner ──────────────────────────────────────
@@ -467,8 +466,9 @@ export default function HomeScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const stepGoal = (profile as any)?.step_goal ?? 10000;
-  const { steps: liveSteps } = useSteps(stepGoal);
+  // Steps Tracker from Zustand Authstore state
+   const stepGoal  = (profile as any)?.step_goal ?? 10000;
+    const liveSteps = useAuthStore((s) => s.liveSteps);
 
   const [unreadCount, setUnreadCount]           = useState(0);
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
@@ -578,6 +578,8 @@ export default function HomeScreen() {
     </AndroidSafeView>
   );
 }
+
+export {};
 
 // ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({

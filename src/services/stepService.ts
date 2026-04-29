@@ -2,91 +2,72 @@ import { Pedometer } from 'expo-sensors';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-// ── CHECK AVAILABILITY ────────────────────────────────────────
 export const isPedometerAvailable = async (): Promise<boolean> => {
-  try {
-    const available = await Pedometer.isAvailableAsync();
-    return available;
-  } catch {
-    return false;
-  }
+  try { return await Pedometer.isAvailableAsync(); }
+  catch { return false; }
 };
 
-// ── REQUEST PERMISSIONS ───────────────────────────────────────
 export const requestStepsPermission = async (): Promise<boolean> => {
   try {
     if (Platform.OS === 'ios') {
-      // iOS requires motion permission
       const { status } = await Pedometer.requestPermissionsAsync();
       return status === 'granted';
     }
-    // Android pedometer works without explicit permission on most devices
     return true;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 };
 
-// ── GET TODAY'S STEPS ─────────────────────────────────────────
+// ── THE KEY FIX: query midnight → now, not watchStepCount ────
 export const getTodaySteps = async (): Promise<number> => {
   try {
-    const available = await Pedometer.isAvailableAsync();
-    if (!available) return 0;
-
+    if (!(await Pedometer.isAvailableAsync())) return 0;
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    const end = new Date();
-
-    const result = await Pedometer.getStepCountAsync(start, end);
+    const result = await Pedometer.getStepCountAsync(start, new Date());
     return result.steps ?? 0;
-  } catch {
-    return 0;
-  }
+  } catch { return 0; }
 };
 
-// ── LIVE STEP SUBSCRIPTION ────────────────────────────────────
+// ── POLLING SUBSCRIPTION (replaces watchStepCount delta) ─────
+// No local state — every poll calls getTodaySteps fresh.
+// Safe to tear down and recreate without losing count.
 export const subscribeToSteps = (
-  onStepUpdate: (steps: number) => void
+  onUpdate: (steps: number) => void,
+  intervalMs = 10_000
 ): (() => void) => {
-  let baseSteps = 0;
-  let initialized = false;
-
-  const subscription = Pedometer.watchStepCount((result) => {
-    if (!initialized) {
-      baseSteps = result.steps;
-      initialized = true;
-    }
-    onStepUpdate(result.steps);
-  });
-
-  return () => subscription.remove();
+  let active = true;
+  const tick = async () => {
+    if (!active) return;
+    const s = await getTodaySteps();
+    if (active) onUpdate(s);
+  };
+  tick(); // immediate first read
+  const id = setInterval(tick, intervalMs);
+  return () => { active = false; clearInterval(id); };
 };
 
-// ── SAVE STEPS TO SUPABASE ────────────────────────────────────
+export const loadSavedSteps = async (userId: string): Promise<number> => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('step_logs').select('steps')
+      .eq('user_id', userId).eq('date', today).maybeSingle();
+    return data?.steps ?? 0;
+  } catch { return 0; }
+};
+
 export const saveStepsToSupabase = async (
-  userId: string,
-  steps: number,
-  goalSteps: number
+  userId: string, steps: number, goalSteps: number
 ): Promise<void> => {
+  if (!userId || steps < 0) return;
   const today = new Date().toISOString().split('T')[0];
-
-  await supabase
-    .from('step_logs')
-    .upsert({
-      user_id: userId,
-      steps,
-      goal_steps: goalSteps,
-      date: today,
-    }, { onConflict: 'user_id,date' });
+  try {
+    await supabase.from('step_logs').upsert(
+      { user_id: userId, steps, goal_steps: goalSteps, date: today },
+      { onConflict: 'user_id,date' }
+    );
+  } catch {}
 };
 
-// ── STEPS TO CALORIES CONVERSION ─────────────────────────────
-// Average: 1 step burns ~0.04 calories
-export const stepsToCalories = (steps: number): number => {
-  return Math.round(steps * 0.04);
-};
-
-// ── STEPS PROGRESS PERCENTAGE ─────────────────────────────────
-export const stepsProgress = (steps: number, goal: number): number => {
-  return Math.min(steps / goal, 1);
-};
+export const stepsToCalories = (steps: number) => Math.round(steps * 0.04);
+export const stepsProgress   = (steps: number, goal: number) => Math.min(steps / goal, 1);

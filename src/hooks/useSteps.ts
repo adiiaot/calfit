@@ -5,90 +5,64 @@ import {
   getTodaySteps,
   subscribeToSteps,
   saveStepsToSupabase,
+  loadSavedSteps,
   stepsToCalories,
 } from '../services/stepService';
 import { useAuthStore } from '../store/authStore';
-import { supabase } from '../services/supabase';
 
 export function useSteps(goalSteps = 10000) {
   const { user, setLiveSteps } = useAuthStore();
-  const [steps, setStepsLocal]            = useState(0);
-  const [isAvailable, setIsAvailable]     = useState(false);
+  const [steps, setSteps]             = useState(0);
+  const [isAvailable, setIsAvailable] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
-  const [isLoading, setIsLoading]         = useState(true);
+  const [isLoading, setIsLoading]     = useState(true);
 
-  const unsubscribeRef   = useRef<(() => void) | null>(null);
-  const saveTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pedometerBaseRef = useRef<number | null>(null);
-  const supabaseBaseRef  = useRef<number>(0);
-  const goalNotifiedRef  = useRef(false);
+  const unsubRef       = useRef<(() => void) | null>(null);
+  const saveTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const goalNotifiedRef = useRef(false);
 
-  // ── Sync to Zustand AFTER render (not during setState callback) ──
-  // Ensures HomeScreen + ActivityScreen always show the same value.
+  // Keep Zustand in sync so all screens share one value
   useEffect(() => {
     if (setLiveSteps) setLiveSteps(steps);
   }, [steps]);
 
-  // Removed trackingEnabled from deps — steps should ALWAYS be tracked.
-  // tracking_preferences only controls whether the Steps CARD shows on Home,
-  // not whether the pedometer runs.
   useEffect(() => {
-    init();
-    return cleanup;
+    start();
+    return stop;
   }, [user?.id]);
 
-  const cleanup = () => {
-    if (unsubscribeRef.current) unsubscribeRef.current();
+  const stop = () => {
+    unsubRef.current?.();
     if (saveTimerRef.current) clearInterval(saveTimerRef.current);
   };
 
-  const init = async () => {
-    cleanup();
+  const start = async () => {
+    stop();
     setIsLoading(true);
+
+    // 1. Show saved steps immediately — no blank while pedometer warms up
+    if (user?.id) {
+      const saved = await loadSavedSteps(user.id);
+      if (saved > 0) {
+        setSteps(saved);
+        if (setLiveSteps) setLiveSteps(saved);
+      }
+    }
 
     const available = await isPedometerAvailable();
     setIsAvailable(available);
-
-    if (!available) {
-      if (user?.id) {
-        const saved = await loadSavedSteps(user.id);
-        setStepsLocal(saved);
-        supabaseBaseRef.current = saved;
-      }
-      setIsLoading(false);
-      return;
-    }
+    if (!available) { setIsLoading(false); return; }
 
     const granted = await requestStepsPermission();
     setHasPermission(granted);
+    if (!granted) { setIsLoading(false); return; }
 
-    if (!granted) {
-      if (user?.id) {
-        const saved = await loadSavedSteps(user.id);
-        setStepsLocal(saved);
-        supabaseBaseRef.current = saved;
-      }
-      setIsLoading(false);
-      return;
-    }
+    // 2. Start polling — getTodaySteps is always midnight→now, never drifts
+    unsubRef.current = subscribeToSteps(async (todaySteps) => {
+      setSteps(todaySteps);
 
-    const savedBase = user?.id ? await loadSavedSteps(user.id) : 0;
-    supabaseBaseRef.current = savedBase;
-    setStepsLocal(savedBase);
-
-    const pedometerNow = await getTodaySteps();
-    pedometerBaseRef.current = pedometerNow;
-
-    unsubscribeRef.current = subscribeToSteps(async (newPedometerSteps) => {
-      if (pedometerBaseRef.current === null) {
-        pedometerBaseRef.current = newPedometerSteps;
-      }
-      const sessionDelta = Math.max(0, newPedometerSteps - pedometerBaseRef.current);
-      const totalToday   = supabaseBaseRef.current + sessionDelta;
-
-      setStepsLocal(totalToday);
-
-      if (user?.id && !goalNotifiedRef.current && totalToday >= goalSteps) {
+      // Goal notification (fires once per day)
+      if (user?.id && !goalNotifiedRef.current && todaySteps >= goalSteps) {
         goalNotifiedRef.current = true;
         try {
           const { sendNotification } = await import('../services/notificationService');
@@ -102,41 +76,25 @@ export function useSteps(goalSteps = 10000) {
       }
     });
 
+    // 3. Save to Supabase every 60s (was 5 min — progress screen needs this)
     if (user?.id) {
-      await saveStepsToSupabase(user.id, savedBase, goalSteps);
-
       saveTimerRef.current = setInterval(async () => {
         const live = await getTodaySteps();
-        if (pedometerBaseRef.current === null) return;
-        const delta = Math.max(0, live - pedometerBaseRef.current);
-        const total = supabaseBaseRef.current + delta;
-        await saveStepsToSupabase(user.id, total, goalSteps);
-        supabaseBaseRef.current = total;
-        pedometerBaseRef.current = live;
-      }, 5 * 60 * 1000);
+        if (live > 0) await saveStepsToSupabase(user.id, live, goalSteps);
+      }, 60_000);
     }
 
     setIsLoading(false);
   };
 
-  const calories   = stepsToCalories(steps);
-  const progress   = Math.min(steps / goalSteps, 1);
-  const percentage = Math.round(progress * 100);
-
-  return { steps, calories, progress, percentage, isAvailable, hasPermission, isLoading, goalSteps };
-}
-
-async function loadSavedSteps(userId: string): Promise<number> {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
-      .from('step_logs')
-      .select('steps')
-      .eq('user_id', userId)
-      .eq('date', today)
-      .maybeSingle();
-    return data?.steps ?? 0;
-  } catch {
-    return 0;
-  }
+  return {
+    steps,
+    calories:   stepsToCalories(steps),
+    progress:   Math.min(steps / goalSteps, 1),
+    percentage: Math.round(Math.min(steps / goalSteps, 1) * 100),
+    isAvailable,
+    hasPermission,
+    isLoading,
+    goalSteps,
+  };
 }

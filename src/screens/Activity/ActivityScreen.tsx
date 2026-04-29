@@ -9,11 +9,9 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
-  Image,
-  Animated,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import Svg, { Circle, Ellipse, Line, Path, Rect, G, Defs, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,9 +20,9 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import * as Speech from 'expo-speech';
-import { useSteps } from '../../hooks/useSteps';
 import { claudeJSON, hasClaudeKey } from '../../services/ClaudeService';
 import { checkAndSavePRs } from '../../services/personalRecordsService';
+import ExerciseDemoModal from '../../components/ExerciseDemoModal';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -49,9 +47,7 @@ interface PRResult {
   isNewPR: boolean;
   newRecords: { type: string; label: string; value: string; improvement: string }[];
 }
-interface MealSuggestion {
-  name: string; why: string; calories: number;
-}
+interface MealSuggestion { name: string; why: string; calories: number; }
 
 const speak = (text: string) => { Speech.stop(); Speech.speak(text, { language: 'en-US', pitch: 1.05, rate: 0.92 }); };
 
@@ -64,37 +60,7 @@ const CAT_COLORS: Record<string, string> = {
 
 const EQUIPMENT_OPTIONS = ['All', 'none', 'dumbbells', 'barbell', 'resistance band', 'machine'];
 
-// ── SVG ILLUSTRATIONS ─────────────────────────────────────────
-function BarbellSvg({ color }: { color: string }) {
-  return (
-    <Svg width={120} height={80} viewBox="0 0 120 80">
-      <Rect x="20" y="37" width="80" height="6" rx="3" fill={color} opacity={0.9} />
-      <Rect x="8" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
-      <Rect x="4" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
-      <Rect x="96" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
-      <Rect x="108" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
-      <Path d="M60 10 L62 14 L66 14 L63 17 L64 21 L60 18 L56 21 L57 17 L54 14 L58 14Z" fill={color} opacity={0.4} />
-      <Circle cx="95" cy="12" r="3" fill={color} opacity={0.3} />
-      <Circle cx="25" cy="65" r="2" fill={color} opacity={0.25} />
-    </Svg>
-  );
-}
-
-function RunnerSvg({ color }: { color: string }) {
-  return (
-    <Svg width={80} height={80} viewBox="0 0 80 80">
-      <Circle cx="50" cy="14" r="8" fill={color} opacity={0.85} />
-      <Path d="M50 22 L44 42 L32 58" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity={0.85} />
-      <Path d="M46 30 L30 22" stroke={color} strokeWidth="4" strokeLinecap="round" fill="none" opacity={0.70} />
-      <Path d="M48 34 L60 28" stroke={color} strokeWidth="4" strokeLinecap="round" fill="none" opacity={0.70} />
-      <Path d="M44 42 L36 60 L24 68" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity={0.85} />
-      <Path d="M44 42 L54 56 L62 64" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity={0.85} />
-      <Line x1="10" y1="40" x2="22" y2="40" stroke={color} strokeWidth="2.5" strokeLinecap="round" opacity={0.30} />
-      <Line x1="6" y1="50" x2="18" y2="50" stroke={color} strokeWidth="2" strokeLinecap="round" opacity={0.20} />
-    </Svg>
-  );
-}
-
+// ── DECORATIVE SVGs (used in empty states / tabs) ─────────────
 function FlameSvg({ color }: { color: string }) {
   return (
     <Svg width={60} height={80} viewBox="0 0 60 80">
@@ -104,7 +70,6 @@ function FlameSvg({ color }: { color: string }) {
     </Svg>
   );
 }
-
 function FootprintSvg({ color }: { color: string }) {
   return (
     <Svg width={80} height={80} viewBox="0 0 80 80">
@@ -121,7 +86,6 @@ function FootprintSvg({ color }: { color: string }) {
     </Svg>
   );
 }
-
 function HistorySvg({ color }: { color: string }) {
   return (
     <Svg width={80} height={80} viewBox="0 0 80 80">
@@ -129,496 +93,18 @@ function HistorySvg({ color }: { color: string }) {
       <Circle cx="40" cy="40" r="4" fill={color} opacity={0.8} />
       <Line x1="40" y1="40" x2="40" y2="18" stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity={0.8} />
       <Line x1="40" y1="40" x2="58" y2="48" stroke={color} strokeWidth="3" strokeLinecap="round" opacity={0.7} />
-      {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg, i) => {
-        const rad = (deg * Math.PI) / 180;
-        const x1 = 40 + 28 * Math.sin(rad); const y1 = 40 - 28 * Math.cos(rad);
-        const x2 = 40 + 32 * Math.sin(rad); const y2 = 40 - 32 * Math.cos(rad);
-        return <Line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={i % 3 === 0 ? 2.5 : 1} opacity={0.4} />;
-      })}
     </Svg>
   );
 }
-
-// ── EXERCISE DEMO MODAL ───────────────────────────────────────
-// Inlined to avoid import resolution issues.
-// Shows GIF + form tips when user taps the ▶ button on an exercise card.
-// ── EXERCISE ILLUSTRATIONS ────────────────────────────────────
-// Animated SVG stick-figure illustrations — no external URLs,
-// works offline, correct movement per exercise category.
-// Uses React Native's Animated API to loop the movement.
-
-function useLoopAnim(duration = 800) {
-  const anim = React.useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration, useNativeDriver: false }),
-        Animated.timing(anim, { toValue: 0, duration, useNativeDriver: false }),
-      ])
-    ).start();
-    return () => anim.stopAnimation();
-  }, [duration]);
-  return anim;
-}
-
-// Squats / Legs — figure squats up and down
-function SquatIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(900);
-  const kneeAngle = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 28] });
-  const bodyY     = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
+function BarbellSvg({ color }: { color: string }) {
   return (
-    <Animated.View style={{ transform: [{ translateY: bodyY as any }] }}>
-      <Svg width={120} height={160} viewBox="0 0 120 160">
-        {/* Head */}
-        <Circle cx="60" cy="28" r="14" fill={color} opacity={0.9} />
-        {/* Body */}
-        <Line x1="60" y1="42" x2="60" y2="88" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Arms */}
-        <Line x1="60" y1="55" x2="34" y2="72" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
-        <Line x1="60" y1="55" x2="86" y2="72" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
-        {/* Legs bent at knee */}
-        <Line x1="60" y1="88" x2="42" y2="116" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        <Line x1="42" y1="116" x2="36" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        <Line x1="60" y1="88" x2="78" y2="116" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        <Line x1="78" y1="116" x2="84" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Feet */}
-        <Line x1="30" y1="148" x2="46" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="78" y1="148" x2="94" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
-      </Svg>
-    </Animated.View>
-  );
-}
-
-// Push-ups / Chest — figure goes down and up horizontally
-function PushupIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(1000);
-  const bodyY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 20] });
-  return (
-    <Animated.View style={{ transform: [{ translateY: bodyY as any }] }}>
-      <Svg width={200} height={100} viewBox="0 0 200 100">
-        {/* Head */}
-        <Circle cx="28" cy="36" r="13" fill={color} opacity={0.9} />
-        {/* Body horizontal */}
-        <Line x1="40" y1="40" x2="140" y2="50" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Arms down */}
-        <Line x1="70" y1="42" x2="68" y2="72" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="110" y1="46" x2="108" y2="76" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        {/* Legs */}
-        <Line x1="140" y1="50" x2="175" y2="56" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Feet */}
-        <Line x1="168" y1="55" x2="184" y2="55" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        {/* Floor */}
-        <Line x1="10" y1="82" x2="190" y2="82" stroke={color} strokeWidth="2" opacity={0.25} />
-      </Svg>
-    </Animated.View>
-  );
-}
-
-// Pull-ups / Back — figure pulls up from hanging
-function PullupIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(1100);
-  const bodyY = anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
-  return (
-    <Animated.View style={{ transform: [{ translateY: bodyY as any }] }}>
-      <Svg width={120} height={180} viewBox="0 0 120 180">
-        {/* Bar */}
-        <Line x1="10" y1="10" x2="110" y2="10" stroke={color} strokeWidth="6" strokeLinecap="round" opacity={0.5} />
-        {/* Arms up to bar */}
-        <Line x1="40" y1="10" x2="48" y2="42" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="80" y1="10" x2="72" y2="42" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        {/* Head */}
-        <Circle cx="60" cy="54" r="13" fill={color} opacity={0.9} />
-        {/* Body */}
-        <Line x1="60" y1="67" x2="60" y2="118" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Legs hanging */}
-        <Line x1="60" y1="118" x2="48" y2="155" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        <Line x1="60" y1="118" x2="72" y2="155" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      </Svg>
-    </Animated.View>
-  );
-}
-
-// Plank / Core — body moves slightly
-function PlankIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(1200);
-  const hipY = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -6, 0] });
-  return (
-    <Animated.View style={{ transform: [{ translateY: hipY as any }] }}>
-      <Svg width={200} height={90} viewBox="0 0 200 90">
-        {/* Head */}
-        <Circle cx="24" cy="30" r="13" fill={color} opacity={0.9} />
-        {/* Body */}
-        <Line x1="36" y1="34" x2="148" y2="44" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Forearm support */}
-        <Line x1="62" y1="37" x2="62" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="48" y1="68" x2="76" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="100" y1="41" x2="100" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="86" y1="68" x2="114" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        {/* Legs */}
-        <Line x1="148" y1="44" x2="180" y2="50" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Feet */}
-        <Line x1="172" y1="50" x2="188" y2="50" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        {/* Floor */}
-        <Line x1="10" y1="72" x2="190" y2="72" stroke={color} strokeWidth="2" opacity={0.25} />
-      </Svg>
-    </Animated.View>
-  );
-}
-
-// Running / Cardio — figure runs in place
-function RunIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(500);
-  const legF  = anim.interpolate({ inputRange: [0, 1], outputRange: [20, -20] });
-  const legB  = anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 20] });
-  const armF  = anim.interpolate({ inputRange: [0, 1], outputRange: [-15, 15] });
-  const armB  = anim.interpolate({ inputRange: [0, 1], outputRange: [15, -15] });
-  return (
-    <Svg width={120} height={180} viewBox="0 0 120 180">
-      {/* Head */}
-      <Circle cx="60" cy="28" r="14" fill={color} opacity={0.9} />
-      {/* Body */}
-      <Line x1="60" y1="42" x2="60" y2="95" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      {/* Arms animated */}
-      <AnimatedLine
-        x1="60" y1="58"
-        x2={armF.interpolate({ inputRange: [-15,15], outputRange: ['38','82'] }) as any}
-        y2="78"
-        stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8}
-      />
-      <AnimatedLine
-        x1="60" y1="58"
-        x2={armB.interpolate({ inputRange: [-15,15], outputRange: ['38','82'] }) as any}
-        y2="78"
-        stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8}
-      />
-      {/* Legs animated */}
-      <AnimatedLine
-        x1="60" y1="95"
-        x2={legF.interpolate({ inputRange: [-20,20], outputRange: ['40','80'] }) as any}
-        y2="135"
-        stroke={color} strokeWidth="5" strokeLinecap="round"
-      />
-      <AnimatedLine
-        x1="60" y1="95"
-        x2={legB.interpolate({ inputRange: [-20,20], outputRange: ['40','80'] }) as any}
-        y2="135"
-        stroke={color} strokeWidth="5" strokeLinecap="round"
-      />
+    <Svg width={120} height={80} viewBox="0 0 120 80">
+      <Rect x="20" y="37" width="80" height="6" rx="3" fill={color} opacity={0.9} />
+      <Rect x="8" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
+      <Rect x="4" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
+      <Rect x="96" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
+      <Rect x="108" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
     </Svg>
-  );
-}
-
-// Curl / Arms — arm curls up and down
-function CurlIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(800);
-  const forearmAngle = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] });
-  return (
-    <Svg width={120} height={180} viewBox="0 0 120 180">
-      {/* Head */}
-      <Circle cx="60" cy="28" r="14" fill={color} opacity={0.9} />
-      {/* Body */}
-      <Line x1="60" y1="42" x2="60" y2="105" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      {/* Static left arm */}
-      <Line x1="60" y1="58" x2="36" y2="82" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.5} />
-      <Line x1="36" y1="82" x2="30" y2="108" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.5} />
-      {/* Animated right arm — upper */}
-      <Line x1="60" y1="58" x2="84" y2="82" stroke={color} strokeWidth="4" strokeLinecap="round" />
-      {/* Animated right arm — forearm curls up */}
-      <AnimatedLine
-        x1="84" y1="82"
-        x2={forearmAngle.interpolate({ inputRange: [-50, 0], outputRange: ['100', '90'] }) as any}
-        y2={forearmAngle.interpolate({ inputRange: [-50, 0], outputRange: ['60', '108'] }) as any}
-        stroke={color} strokeWidth="4" strokeLinecap="round"
-      />
-      {/* Legs */}
-      <Line x1="60" y1="105" x2="46" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      <Line x1="60" y1="105" x2="74" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      <Line x1="38" y1="148" x2="54" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
-      <Line x1="68" y1="148" x2="84" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-// Shoulder Press — arms press overhead
-function ShoulderPressIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(900);
-  const armY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -22] });
-  return (
-    <Animated.View style={{ transform: [{ translateY: armY as any }] }}>
-      <Svg width={120} height={180} viewBox="0 0 120 180">
-        {/* Head */}
-        <Circle cx="60" cy="38" r="14" fill={color} opacity={0.9} />
-        {/* Body */}
-        <Line x1="60" y1="52" x2="60" y2="108" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        {/* Arms pressing up */}
-        <Line x1="60" y1="65" x2="34" y2="50" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="34" y1="50" x2="24" y2="20" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="60" y1="65" x2="86" y2="50" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="86" y1="50" x2="96" y2="20" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        {/* Weight bar */}
-        <Line x1="14" y1="14" x2="106" y2="14" stroke={color} strokeWidth="5" strokeLinecap="round" opacity={0.7} />
-        {/* Legs */}
-        <Line x1="60" y1="108" x2="46" y2="150" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        <Line x1="60" y1="108" x2="74" y2="150" stroke={color} strokeWidth="5" strokeLinecap="round" />
-        <Line x1="38" y1="150" x2="54" y2="150" stroke={color} strokeWidth="4" strokeLinecap="round" />
-        <Line x1="68" y1="150" x2="84" y2="150" stroke={color} strokeWidth="4" strokeLinecap="round" />
-      </Svg>
-    </Animated.View>
-  );
-}
-
-// Stretch / Flexibility — figure bends forward
-function StretchIllustration({ color }: { color: string }) {
-  const anim = useLoopAnim(1400);
-  const bendY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
-  return (
-    <Svg width={160} height={160} viewBox="0 0 160 160">
-      {/* Head tilting */}
-      <Circle cx="60" cy="30" r="14" fill={color} opacity={0.9} />
-      {/* Body bending forward */}
-      <Line x1="60" y1="44" x2="60" y2="88" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      {/* Arms reaching forward */}
-      <Line x1="60" y1="62" x2="110" y2="78" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
-      <Line x1="60" y1="62" x2="112" y2="86" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
-      {/* Legs straight */}
-      <Line x1="60" y1="88" x2="48" y2="138" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      <Line x1="60" y1="88" x2="72" y2="138" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      {/* Feet */}
-      <Line x1="40" y1="138" x2="56" y2="138" stroke={color} strokeWidth="4" strokeLinecap="round" />
-      <Line x1="66" y1="138" x2="82" y2="138" stroke={color} strokeWidth="4" strokeLinecap="round" />
-      {/* Floor */}
-      <Line x1="10" y1="144" x2="150" y2="144" stroke={color} strokeWidth="2" opacity={0.25} />
-    </Svg>
-  );
-}
-
-// Helper: create Animated versions of SVG Line
-const AnimatedLine = Animated.createAnimatedComponent(Line);
-
-// Pick the right illustration based on exercise name/category
-function ExerciseIllustration({ exercise, color }: { exercise: Exercise; color: string }) {
-  const name = exercise.name.toLowerCase();
-  const cat  = exercise.category;
-
-  if (name.includes('squat') || name.includes('lunge') || name.includes('leg press') || name.includes('calf') || name.includes('glute') || cat === 'Legs') {
-    return <SquatIllustration color={color} />;
-  }
-  if (name.includes('push') || name.includes('bench') || name.includes('chest') || name.includes('dip') || cat === 'Chest') {
-    return <PushupIllustration color={color} />;
-  }
-  if (name.includes('pull') || name.includes('row') || name.includes('lat') || name.includes('deadlift') || cat === 'Back') {
-    return <PullupIllustration color={color} />;
-  }
-  if (name.includes('plank') || name.includes('crunch') || name.includes('twist') || name.includes('leg raise') || cat === 'Core') {
-    return <PlankIllustration color={color} />;
-  }
-  if (name.includes('curl') || name.includes('tricep') || name.includes('hammer') || name.includes('skull') || cat === 'Arms') {
-    return <CurlIllustration color={color} />;
-  }
-  if (name.includes('press') || name.includes('raise') || name.includes('arnold') || name.includes('face') || cat === 'Shoulders') {
-    return <ShoulderPressIllustration color={color} />;
-  }
-  if (cat === 'Flexibility' || name.includes('yoga') || name.includes('stretch') || name.includes('pose') || name.includes('dog') || name.includes('foam')) {
-    return <StretchIllustration color={color} />;
-  }
-  // Default: cardio / running
-  return <RunIllustration color={color} />;
-}
-
-// ── EXERCISE DEMO MODAL ────────────────────────────────────────
-function ExerciseDemoModal({ visible, exercise, theme, onClose }: {
-  visible: boolean;
-  exercise: Exercise | null;
-  theme: typeof colors.light;
-  onClose: () => void;
-}) {
-  if (!exercise) return null;
-
-  const catColor  = CAT_COLORS[exercise.category] ?? theme.accent;
-  const DIFF_COLORS: Record<string, string> = {
-    beginner: theme.accent, intermediate: theme.amber, advanced: theme.red,
-  };
-  const diffColor = DIFF_COLORS[exercise.difficulty] ?? theme.accent;
-
-  const TIPS: Record<string, string[]> = {
-    Cardio:      ['Keep your core tight throughout', 'Breathe rhythmically', 'Land softly to protect joints'],
-    Chest:       ['Control the weight on the way down', 'Keep shoulder blades retracted', 'Full range of motion'],
-    Back:        ['Drive elbows back, not arms', 'Squeeze at the top', 'Keep spine neutral'],
-    Core:        ["Don't hold your breath", 'Slow and controlled beats fast', 'Quality over quantity'],
-    Legs:        ['Knees track over toes', 'Keep chest up throughout', 'Drive through the heels'],
-    Shoulders:   ['Avoid shrugging', 'Control at the top', 'Keep core braced'],
-    Arms:        ['Isolate the muscle — no swinging', 'Full extension on every rep', 'Squeeze at peak contraction'],
-    Flexibility: ['Never stretch into pain', 'Hold each position for 20-30s', 'Breathe into the stretch'],
-  };
-  const tips = TIPS[exercise.category] ?? ['Focus on form over weight', 'Breathe steadily', 'Rest when needed'];
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={dm.overlay}>
-        <TouchableOpacity style={dm.backdrop} onPress={onClose} activeOpacity={1} />
-        <View style={[dm.sheet, { backgroundColor: theme.surface }]}>
-
-          <LinearGradient
-            colors={[catColor + 'EE', catColor + '88'] as [string, string]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={dm.header}
-          >
-            <View style={dm.headerRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={dm.headerCat}>{exercise.category}</Text>
-                <Text style={dm.headerName}>{exercise.name}</Text>
-                <Text style={dm.headerMuscle}>{exercise.muscle_group}</Text>
-              </View>
-              <TouchableOpacity onPress={onClose} style={dm.closeBtn}>
-                <Ionicons name="close" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <View style={dm.badges}>
-              <View style={[dm.badge, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
-                <Ionicons name="flame-outline" size={11} color="#fff" />
-                <Text style={dm.badgeText}>{exercise.calories_per_minute} kcal/min</Text>
-              </View>
-              <View style={[dm.badge, { backgroundColor: diffColor + '44' }]}>
-                <Text style={[dm.badgeText, { color: diffColor }]}>{exercise.difficulty}</Text>
-              </View>
-              {exercise.equipment !== 'none' && (
-                <View style={[dm.badge, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
-                  <Text style={dm.badgeText}>{exercise.equipment}</Text>
-                </View>
-              )}
-            </View>
-          </LinearGradient>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.body}>
-
-            {/* Animated illustration */}
-            <View style={[dm.illustrationCard, { backgroundColor: catColor + '12', borderColor: catColor + '33' }]}>
-              <Text style={[dm.sectionLabel, { color: theme.textSecondary }]}>Movement Demo</Text>
-              <View style={dm.illustrationBox}>
-                <ExerciseIllustration exercise={exercise} color={catColor} />
-              </View>
-              <Text style={[dm.illustrationHint, { color: theme.textMuted }]}>
-                Animated illustration — follow the movement pattern
-              </Text>
-            </View>
-
-            {/* Description */}
-            {!!exercise.description && (
-              <View style={[dm.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <Text style={[dm.sectionLabel, { color: theme.textSecondary }]}>About</Text>
-                <Text style={[dm.bodyText, { color: theme.textPrimary }]}>{exercise.description}</Text>
-              </View>
-            )}
-
-            {/* Form tips */}
-            <View style={[dm.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Text style={[dm.sectionLabel, { color: theme.textSecondary }]}>Form Tips</Text>
-              {tips.map((tip, i) => (
-                <View key={i} style={dm.tipRow}>
-                  <View style={[dm.tipDot, { backgroundColor: catColor }]} />
-                  <Text style={[dm.bodyText, { color: theme.textPrimary }]}>{tip}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={{ height: 32 }} />
-          </ScrollView>
-
-          <View style={[dm.footer, { borderTopColor: theme.border, backgroundColor: theme.surface }]}>
-            <TouchableOpacity onPress={onClose} activeOpacity={0.85} style={dm.footerBtnWrap}>
-              <LinearGradient
-                colors={[catColor, catColor + 'BB'] as [string, string]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={dm.footerBtn}
-              >
-                <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                <Text style={dm.footerBtnText}>Got it — add to workout</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const dm = StyleSheet.create({
-  overlay:          { flex: 1, justifyContent: 'flex-end' },
-  backdrop:         { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
-  sheet:            { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%', overflow: 'hidden' },
-  header:           { padding: spacing.lg, paddingBottom: spacing.md },
-  headerRow:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
-  headerCat:        { fontSize: fontSize.xs, fontWeight: '700', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  headerName:       { fontSize: fontSize.xxl, fontWeight: '900', color: '#fff', lineHeight: 30 },
-  headerMuscle:     { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.70)', marginTop: 2 },
-  closeBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.20)', alignItems: 'center', justifyContent: 'center' },
-  badges:           { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
-  badge:            { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: 99 },
-  badgeText:        { fontSize: fontSize.xs, fontWeight: '700', color: '#fff' },
-  body:             { padding: spacing.lg, gap: spacing.md },
-  sectionLabel:     { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
-  illustrationCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, alignItems: 'center' },
-  illustrationBox:  { paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center', minHeight: 180 },
-  illustrationHint: { fontSize: fontSize.xs, textAlign: 'center', marginTop: spacing.xs },
-  card:             { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, gap: spacing.xs },
-  bodyText:         { fontSize: fontSize.sm, lineHeight: 22 },
-  tipRow:           { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.xs },
-  tipDot:           { width: 6, height: 6, borderRadius: 3, marginTop: 8, flexShrink: 0 },
-  footer:           { padding: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1 },
-  footerBtnWrap:    { borderRadius: radius.lg, overflow: 'hidden' },
-  footerBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
-  footerBtnText:    { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-});
-
-// ── DIFFICULTY BADGE ──────────────────────────────────────────
-function DifficultyBadge({ level, theme }: { level: string; theme: typeof colors.light }) {
-  const colorMap: Record<string, string> = { beginner: theme.accent, intermediate: theme.amber, advanced: theme.red };
-  const c = colorMap[level] ?? theme.accent;
-  return (
-    <View style={[styles.diffBadge, { backgroundColor: c + '22' }]}>
-      <Text style={[styles.diffBadgeText, { color: c }]}>{level}</Text>
-    </View>
-  );
-}
-
-// ── EXERCISE CARD ─────────────────────────────────────────────
-function ExerciseCard({ exercise, theme, isSelected, onToggle, onDemo }: {
-  exercise: Exercise; theme: typeof colors.light; isSelected: boolean;
-  onToggle: () => void; onDemo: () => void;
-}) {
-  const catColor = CAT_COLORS[exercise.category] ?? theme.accent;
-  return (
-    <TouchableOpacity onPress={onToggle} activeOpacity={0.8}
-      style={[styles.exerciseCard, { backgroundColor: isSelected ? catColor + '18' : theme.card, borderColor: isSelected ? catColor : theme.border }]}>
-      <View style={[styles.exerciseCatBar, { backgroundColor: catColor }]} />
-      <View style={styles.exerciseCardInner}>
-        <View style={styles.exerciseCardLeft}>
-          <View style={[styles.exerciseIconCircle, { backgroundColor: catColor + '22' }]}>
-            <Ionicons name={catIconName(exercise.category)} size={18} color={catColor} />
-          </View>
-          <View style={styles.exerciseCardInfo}>
-            <Text style={[styles.exerciseCardName, { color: isSelected ? catColor : theme.textPrimary }]} numberOfLines={1}>{exercise.name}</Text>
-            <Text style={[styles.exerciseCardMeta, { color: theme.textMuted }]}>{exercise.muscle_group} · {exercise.calories_per_minute} kcal/min</Text>
-          </View>
-        </View>
-        <View style={styles.exerciseCardRight}>
-          <DifficultyBadge level={exercise.difficulty} theme={theme} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {/* Demo button — shows GIF/description of how to do the exercise */}
-            <TouchableOpacity
-              onPress={(e) => { e.stopPropagation(); onDemo(); }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={[styles.demoBtn, { backgroundColor: catColor + '18', borderColor: catColor + '44' }]}
-            >
-              <Ionicons name="play-circle-outline" size={16} color={catColor} />
-            </TouchableOpacity>
-            <View style={[styles.selectCircle, { backgroundColor: isSelected ? catColor : 'transparent', borderColor: isSelected ? catColor : theme.border }]}>
-              {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
-            </View>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
   );
 }
 
@@ -631,45 +117,167 @@ function catIconName(cat: string): any {
   return m[cat] ?? 'barbell-outline';
 }
 
+// ── EXERCISE CARD ─────────────────────────────────────────────
+// Demo button now shows animated figure icon — no YouTube
+function ExerciseCard({ exercise, theme, isSelected, onToggle, onDemo }: {
+  exercise: Exercise; theme: typeof colors.light; isSelected: boolean;
+  onToggle: () => void; onDemo: () => void;
+}) {
+  const catColor = CAT_COLORS[exercise.category] ?? theme.accent;
+  const diffColors: Record<string, string> = { beginner: '#2DDC8C', intermediate: '#FFB830', advanced: '#FF5959' };
+  const diffLabels: Record<string, string> = { beginner: 'Beginner', intermediate: 'Inter.', advanced: 'Advanced' };
+  const diffColor = diffColors[exercise.difficulty] ?? '#2DDC8C';
+
+  return (
+    <TouchableOpacity
+      onPress={onToggle}
+      activeOpacity={0.75}
+      style={[ec.card, {
+        backgroundColor: isSelected ? catColor + '15' : theme.card,
+        borderColor: isSelected ? catColor : theme.border,
+        borderWidth: isSelected ? 1.5 : 1,
+      }]}
+    >
+      <View style={[ec.accentBar, { backgroundColor: catColor }]} />
+      <View style={ec.body}>
+        <View style={ec.topRow}>
+          <Text style={[ec.name, { color: theme.textPrimary }]} numberOfLines={1}>{exercise.name}</Text>
+          <View style={[ec.checkbox, { backgroundColor: isSelected ? catColor : 'transparent', borderColor: isSelected ? catColor : theme.border }]}>
+            {isSelected && <Ionicons name="checkmark" size={13} color="#fff" />}
+          </View>
+        </View>
+        <Text style={[ec.muscle, { color: theme.textMuted }]} numberOfLines={1}>{exercise.muscle_group}</Text>
+        <View style={ec.bottomRow}>
+          <View style={[ec.diffPill, { backgroundColor: diffColor + '18', borderColor: diffColor + '44' }]}>
+            <Text style={[ec.diffText, { color: diffColor }]}>{diffLabels[exercise.difficulty]}</Text>
+          </View>
+          <View style={ec.kcalRow}>
+            <Ionicons name="flame-outline" size={11} color="#FF6B35" />
+            <Text style={[ec.kcalText, { color: theme.textMuted }]}>{exercise.calories_per_minute} kcal/min</Text>
+          </View>
+          {exercise.equipment !== 'none' && (
+            <View style={[ec.equipPill, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+              <Ionicons name="barbell-outline" size={10} color={theme.textMuted} />
+              <Text style={[ec.equipText, { color: theme.textMuted }]}>{exercise.equipment}</Text>
+            </View>
+          )}
+          {/* Demo button — triggers animated figure modal */}
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); onDemo(); }}
+            style={[ec.playBtn, { backgroundColor: catColor + '18', borderColor: catColor + '44' }]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="play-circle" size={15} color={catColor} />
+            <Text style={[ec.playText, { color: catColor }]}>Demo</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const ec = StyleSheet.create({
+  card:      { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 14, overflow: 'hidden' },
+  accentBar: { width: 4, flexShrink: 0 },
+  body:      { flex: 1, padding: spacing.md, gap: 5 },
+  topRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  name:      { flex: 1, fontSize: fontSize.base, fontWeight: '700' },
+  checkbox:  { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  muscle:    { fontSize: fontSize.xs },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
+  diffPill:  { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
+  diffText:  { fontSize: 10, fontWeight: '700' },
+  kcalRow:   { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  kcalText:  { fontSize: 10 },
+  equipPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
+  equipText: { fontSize: 10 },
+  playBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginLeft: 'auto' },
+  playText:  { fontSize: 10, fontWeight: '700' },
+});
+
 // ── ACTIVE EXERCISE ROW ───────────────────────────────────────
-function ActiveExerciseRow({ exercise, theme, isActive, onStart, onComplete }: {
-  exercise: ActiveExercise; theme: typeof colors.light; isActive: boolean; onStart: () => void; onComplete: () => void;
+// Demo button triggers animated figure modal during workout
+function ActiveExerciseRow({ exercise, theme, isActive, onStart, onComplete, onDemo }: {
+  exercise: ActiveExercise; theme: typeof colors.light; isActive: boolean;
+  onStart: () => void; onComplete: () => void; onDemo: () => void;
 }) {
   const mins = Math.floor(exercise.seconds / 60);
   const secs = exercise.seconds % 60;
   const catColor = CAT_COLORS[exercise.category] ?? theme.accent;
+
   return (
-    <View style={[styles.activeRow, {
-      backgroundColor: exercise.done ? theme.accent + '12' : theme.card,
+    <View style={[aer.row, {
+      backgroundColor: exercise.done ? theme.accent + '10' : isActive ? catColor + '15' : theme.card,
       borderColor: exercise.done ? theme.accent : isActive ? catColor : theme.border,
-      borderWidth: isActive ? 2 : 1, borderLeftWidth: 4, borderLeftColor: catColor,
+      borderWidth: isActive ? 2 : 1,
+      borderLeftWidth: 4,
+      borderLeftColor: exercise.done ? theme.accent : catColor,
     }]}>
-      <View style={styles.activeRowLeft}>
-        <Text style={[styles.activeRowName, { color: exercise.done ? theme.accent : theme.textPrimary }]}>{exercise.name}</Text>
-        <Text style={[styles.activeRowMeta, { color: theme.textMuted }]}>{exercise.muscle_group} · {exercise.calories_per_minute} kcal/min</Text>
+      <View style={{ flex: 1 }}>
+        <View style={aer.nameRow}>
+          <Text style={[aer.name, {
+            color: exercise.done ? theme.accent : theme.textPrimary,
+            textDecorationLine: exercise.done ? 'line-through' : 'none',
+          }]}>{exercise.name}</Text>
+          {exercise.done && <Ionicons name="checkmark-circle" size={16} color={theme.accent} />}
+        </View>
+        <Text style={[aer.meta, { color: theme.textMuted }]}>
+          {exercise.muscle_group} · {exercise.calories_per_minute} kcal/min
+        </Text>
         {exercise.seconds > 0 && (
-          <Text style={[styles.activeRowTime, { color: catColor }]}>⏱ {mins}:{secs.toString().padStart(2, '0')} · {exercise.calories_burned} kcal</Text>
+          <View style={aer.progressRow}>
+            <Ionicons name="timer-outline" size={12} color={catColor} />
+            <Text style={[aer.timer, { color: catColor }]}>
+              {mins}:{secs.toString().padStart(2, '0')} · {exercise.calories_burned} kcal
+            </Text>
+          </View>
         )}
       </View>
-      {exercise.done ? (
-        <View style={[styles.doneCheck, { backgroundColor: theme.accent }]}>
-          <Ionicons name="checkmark" size={18} color="#fff" />
-        </View>
-      ) : isActive ? (
-        <TouchableOpacity onPress={onComplete} activeOpacity={0.85}>
-          <LinearGradient colors={[catColor, catColor + 'BB'] as [string, string]} style={styles.completeExBtn}>
-            <Text style={styles.completeExBtnText}>Done</Text>
-          </LinearGradient>
+      <View style={aer.actions}>
+        {/* How-to demo — animated figure */}
+        <TouchableOpacity
+          onPress={onDemo}
+          style={[aer.howToBtn, { backgroundColor: catColor + '15', borderColor: catColor + '30' }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="play-circle" size={13} color={catColor} />
         </TouchableOpacity>
-      ) : (
-        <TouchableOpacity onPress={onStart} style={[styles.startExBtn, { borderColor: catColor }]}>
-          <Ionicons name="play" size={12} color={catColor} />
-          <Text style={[styles.startExBtnText, { color: catColor }]}>Start</Text>
-        </TouchableOpacity>
-      )}
+        {exercise.done ? (
+          <View style={[aer.doneChip, { backgroundColor: theme.accent }]}>
+            <Ionicons name="checkmark" size={14} color="#fff" />
+          </View>
+        ) : isActive ? (
+          <TouchableOpacity onPress={onComplete} activeOpacity={0.85}>
+            <LinearGradient colors={[catColor, catColor + 'BB'] as [string, string]} style={aer.doneBtn}>
+              <Text style={aer.doneBtnText}>Done</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={onStart} style={[aer.startBtn, { borderColor: catColor }]}>
+            <Ionicons name="play" size={11} color={catColor} />
+            <Text style={[aer.startBtnText, { color: catColor }]}>Start</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
+
+const aer = StyleSheet.create({
+  row:         { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: 14, gap: spacing.md, overflow: 'hidden' },
+  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  name:        { fontSize: fontSize.base, fontWeight: '700', flex: 1 },
+  meta:        { fontSize: fontSize.xs, marginTop: 2 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  timer:       { fontSize: fontSize.xs, fontWeight: '700' },
+  actions:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 0 },
+  howToBtn:    { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  doneChip:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  doneBtn:     { paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: 8 },
+  doneBtnText: { fontSize: fontSize.sm, fontWeight: '800', color: '#fff' },
+  startBtn:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5 },
+  startBtnText:{ fontSize: fontSize.sm, fontWeight: '700' },
+});
 
 // ── WORKOUT TIMER ─────────────────────────────────────────────
 function WorkoutTimer({ theme, seconds, calories }: { theme: typeof colors.light; seconds: number; calories: number }) {
@@ -696,27 +304,21 @@ function WorkoutTimer({ theme, seconds, calories }: { theme: typeof colors.light
 }
 
 // ── POST-WORKOUT MODAL ────────────────────────────────────────
-// Shows after workout completes — PRs achieved + Claude meal suggestion.
 function PostWorkoutModal({ visible, onClose, prResult, meal, loadingMeal, theme }: {
   visible: boolean; onClose: () => void;
-  prResult: PRResult | null;
-  meal: MealSuggestion | null; loadingMeal: boolean;
-  theme: typeof colors.light;
+  prResult: PRResult | null; meal: MealSuggestion | null;
+  loadingMeal: boolean; theme: typeof colors.light;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={[styles.postWorkoutSheet, { backgroundColor: theme.surface }]}>
-          {/* Header */}
           <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.postWorkoutHeader}>
             <Text style={styles.postWorkoutEmoji}>🎉</Text>
             <Text style={styles.postWorkoutTitle}>Workout Complete!</Text>
             <Text style={styles.postWorkoutSub}>You crushed it. Time to recover.</Text>
           </LinearGradient>
-
           <ScrollView style={{ padding: spacing.lg }} showsVerticalScrollIndicator={false}>
-
-            {/* PR Section — only shows if new records were set */}
             {prResult?.isNewPR && prResult.newRecords.length > 0 && (
               <View style={[styles.prSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 <Text style={[styles.postSectionTitle, { color: theme.textPrimary }]}>🏅 New Personal Records!</Text>
@@ -731,8 +333,6 @@ function PostWorkoutModal({ visible, onClose, prResult, meal, loadingMeal, theme
                 ))}
               </View>
             )}
-
-            {/* Meal Suggestion */}
             <View style={[styles.mealSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <Text style={[styles.postSectionTitle, { color: theme.textPrimary }]}>🍽️ Recovery Meal Suggestion</Text>
               {loadingMeal ? (
@@ -747,11 +347,8 @@ function PostWorkoutModal({ visible, onClose, prResult, meal, loadingMeal, theme
                 <Text style={[styles.mealWhy, { color: theme.textMuted }]}>No suggestion available</Text>
               )}
             </View>
-
             <View style={{ height: spacing.lg }} />
           </ScrollView>
-
-          {/* Close button */}
           <View style={styles.postWorkoutClose}>
             <TouchableOpacity onPress={onClose} activeOpacity={0.85} style={styles.postWorkoutCloseWrap}>
               <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.postWorkoutCloseBtn}>
@@ -913,18 +510,18 @@ function CoachRoutineModal({ visible, theme, onClose, onSave }: {
   visible: boolean; theme: typeof colors.light; onClose: () => void; onSave: (r: Partial<SavedRoutine>) => void;
 }) {
   const questions = [
-    { key: 'goal', label: 'Fitness goal?', options: ['Lose weight', 'Build muscle', 'Get fit', 'Endurance'] },
-    { key: 'style', label: 'Activity style?', options: ['Strength', 'Cardio', 'HIIT', 'Flexibility'] },
-    { key: 'location', label: 'Home or gym?', options: ['Home', 'Gym', 'Both'] },
-    { key: 'level', label: 'Experience level?', options: ['Beginner', 'Intermediate', 'Advanced'] },
-    { key: 'area', label: 'Target area?', options: ['Full body', 'Upper body', 'Lower body', 'Core'] },
-    { key: 'duration', label: 'Duration?', options: ['15 min', '30 min', '45 min', '60 min'] },
-    { key: 'equipment', label: 'Equipment?', options: ['None', 'Dumbbells', 'Full gym', 'Bands'] },
-    { key: 'count', label: 'Exercise count?', options: ['4–5', '6–8', '8–10', '10+'] },
+    { key: 'goal',      label: 'Fitness goal?',       options: ['Lose weight', 'Build muscle', 'Get fit', 'Endurance'] },
+    { key: 'style',     label: 'Activity style?',     options: ['Strength', 'Cardio', 'HIIT', 'Flexibility'] },
+    { key: 'location',  label: 'Home or gym?',         options: ['Home', 'Gym', 'Both'] },
+    { key: 'level',     label: 'Experience level?',    options: ['Beginner', 'Intermediate', 'Advanced'] },
+    { key: 'area',      label: 'Target area?',         options: ['Full body', 'Upper body', 'Lower body', 'Core'] },
+    { key: 'duration',  label: 'Duration?',            options: ['15 min', '30 min', '45 min', '60 min'] },
+    { key: 'equipment', label: 'Equipment?',           options: ['None', 'Dumbbells', 'Full gym', 'Bands'] },
+    { key: 'count',     label: 'Exercise count?',      options: ['4–5', '6–8', '8–10', '10+'] },
   ];
-  const [qIndex, setQIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
+  const [qIndex, setQIndex]       = useState(0);
+  const [answers, setAnswers]     = useState<Record<string, string>>({});
+  const [loading, setLoading]     = useState(false);
   const [generated, setGenerated] = useState<any>(null);
   const reset = () => { setQIndex(0); setAnswers({}); setGenerated(null); setLoading(false); };
 
@@ -1007,14 +604,15 @@ JSON only: {"name":"Routine Name","description":"One sentence","exercises":[{"na
 }
 
 // ── ACTIVE WORKOUT TAB ────────────────────────────────────────
-function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, workoutStarted, onStart, onComplete, onCompleteWorkout, onOpenCatalogue }: {
+function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, workoutStarted, onStart, onComplete, onCompleteWorkout, onOpenCatalogue, onShowDemo }: {
   theme: typeof colors.light; exercises: ActiveExercise[]; activeIndex: number;
   workoutSeconds: number; workoutStarted: boolean;
   onStart: (i: number) => void; onComplete: (i: number) => void;
   onCompleteWorkout: () => void; onOpenCatalogue: () => void;
+  onShowDemo: (ex: ActiveExercise) => void;
 }) {
   const doneCount = exercises.filter(e => e.done).length;
-  const progress = exercises.length > 0 ? doneCount / exercises.length : 0;
+  const progress  = exercises.length > 0 ? doneCount / exercises.length : 0;
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       {workoutStarted && <WorkoutTimer theme={theme} seconds={workoutSeconds} calories={exercises.reduce((s, e) => s + e.calories_burned, 0)} />}
@@ -1035,9 +633,13 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
         <TouchableOpacity onPress={onOpenCatalogue}><Text style={[styles.addMoreText, { color: theme.accent }]}>+ Add</Text></TouchableOpacity>
       </View>
       {exercises.map((ex, i) => (
-        <ActiveExerciseRow key={ex.id} exercise={ex} theme={theme}
+        <ActiveExerciseRow
+          key={ex.id} exercise={ex} theme={theme}
           isActive={i === activeIndex && workoutStarted}
-          onStart={() => onStart(i)} onComplete={() => onComplete(i)} />
+          onStart={() => onStart(i)}
+          onComplete={() => onComplete(i)}
+          onDemo={() => onShowDemo(ex)}
+        />
       ))}
       <TouchableOpacity onPress={onCompleteWorkout} activeOpacity={0.85} style={styles.completeWorkoutWrap}>
         <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.completeWorkoutBtn}>
@@ -1049,7 +651,7 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
   );
 }
 
-// ── CATALOGUE TAB — now with equipment filter ─────────────────
+// ── CATALOGUE TAB ─────────────────────────────────────────────
 function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout, routineName, equipmentFilter, onEquipmentChange, onShowDemo }: {
   theme: typeof colors.light; exercises: Exercise[]; selectedIds: Set<string>;
   onToggle: (ex: Exercise) => void; onAddToWorkout: () => void; routineName?: string;
@@ -1060,7 +662,6 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
   const [activeCategory, setActiveCategory] = useState('All');
   const [customName, setCustomName] = useState('');
 
-  // Filter by both category AND equipment
   const filtered = exercises.filter((e) => {
     const catMatch = activeCategory === 'All' || e.category === activeCategory;
     const eqMatch  = equipmentFilter === 'All' || e.equipment === equipmentFilter;
@@ -1070,7 +671,6 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Category pills */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
         {categories.map((cat) => {
           const cc = CAT_COLORS[cat] ?? theme.accent;
@@ -1083,8 +683,6 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
           );
         })}
       </ScrollView>
-
-      {/* Equipment filter pills */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.categoryRow, { paddingTop: 0 }]}>
         {EQUIPMENT_OPTIONS.map((eq) => {
           const isActive = equipmentFilter === eq;
@@ -1098,25 +696,28 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
           );
         })}
       </ScrollView>
-
       {activeCategory !== 'All' && (
         <View style={[styles.catHeroBar, { backgroundColor: catColor + '15', borderColor: catColor + '44' }]}>
           <Ionicons name={catIconName(activeCategory)} size={16} color={catColor} />
           <Text style={[styles.catHeroText, { color: catColor }]}>{activeCategory} — {filtered.length} exercises</Text>
         </View>
       )}
-
       {selectedIds.size > 0 && (
         <TouchableOpacity onPress={onAddToWorkout} activeOpacity={0.85} style={styles.addSelectedWrap}>
           <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addSelectedBar}>
-            <Text style={styles.addSelectedText}>Add {selectedIds.size} exercise{selectedIds.size > 1 ? 's' : ''}{routineName ? ` to "${routineName}"` : ''} →</Text>
+            <Ionicons name="add-circle" size={18} color="#fff" />
+            <Text style={styles.addSelectedText}>
+              Add {selectedIds.size} exercise{selectedIds.size > 1 ? 's' : ''} to workout{routineName ? ` — "${routineName}"` : ''} ✓
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       )}
-
       <ScrollView contentContainerStyle={styles.tabContent}>
         {filtered.map((ex) => (
-          <ExerciseCard key={ex.id} exercise={ex} theme={theme} isSelected={selectedIds.has(ex.id)} onToggle={() => onToggle(ex)} onDemo={() => onShowDemo(ex)} />
+          <ExerciseCard key={ex.id} exercise={ex} theme={theme}
+            isSelected={selectedIds.has(ex.id)}
+            onToggle={() => onToggle(ex)}
+            onDemo={() => onShowDemo(ex)} />
         ))}
         <View style={[styles.addManuallyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.addManuallyLabel, { color: theme.textSecondary }]}>Can't find it? Add manually:</Text>
@@ -1124,7 +725,12 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
             <TextInput value={customName} onChangeText={setCustomName} placeholder="Exercise name"
               placeholderTextColor={theme.textMuted}
               style={[styles.addManuallyInput, { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.bg }]} />
-            <TouchableOpacity onPress={() => { if (customName.trim()) { onToggle({ id: `custom_${Date.now()}`, name: customName.trim(), category: 'Custom', muscle_group: 'Custom', difficulty: 'beginner', calories_per_minute: 6, equipment: 'none', description: 'Custom exercise' }); setCustomName(''); } }} activeOpacity={0.85} style={styles.addManuallyBtnWrap}>
+            <TouchableOpacity onPress={() => {
+              if (customName.trim()) {
+                onToggle({ id: `custom_${Date.now()}`, name: customName.trim(), category: 'Custom', muscle_group: 'Custom', difficulty: 'beginner', calories_per_minute: 6, equipment: 'none', description: 'Custom exercise' });
+                setCustomName('');
+              }
+            }} activeOpacity={0.85} style={styles.addManuallyBtnWrap}>
               <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} style={styles.addManuallyBtn}>
                 <Ionicons name="add" size={20} color="#fff" />
               </LinearGradient>
@@ -1177,21 +783,15 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: { theme: typeof color
 }
 
 // ── STEPS TAB ─────────────────────────────────────────────────
-// FIX: reads liveSteps from Zustand (written by useSteps in HomeScreen)
-// instead of calling useSteps() again which creates a second independent
-// hook instance that starts from 0 and diverges from the Home screen value.
-function StepsTab({ theme, userId, goalSteps }: { theme: typeof colors.light; userId: string; goalSteps: number }) {
+function StepsTab({ theme, goalSteps }: { theme: typeof colors.light; goalSteps: number }) {
   const { liveSteps: steps } = useAuthStore();
-  const calories   = Math.round(steps * 0.04); // ~0.04 kcal per step
+  const calories   = Math.round(steps * 0.04);
   const percentage = Math.round(Math.min(steps / goalSteps, 1) * 100);
-  const isAvailable   = true;
-  const hasPermission = true;
-  const isLoading     = false;
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       <LinearGradient colors={['#C8E6FF', '#D8F4F4'] as [string, string]} style={styles.stepsHero}>
         <FootprintSvg color="#2BBCB0" />
-        <Text style={styles.stepsHeroValue}>{isLoading ? '...' : steps >= 1000 ? `${(steps / 1000).toFixed(1)}K` : steps.toString()}</Text>
+        <Text style={styles.stepsHeroValue}>{steps >= 1000 ? `${(steps / 1000).toFixed(1)}K` : steps.toString()}</Text>
         <Text style={styles.stepsHeroLabel}>steps today</Text>
         <View style={styles.stepsBarBg}>
           <LinearGradient colors={['#2BBCB0', '#4A90E2'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -1204,22 +804,10 @@ function StepsTab({ theme, userId, goalSteps }: { theme: typeof colors.light; us
         <Ionicons name="flame-outline" size={16} color="#FF6B35" />
         <Text style={[styles.stepsCalText, { color: '#FF6B35' }]}>{calories} kcal burned from steps</Text>
       </LinearGradient>
-      {!isAvailable ? (
-        <View style={[styles.stepsSensorCard, { backgroundColor: theme.amber + '18', borderColor: theme.amber }]}>
-          <Ionicons name="warning-outline" size={20} color={theme.amber} />
-          <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>Step counting not available on this device.</Text>
-        </View>
-      ) : !hasPermission ? (
-        <View style={[styles.stepsSensorCard, { backgroundColor: theme.amber + '18', borderColor: theme.amber }]}>
-          <Ionicons name="lock-closed-outline" size={20} color={theme.amber} />
-          <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>Motion permission required. Enable in Settings → CalFit.</Text>
-        </View>
-      ) : (
-        <View style={[styles.stepsSensorCard, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-          <Ionicons name="checkmark-circle-outline" size={20} color={theme.accent} />
-          <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>Steps tracked automatically in the background.</Text>
-        </View>
-      )}
+      <View style={[styles.stepsSensorCard, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
+        <Ionicons name="checkmark-circle-outline" size={20} color={theme.accent} />
+        <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>Steps tracked automatically in the background.</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -1241,7 +829,7 @@ function HistoryTab({ theme, sessions }: { theme: typeof colors.light; sessions:
     <ScrollView contentContainerStyle={styles.tabContent}>
       {sessions.map((session) => {
         const date = new Date(session.completed_at);
-        const hrs = Math.floor(session.duration_seconds / 3600);
+        const hrs  = Math.floor(session.duration_seconds / 3600);
         const mins = Math.floor((session.duration_seconds % 3600) / 60);
         const secs = session.duration_seconds % 60;
         const timeDisplay = hrs > 0 ? `${hrs}h ${mins}m` : mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
@@ -1297,11 +885,10 @@ function InnerTabs({ tabs, active, onPress, theme }: {
   );
 }
 
-// ── MAIN ──────────────────────────────────────────────────────
+// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function WorkoutScreen() {
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
-  const navigation = useNavigation<any>();
   const theme = colors[colorScheme];
   const goalSteps = (profile as any)?.step_goal ?? 10000;
 
@@ -1321,7 +908,6 @@ export default function WorkoutScreen() {
   const [showCreateModal, setShowCreateModal]           = useState(false);
   const [showCoachModal, setShowCoachModal]             = useState(false);
   const [isInActiveWorkout, setIsInActiveWorkout]       = useState(false);
-  // ── NEW STATE ──────────────────────────────────────────────
   const [equipmentFilter, setEquipmentFilter]           = useState('All');
   const [showPostWorkoutModal, setShowPostWorkoutModal] = useState(false);
   const [prResult, setPrResult]                         = useState<PRResult | null>(null);
@@ -1345,7 +931,11 @@ export default function WorkoutScreen() {
   }, []);
 
   const loadCatalogue = async () => {
-    try { const { supabase } = await import('../../services/supabase'); const { data } = await supabase.from('exercises').select('*').order('category'); if (data) setCatalogue(data); } catch {}
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const { data } = await supabase.from('exercises').select('*').order('category');
+      if (data) setCatalogue(data);
+    } catch {}
   };
 
   const loadHistory = async () => {
@@ -1367,14 +957,21 @@ export default function WorkoutScreen() {
 
   const loadRoutines = async () => {
     if (!user?.id) return;
-    try { const { supabase } = await import('../../services/supabase'); const { data } = await supabase.from('workout_routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false }); if (data) setSavedRoutines(data.map((r: any) => ({ ...r, exercises: r.exercises ?? [] }))); } catch {}
+    try {
+      const { supabase } = await import('../../services/supabase');
+      const { data } = await supabase.from('workout_routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (data) setSavedRoutines(data.map((r: any) => ({ ...r, exercises: r.exercises ?? [] })));
+    } catch {}
   };
 
   const saveRoutine = async (routine: Partial<SavedRoutine>) => {
     if (!user?.id) return;
     try {
       const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('workout_routines').insert({ user_id: user.id, name: routine.name ?? 'My Routine', description: routine.description ?? '', exercises: routine.exercises ?? [], duration_est: routine.duration_est ?? null, calories_est: routine.calories_est ?? null }).select().single();
+      const { data } = await supabase.from('workout_routines').insert({
+        user_id: user.id, name: routine.name ?? 'My Routine', description: routine.description ?? '',
+        exercises: routine.exercises ?? [], duration_est: routine.duration_est ?? null, calories_est: routine.calories_est ?? null,
+      }).select().single();
       if (data) setSavedRoutines((prev) => [data, ...prev]);
       setShowCoachModal(false); setShowCreateModal(false);
       Alert.alert('Routine saved! 💪', `"${routine.name}" added to My Routines.`);
@@ -1382,11 +979,20 @@ export default function WorkoutScreen() {
   };
 
   const deleteRoutine = async (id: string) => {
-    try { const { supabase } = await import('../../services/supabase'); await supabase.from('workout_routines').delete().eq('id', id); setSavedRoutines((prev) => prev.filter((r) => r.id !== id)); } catch {}
+    try {
+      const { supabase } = await import('../../services/supabase');
+      await supabase.from('workout_routines').delete().eq('id', id);
+      setSavedRoutines((prev) => prev.filter((r) => r.id !== id));
+    } catch {}
   };
 
   const handleStartRoutine = (routine: SavedRoutine) => {
-    const exercises = routine.exercises.map((ex: any) => ({ ...ex, id: ex.id ?? `${ex.name}_${Date.now()}`, muscle_group: ex.muscle_group ?? '', difficulty: ex.difficulty ?? 'beginner', equipment: ex.equipment ?? 'none', description: ex.description ?? '', seconds: 0, calories_burned: 0, done: false }));
+    const exercises = routine.exercises.map((ex: any) => ({
+      ...ex, id: ex.id ?? `${ex.name}_${Date.now()}`,
+      muscle_group: ex.muscle_group ?? '', difficulty: ex.difficulty ?? 'beginner',
+      equipment: ex.equipment ?? 'none', description: ex.description ?? '',
+      seconds: 0, calories_burned: 0, done: false,
+    }));
     setWorkoutExercises(exercises); setIsInActiveWorkout(true);
     speak(`Starting ${routine.name}! Let's go!`);
   };
@@ -1403,17 +1009,26 @@ export default function WorkoutScreen() {
     } else {
       const toAdd = catalogue.filter((e) => selectedIds.has(e.id)).filter((e) => !workoutExercises.some((we) => we.id === e.id)).map((e) => ({ ...e, seconds: 0, calories_burned: 0, done: false }));
       setWorkoutExercises((prev) => [...prev, ...toAdd]);
+      setIsInActiveWorkout(true);
     }
     setSelectedIds(new Set()); setActiveTab('My Routines');
   };
 
   const handleStartExercise = (index: number) => {
     const ex = workoutExercises[index];
-    if (!workoutStarted) { setWorkoutStarted(true); speak(`Workout started! First up — ${ex.name}!`); workoutTimerRef.current = setInterval(() => setWorkoutSeconds((p) => p + 1), 1000); } else { speak(`Starting ${ex.name}.`); }
+    if (!workoutStarted) {
+      setWorkoutStarted(true);
+      speak(`Workout started! First up — ${ex.name}!`);
+      workoutTimerRef.current = setInterval(() => setWorkoutSeconds((p) => p + 1), 1000);
+    } else { speak(`Starting ${ex.name}.`); }
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     setActiveExerciseIndex(index);
     exerciseTimerRef.current = setInterval(() => {
-      setWorkoutExercises((prev) => prev.map((e, i) => { if (i !== index) return e; const ns = e.seconds + 1; return { ...e, seconds: ns, calories_burned: Math.round((e.calories_per_minute / 60) * ns) }; }));
+      setWorkoutExercises((prev) => prev.map((e, i) => {
+        if (i !== index) return e;
+        const ns = e.seconds + 1;
+        return { ...e, seconds: ns, calories_burned: Math.round((e.calories_per_minute / 60) * ns) };
+      }));
     }, 1000);
   };
 
@@ -1425,58 +1040,33 @@ export default function WorkoutScreen() {
     setActiveExerciseIndex(-1);
   };
 
-  // ── UPDATED handleCompleteWorkout — now checks PRs + shows modal ──
   const handleCompleteWorkout = async () => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
-
     const totalCal = workoutExercises.reduce((s, e) => s + e.calories_burned, 0);
     const sessionName = workoutExercises[0]?.category ? `${workoutExercises[0].category} Workout` : 'Workout Session';
-    const hrs = Math.floor(workoutSeconds / 3600);
-    const mins = Math.floor((workoutSeconds % 3600) / 60);
-    const secs = workoutSeconds % 60;
-
     speak(`Workout complete! ${workoutExercises.length} exercises, ${totalCal} calories. Be proud!`);
-
     try {
       if (user?.id) {
         const { supabase } = await import('../../services/supabase');
         await supabase.from('workout_sessions').insert({
-          user_id: user.id, name: sessionName,
-          completed_at: new Date().toISOString(),
+          user_id: user.id, name: sessionName, completed_at: new Date().toISOString(),
           duration_seconds: workoutSeconds, calories_burned: totalCal,
           exercises: workoutExercises.map(e => ({ name: e.name, seconds: e.seconds, calories: e.calories_burned })),
           status: 'completed',
         });
-
-        // ── Check Personal Records ────────────────────────────
-        const result = await checkAndSavePRs(
-          user.id, sessionName, workoutSeconds, totalCal,
-          workoutExercises.map(e => ({ name: e.name, seconds: e.seconds, calories: e.calories_burned }))
-        );
+        const result = await checkAndSavePRs(user.id, sessionName, workoutSeconds, totalCal, workoutExercises.map(e => ({ name: e.name, seconds: e.seconds, calories: e.calories_burned })));
         setPrResult(result);
       }
-    } catch (e) {
-      console.error('handleCompleteWorkout error:', e);
-    }
-
-    // Reset workout state
-    setIsInActiveWorkout(false);
-    setWorkoutExercises([]);
-    setWorkoutStarted(false);
-    setWorkoutSeconds(0);
-    setActiveExerciseIndex(-1);
-
-    // ── Show post-workout modal + load meal suggestion ────────
+    } catch (e) { console.error('handleCompleteWorkout error:', e); }
+    setIsInActiveWorkout(false); setWorkoutExercises([]); setWorkoutStarted(false); setWorkoutSeconds(0); setActiveExerciseIndex(-1);
     setShowPostWorkoutModal(true);
     loadPostWorkoutMeal(workoutExercises, totalCal);
     loadHistory();
   };
 
-  // ── Load Claude meal suggestion after workout ─────────────
   const loadPostWorkoutMeal = async (exercises: ActiveExercise[], totalCal: number) => {
-    setLoadingMealSuggestion(true);
-    setPostWorkoutMeal(null);
+    setLoadingMealSuggestion(true); setPostWorkoutMeal(null);
     try {
       const fallbacks: MealSuggestion[] = [
         { name: 'Grilled Chicken + Rice', why: 'High protein to repair muscles, carbs to replenish glycogen.', calories: 520 },
@@ -1484,23 +1074,15 @@ export default function WorkoutScreen() {
         { name: 'Greek Yoghurt + Banana', why: 'Fast carbs + protein — ideal within 30 min of training.', calories: 290 },
         { name: 'Jollof Rice + Grilled Fish', why: 'Great carb and protein balance for Nigerian recovery.', calories: 580 },
       ];
-
-      if (!hasClaudeKey()) {
-        setPostWorkoutMeal(fallbacks[Math.floor(Math.random() * fallbacks.length)]);
-        return;
-      }
-
+      if (!hasClaudeKey()) { setPostWorkoutMeal(fallbacks[Math.floor(Math.random() * fallbacks.length)]); return; }
       const categories = [...new Set(exercises.map(e => e.category))].join(', ');
       const result = await claudeJSON<MealSuggestion>(
         'You are a sports nutritionist. Suggest a post-workout recovery meal. Return JSON only: { "name": string, "why": string (max 15 words), "calories": number }',
         `Workout: ${categories || 'mixed'} training, ${totalCal} kcal burned. Suggest one recovery meal suitable for Nigeria or globally.`
       );
       setPostWorkoutMeal(result ?? fallbacks[0]);
-    } catch {
-      setPostWorkoutMeal({ name: 'Grilled Chicken + Rice', why: 'High protein to repair muscles, carbs to replenish glycogen.', calories: 520 });
-    } finally {
-      setLoadingMealSuggestion(false);
-    }
+    } catch { setPostWorkoutMeal({ name: 'Grilled Chicken + Rice', why: 'High protein to repair muscles, carbs to replenish glycogen.', calories: 520 }); }
+    finally { setLoadingMealSuggestion(false); }
   };
 
   return (
@@ -1520,12 +1102,9 @@ export default function WorkoutScreen() {
         )}
       </View>
 
-      <InnerTabs
-        tabs={tabs}
-        active={activeTab}
+      <InnerTabs tabs={tabs} active={activeTab}
         onPress={(tab) => { setActiveTab(tab); if (tab !== 'My Routines') setIsInActiveWorkout(false); }}
-        theme={theme}
-      />
+        theme={theme} />
 
       {activeTab === 'My Routines' && !isInActiveWorkout && (
         <MyRoutinesTab theme={theme} routines={savedRoutines}
@@ -1533,10 +1112,13 @@ export default function WorkoutScreen() {
           onStartRoutine={handleStartRoutine} onDeleteRoutine={deleteRoutine} />
       )}
       {activeTab === 'My Routines' && isInActiveWorkout && (
-        <ActiveWorkoutTab theme={theme} exercises={workoutExercises} activeIndex={activeExerciseIndex}
+        <ActiveWorkoutTab
+          theme={theme} exercises={workoutExercises} activeIndex={activeExerciseIndex}
           workoutSeconds={workoutSeconds} workoutStarted={workoutStarted}
           onStart={handleStartExercise} onComplete={handleCompleteExercise}
-          onCompleteWorkout={handleCompleteWorkout} onOpenCatalogue={() => setActiveTab('Catalogue')} />
+          onCompleteWorkout={handleCompleteWorkout} onOpenCatalogue={() => setActiveTab('Catalogue')}
+          onShowDemo={(ex) => setDemoExercise(ex)}
+        />
       )}
       {activeTab === 'Catalogue' && (
         <CatalogueTab theme={theme} exercises={catalogue} selectedIds={selectedIds}
@@ -1545,28 +1127,32 @@ export default function WorkoutScreen() {
           onShowDemo={(ex) => setDemoExercise(ex)} />
       )}
       {activeTab === 'Calories' && <CaloriesTab theme={theme} totalCalories={totalCaloriesBurned} weeklyData={weeklyCalories} />}
-      {activeTab === 'Steps' && <StepsTab theme={theme} userId={user?.id ?? ''} goalSteps={goalSteps} />}
+      {activeTab === 'Steps' && <StepsTab theme={theme} goalSteps={goalSteps} />}
       {activeTab === 'History' && <HistoryTab theme={theme} sessions={sessions} />}
 
       <CreateRoutineModal visible={showCreateModal} theme={theme} onClose={() => setShowCreateModal(false)}
         onConfirm={(name) => { setPendingRoutineName(name); setShowCreateModal(false); setActiveTab('Catalogue'); }} />
       <CoachRoutineModal visible={showCoachModal} theme={theme} onClose={() => setShowCoachModal(false)} onSave={saveRoutine} />
 
-      {/* ── POST-WORKOUT MODAL — PRs + Meal Suggestion ────── */}
       <PostWorkoutModal
         visible={showPostWorkoutModal}
         onClose={() => { setShowPostWorkoutModal(false); setPrResult(null); setPostWorkoutMeal(null); }}
-        prResult={prResult}
-        meal={postWorkoutMeal}
-        loadingMeal={loadingMealSuggestion}
-        theme={theme}
+        prResult={prResult} meal={postWorkoutMeal} loadingMeal={loadingMealSuggestion} theme={theme}
       />
-      {/* ── EXERCISE DEMO MODAL — GIF + form tips ── */}
+
+      {/* ── EXERCISE DEMO MODAL — animated human figure ── */}
       <ExerciseDemoModal
         visible={!!demoExercise}
         exercise={demoExercise}
         theme={theme}
         onClose={() => setDemoExercise(null)}
+        onAddToWorkout={(ex) => {
+          const toAdd = { ...ex, seconds: 0, calories_burned: 0, done: false };
+          setWorkoutExercises((prev) => prev.some((e) => e.id === ex.id) ? prev : [...prev, toAdd as ActiveExercise]);
+          setDemoExercise(null);
+          setIsInActiveWorkout(true);
+          setActiveTab('My Routines');
+        }}
       />
     </AndroidSafeView>
   );
@@ -1635,16 +1221,6 @@ const styles = StyleSheet.create({
   todayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   todayTitle: { fontSize: fontSize.lg, fontWeight: '700' },
   addMoreText: { fontSize: fontSize.sm, fontWeight: '600' },
-  activeRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: 12, gap: spacing.md, overflow: 'hidden' },
-  activeRowLeft: { flex: 1 },
-  activeRowName: { fontSize: fontSize.base, fontWeight: '700' },
-  activeRowMeta: { fontSize: fontSize.xs, marginTop: 2 },
-  activeRowTime: { fontSize: fontSize.xs, marginTop: 4, fontWeight: '600' },
-  doneCheck: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  completeExBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 8 },
-  completeExBtnText: { fontSize: fontSize.sm, fontWeight: '700', color: '#fff' },
-  startExBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 8, borderWidth: 1 },
-  startExBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
   completeWorkoutWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 16, overflow: 'hidden' },
   completeWorkoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
   completeWorkoutBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
@@ -1657,27 +1233,13 @@ const styles = StyleSheet.create({
   categoryRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
   categoryPill: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1, height: 32, justifyContent: 'center' },
   categoryPillText: { fontSize: fontSize.sm },
-  // Equipment filter pills
   eqPill: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: 99, borderWidth: 1, height: 28, justifyContent: 'center' },
   eqPillText: { fontSize: 11, fontWeight: '600' },
   catHeroBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: 10, borderRadius: 10, borderWidth: 1 },
   catHeroText: { fontSize: fontSize.sm, fontWeight: '600' },
   addSelectedWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 12, overflow: 'hidden' },
-  addSelectedBar: { padding: spacing.md, alignItems: 'center' },
+  addSelectedBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
   addSelectedText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  exerciseCard: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  exerciseCatBar: { width: 4, flexShrink: 0 },
-  exerciseCardInner: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: spacing.md, gap: spacing.md },
-  exerciseCardLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  exerciseIconCircle: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  exerciseCardInfo: { flex: 1 },
-  exerciseCardName: { fontSize: fontSize.base, fontWeight: '700' },
-  exerciseCardMeta: { fontSize: fontSize.xs, marginTop: 2 },
-  exerciseCardRight: { alignItems: 'flex-end', gap: spacing.sm, flexShrink: 0 },
-  diffBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 },
-  diffBadgeText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
-  selectCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  demoBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   addManuallyCard: { marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', gap: spacing.sm },
   addManuallyLabel: { fontSize: fontSize.sm },
   addManuallyRow: { flexDirection: 'row', gap: spacing.sm },
@@ -1718,7 +1280,6 @@ const styles = StyleSheet.create({
   historyStats: { flexDirection: 'row', gap: spacing.lg },
   historyStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   historyStatText: { fontSize: fontSize.xs },
-  // Modals (shared)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, paddingBottom: 40, gap: spacing.md },
   modalTitle: { fontSize: fontSize.xl, fontWeight: '800' },
@@ -1743,7 +1304,6 @@ const styles = StyleSheet.create({
   coachQOptions: { gap: spacing.sm },
   coachQOption: { padding: spacing.md, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
   coachQOptionText: { fontSize: fontSize.base, fontWeight: '600' },
-  // Post-workout modal
   postWorkoutSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', maxHeight: '85%' },
   postWorkoutHeader: { padding: spacing.xl, alignItems: 'center', gap: spacing.xs },
   postWorkoutEmoji: { fontSize: 40 },
@@ -1753,7 +1313,6 @@ const styles = StyleSheet.create({
   postWorkoutCloseWrap: { borderRadius: radius.lg, overflow: 'hidden' },
   postWorkoutCloseBtn: { padding: spacing.md, alignItems: 'center' },
   postWorkoutCloseBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  // PR section inside modal
   prSection: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
   mealSection: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
   postSectionTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.xs },

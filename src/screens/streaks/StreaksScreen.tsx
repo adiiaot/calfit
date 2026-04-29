@@ -1,6 +1,11 @@
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, RefreshControl,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
@@ -12,6 +17,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { UserAvatar } from '../../modules/shared/UserAvatar';
 import { supabase } from '../../services/supabase';
+import { MilestoneCelebration, checkStreakMilestone, Milestone } from '../../components/Milestonecelebration';
 
 const ORANGE = '#FFB347';
 const GOLD   = '#FFD133';
@@ -19,7 +25,6 @@ const PINK   = '#FF6B9D';
 const BLUE   = '#6699FF';
 const GREEN  = '#2DDC8C';
 
-// ── MILESTONE BADGES ──────────────────────────────────────────
 const MILESTONES = [
   { days: 3,   emoji: '🔥', label: '3-Day Spark',      color: ORANGE },
   { days: 7,   emoji: '⚡', label: '1-Week Warrior',    color: GOLD   },
@@ -31,13 +36,11 @@ const MILESTONES = [
   { days: 365, emoji: '🌟', label: '1-Year Immortal',   color: '#B280FF' },
 ];
 
-// ── PARTNER INFO ──────────────────────────────────────────────
 interface PartnerInfo {
   partner_id: string; full_name: string; calfit_id: string;
   avatar_url: string | null; streak_count: number;
 }
 
-// ── DAY DOT ROW ───────────────────────────────────────────────
 function DayDots({ streak, theme }: { streak: number; theme: typeof colors.dark }) {
   const today = new Date();
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -46,16 +49,12 @@ function DayDots({ streak, theme }: { streak: number; theme: typeof colors.dark 
     const active  = streak > 0 && i >= 7 - Math.min(streak, 7);
     return { label: d.toLocaleDateString('en', { weekday: 'short' }).slice(0, 2), active, isToday };
   });
-
   const ringColors = [ORANGE, GOLD, PINK, BLUE, GREEN, '#60A5FA', '#B280FF'];
-
   return (
     <View style={dd.row}>
       {days.map((d, i) => (
         <View key={i} style={dd.dayWrap}>
-          {d.active && d.isToday && (
-            <Text style={dd.fireAbove}>🔥</Text>
-          )}
+          {d.active && d.isToday && <Text style={dd.fireAbove}>🔥</Text>}
           <View style={[dd.dot, {
             backgroundColor: d.active ? ringColors[i] : theme.border,
             borderColor:     d.isToday ? ringColors[i] : 'transparent',
@@ -77,7 +76,6 @@ const dd = StyleSheet.create({
   label:   { fontSize: 10, fontWeight: '700' },
 });
 
-// ── PARTNER STREAK CARD ───────────────────────────────────────
 function PartnerCard({ partner, theme }: { partner: PartnerInfo; theme: typeof colors.dark }) {
   const pct = Math.min(partner.streak_count / 30, 1);
   return (
@@ -108,7 +106,6 @@ const pc = StyleSheet.create({
   badgeNum:   { fontSize: fontSize.base, fontWeight: '900', marginTop: 1 },
 });
 
-// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function StreaksScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
@@ -120,9 +117,10 @@ export default function StreaksScreen() {
   const alreadyChecked = (profile as any)?.last_active_date === today;
   const hasFreezeThisWeek = (profile as any)?.streak_freeze_used_week === today?.slice(0, 7);
 
-  const [partners, setPartners]       = useState<PartnerInfo[]>([]);
+  const [partners, setPartners]         = useState<PartnerInfo[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [milestone, setMilestone]       = useState<Milestone | null>(null);
 
   useFocusEffect(useCallback(() => {
     if (user?.id) loadPartners();
@@ -155,7 +153,14 @@ export default function StreaksScreen() {
         last_active_date: today,
       }).eq('id', user.id);
       updateProfile({ streak_count: newStreak, last_active_date: today } as any);
-      Alert.alert('Streak extended! 🔥', `You're on a ${newStreak}-day streak. Keep it up!`);
+
+      // ── Check for milestone celebration ──
+      const hit = checkStreakMilestone(newStreak);
+      if (hit) {
+        setMilestone(hit);
+      } else {
+        Alert.alert('Streak extended! 🔥', `You're on a ${newStreak}-day streak. Keep it up!`);
+      }
     } catch {
       Alert.alert('Error', 'Could not check in. Please try again.');
     } finally {
@@ -191,8 +196,6 @@ export default function StreaksScreen() {
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-
-      {/* ── GRADIENT HEADER ── */}
       <LinearGradient
         colors={[ORANGE + 'EE', '#FF4500CC'] as [string, string]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -218,14 +221,12 @@ export default function StreaksScreen() {
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={ORANGE} colors={[ORANGE]} />}
       >
-
         {/* ── STREAK HERO CARD ── */}
         <LinearGradient
           colors={[ORANGE + '22', GOLD + '11'] as [string, string]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={[styles.heroCard, { borderColor: ORANGE + '40' }]}
         >
-          {/* Big streak number */}
           <View style={styles.heroTop}>
             <View style={styles.heroLeft}>
               <Text style={styles.heroFire}>🔥</Text>
@@ -243,11 +244,7 @@ export default function StreaksScreen() {
               </View>
             )}
           </View>
-
-          {/* Day dots */}
           <DayDots streak={streak} theme={theme} />
-
-          {/* Check-in button */}
           <TouchableOpacity
             onPress={handleCheckIn}
             disabled={alreadyChecked || isCheckingIn}
@@ -272,7 +269,6 @@ export default function StreaksScreen() {
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Milestone Badges</Text>
           <Text style={[styles.sectionSub, { color: theme.textMuted }]}>Earn by maintaining your streak</Text>
         </View>
-
         <View style={styles.badgesGrid}>
           {MILESTONES.map((m) => {
             const earned = streak >= m.days;
@@ -283,12 +279,8 @@ export default function StreaksScreen() {
                 opacity: earned ? 1 : 0.5,
               }]}>
                 <Text style={styles.badgeEmoji}>{m.emoji}</Text>
-                <Text style={[styles.badgeLabel, { color: earned ? m.color : theme.textMuted }]} numberOfLines={1}>
-                  {m.label}
-                </Text>
-                <Text style={[styles.badgeDays, { color: earned ? m.color : theme.textMuted }]}>
-                  {m.days}d
-                </Text>
+                <Text style={[styles.badgeLabel, { color: earned ? m.color : theme.textMuted }]} numberOfLines={1}>{m.label}</Text>
+                <Text style={[styles.badgeDays, { color: earned ? m.color : theme.textMuted }]}>{m.days}d</Text>
                 {earned && (
                   <View style={[styles.badgeEarnedPill, { backgroundColor: m.color }]}>
                     <Text style={styles.badgeEarnedText}>✓</Text>
@@ -331,6 +323,12 @@ export default function StreaksScreen() {
 
         <View style={{ height: 80 }} />
       </ScrollView>
+
+      {/* ── MILESTONE CELEBRATION MODAL ── */}
+      <MilestoneCelebration
+        milestone={milestone}
+        onDismiss={() => setMilestone(null)}
+      />
     </AndroidSafeView>
   );
 }

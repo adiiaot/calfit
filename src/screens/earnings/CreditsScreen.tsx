@@ -13,6 +13,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
+import { WithdrawalHistory } from '../../components/WithdrawalHistory';
 
 export default function CreditsScreen() {
   const navigation = useNavigation<any>();
@@ -31,7 +32,6 @@ export default function CreditsScreen() {
 
   const referralCode = profile?.referral_code ?? user?.id?.slice(0, 8) ?? 'calfit';
   const inviteLink   = `https://calfit.app/ref/${referralCode}`;
-  // Every user gets an invite code — short uppercase version of their referral code
   const inviteCode   = referralCode.toUpperCase().replace(/-/g, '').slice(0, 8);
 
   useFocusEffect(useCallback(() => { loadData(); }, [user?.id]));
@@ -97,14 +97,13 @@ export default function CreditsScreen() {
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
 
-      {/* Back button */}
-            <TouchableOpacity
-              onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Settings' }] })}
-              style={styles.backBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-            </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Settings' }] })}
+        style={styles.backBtn}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+      </TouchableOpacity>
 
       <View style={styles.header}>
         <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Credits & Earnings</Text>
@@ -113,13 +112,11 @@ export default function CreditsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
-        {/* ── 1. INCOME EARNED (shown first per corrections) ── */}
+        {/* ── 1. INCOME EARNED ── */}
         <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.incomeHero}>
           <Text style={styles.incomeHeroLabel}>💰 Wallet Balance</Text>
           <Text style={styles.incomeHeroBig}>${walletBalance.toFixed(2)}</Text>
           <Text style={styles.incomeHeroSub}>Available for withdrawal</Text>
-
-          {/* Earnings breakdown */}
           <View style={styles.earningsGrid}>
             {[
               { label: '30-day earnings', value: `$${earned30d.toFixed(2)}`, color: '#FFB830' },
@@ -131,8 +128,6 @@ export default function CreditsScreen() {
               </View>
             ))}
           </View>
-
-          {/* Referral stats */}
           <View style={styles.refStatsRow}>
             {[
               { label: 'Total invited', val: referralStats.total, color: '#fff' },
@@ -145,7 +140,6 @@ export default function CreditsScreen() {
               </View>
             ))}
           </View>
-
           <TouchableOpacity onPress={handleWithdraw} activeOpacity={0.85} style={styles.withdrawBtnWrap}>
             <LinearGradient
               colors={walletBalance >= 10 ? [theme.gradStart, theme.gradMid] as [string, string] : ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.10)'] as [string, string]}
@@ -165,8 +159,6 @@ export default function CreditsScreen() {
           <Text style={[styles.cardSub, { color: theme.textSecondary }]}>
             Share your code or link — earn 15% of their subscription for 5 years + 5 points per signup
           </Text>
-
-          {/* Invite CODE — prominently displayed */}
           <View style={[styles.inviteCodeBox, { backgroundColor: theme.heroCard, borderColor: theme.accent + '44' }]}>
             <View>
               <Text style={styles.inviteCodeLabel}>Your Invite Code</Text>
@@ -179,8 +171,6 @@ export default function CreditsScreen() {
                 : <Ionicons name="copy-outline" size={18} color="#fff" />}
             </TouchableOpacity>
           </View>
-
-          {/* Invite LINK */}
           <Text style={[styles.linkLabel, { color: theme.textMuted }]}>Your invite link</Text>
           <View style={[styles.inviteLink, { backgroundColor: theme.bg, borderColor: theme.border }]}>
             <Text style={[styles.inviteLinkText, { color: theme.textPrimary }]} numberOfLines={1}>{inviteLink}</Text>
@@ -190,16 +180,12 @@ export default function CreditsScreen() {
                 : <Ionicons name="copy-outline" size={20} color={theme.accent} />}
             </TouchableOpacity>
           </View>
-
-          {/* Share button */}
           <TouchableOpacity onPress={handleShare} activeOpacity={0.85} style={styles.shareBtnWrap}>
             <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.shareBtn}>
               <Ionicons name="share-social-outline" size={18} color="#fff" />
               <Text style={styles.shareBtnText}>Share Your Invite</Text>
             </LinearGradient>
           </TouchableOpacity>
-
-          {/* How it works */}
           <View style={[styles.howItWorks, { backgroundColor: theme.bg, borderColor: theme.border }]}>
             <Text style={[styles.howTitle, { color: theme.textPrimary }]}>How it works</Text>
             {[
@@ -215,7 +201,7 @@ export default function CreditsScreen() {
           </View>
         </View>
 
-        {/* ── 3. CALFIT POINTS (shown below income per corrections) ── */}
+        {/* ── 3. CALFIT POINTS ── */}
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.pointsHeader}>
             <View>
@@ -227,8 +213,6 @@ export default function CreditsScreen() {
               <Text style={[styles.pointsBadgeVal, { color: '#FFB830' }]}>{points}</Text>
             </View>
           </View>
-
-          {/* Earn points options */}
           <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Earn Points</Text>
           {[
             { label: 'Daily login',          points: '+1 pt',   icon: 'calendar-outline',        color: theme.accent },
@@ -247,8 +231,6 @@ export default function CreditsScreen() {
               </View>
             </View>
           ))}
-
-          {/* Spend points */}
           <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: spacing.md }]}>Spend Points</Text>
           {[
             { label: 'Extra AI Coach prompts (5)',  cost: 10, icon: 'chatbubble-ellipses-outline', color: theme.accent },
@@ -266,7 +248,6 @@ export default function CreditsScreen() {
               </TouchableOpacity>
             </View>
           ))}
-
           <TouchableOpacity onPress={() => navigation.navigate('PurchaseCredits')}
             style={[styles.buyMoreBtn, { backgroundColor: '#FFB830' + '15', borderColor: '#FFB830' }]}>
             <Text style={styles.pointsStar}>✦</Text>
@@ -298,6 +279,9 @@ export default function CreditsScreen() {
           ))}
         </View>
 
+        {/* ── 5. WITHDRAWAL HISTORY ── */}
+        <WithdrawalHistory userId={user?.id ?? ''} theme={theme} />
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </AndroidSafeView>
@@ -311,8 +295,6 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
   pageSub: { fontSize: fontSize.xs, marginTop: 2 },
   scrollContent: { paddingBottom: 80 },
-
-  // Income hero
   incomeHero: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.lg, borderRadius: 20 },
   incomeHeroLabel: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.60)', fontWeight: '600', marginBottom: 4 },
   incomeHeroBig: { fontSize: 48, fontWeight: '900', color: '#fff', lineHeight: 52 },
@@ -328,38 +310,26 @@ const styles = StyleSheet.create({
   withdrawBtnWrap: { borderRadius: 14, overflow: 'hidden' },
   withdrawBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
   withdrawBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-
-  // Card
   card: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.lg, borderRadius: 20, borderWidth: 1 },
   cardTitle: { fontSize: fontSize.lg, fontWeight: '800', marginBottom: 4 },
   cardSub: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
   sectionLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
-
-  // Invite code
   inviteCodeBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderRadius: 16, borderWidth: 1, marginBottom: spacing.md },
   inviteCodeLabel: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.55)', marginBottom: 4 },
   inviteCode: { fontSize: 28, fontWeight: '900', color: '#fff', letterSpacing: 4 },
   copyCodeBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-
-  // Invite link
   linkLabel: { fontSize: fontSize.xs, fontWeight: '600', marginBottom: 6 },
   inviteLink: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: 12, borderWidth: 1, marginBottom: spacing.sm },
   inviteLinkText: { flex: 1, fontSize: fontSize.sm },
   copyBtn: { paddingLeft: spacing.sm },
-
-  // Share button
   shareBtnWrap: { borderRadius: 12, overflow: 'hidden', marginBottom: spacing.md },
   shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
   shareBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-
-  // How it works
   howItWorks: { padding: spacing.md, borderRadius: 12, borderWidth: 1, gap: spacing.sm },
   howTitle: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: spacing.xs },
   howRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   howEmoji: { fontSize: 16, width: 24 },
   howText: { flex: 1, fontSize: fontSize.sm, lineHeight: 18 },
-
-  // Points
   pointsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md },
   pointsBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 99, borderWidth: 1 },
   pointsBadgeStar: { fontSize: 14, color: '#FFB830' },
@@ -375,8 +345,6 @@ const styles = StyleSheet.create({
   buyMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md, padding: spacing.md, borderRadius: 12, borderWidth: 1 },
   pointsStar: { fontSize: 16, color: '#FFB830' },
   buyMoreText: { fontSize: fontSize.base, fontWeight: '700' },
-
-  // Payout
   payoutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 0.5 },
   payoutIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   payoutLabel: { flex: 1, fontSize: fontSize.base, fontWeight: '600' },

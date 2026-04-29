@@ -22,6 +22,9 @@ import { getTodayCalories, getTodayWater, logWater } from '../../services/profil
 import { useSteps } from '../../hooks/useSteps';
 import { supabase } from '../../services/supabase';
 
+// ── NEW: Comeback Banner ──────────────────────────────────────
+import { ComebackBanner } from '../../components/ComebackBanner';
+
 const { width: SCREEN_W } = Dimensions.get('window');
 const SLIDE_GAP = 12;
 const SLIDE_W = SCREEN_W - spacing.lg * 2;
@@ -230,8 +233,6 @@ function StatsSlide({ theme, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs
 }
 
 // ── HERO CAROUSEL ─────────────────────────────────────────────
-// Auto-advances every 4s. User can swipe manually.
-// Streak stays fixed above — only calorie/macro/stats rotate.
 function HeroCarousel({ theme, consumed, goal, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs }: {
   theme: typeof colors.light;
   consumed: number; goal: number;
@@ -262,7 +263,7 @@ function HeroCarousel({ theme, consumed, goal, waterMl, waterGoalMl, liveSteps, 
   const handleMomentumEnd = (e: any) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / (SLIDE_W + SLIDE_GAP));
     setActiveIndex(index);
-    startTimer(); // reset after manual swipe
+    startTimer();
   };
 
   const renderSlide = ({ item }: { item: string }) => {
@@ -542,6 +543,9 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}
       >
+        {/* ── COMEBACK BANNER — only shows if inactive 2+ days ── */}
+        {user?.id && <ComebackBanner userId={user.id} theme={theme} />}
+
         {/* 1. Streak — fixed, always visible */}
         <StreakRow theme={theme} streakCount={streakCount} />
 
@@ -604,7 +608,6 @@ const styles = StyleSheet.create({
 
   // ── CAROUSEL ──
   carouselWrap: { marginBottom: spacing.md },
-  // Each slide is SLIDE_W wide — paginates cleanly
   slide: { borderRadius: radius.lg, padding: spacing.lg, overflow: 'hidden', minHeight: 175 },
   foodIllustrationWrap: { position: 'absolute', right: -40, top: -20, opacity: 0.85 },
   slideChip: { fontSize: fontSize.xs, fontWeight: '700', color: 'rgba(255,255,255,0.55)', marginBottom: 6, letterSpacing: 0.5 },

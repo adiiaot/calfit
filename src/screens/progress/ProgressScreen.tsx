@@ -11,6 +11,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
+import { MoodTrendChart } from '../../components/TrendCharts';
 
 const { width: SW } = Dimensions.get('window');
 const PINK   = '#FF6B9D';
@@ -22,7 +23,6 @@ const GREEN  = '#2DDC8C';
 
 type Period = 'Week' | 'Month' | '3 Months' | 'Year';
 
-// ── DATA LOADER ───────────────────────────────────────────────
 async function loadStats(userId: string, period: Period) {
   const days = period === 'Week' ? 7 : period === 'Month' ? 30 : period === '3 Months' ? 90 : 365;
   const since = new Date(); since.setDate(since.getDate() - days);
@@ -38,22 +38,21 @@ async function loadStats(userId: string, period: Period) {
     supabase.from('body_measurements').select('*').eq('user_id', userId).order('measured_at', { ascending: false }).limit(2),
   ]);
 
-  const foodData     = (food.data ?? []) as any[];
-  const workoutData  = (workouts.data ?? []) as any[];
-  const waterData    = (water.data ?? []) as any[];
-  const sleepData    = (sleep.data ?? []) as any[];
-  const stepsData    = (steps.data ?? []) as any[];
-  const p            = profile.data as any;
-  const measData     = (measurements.data ?? []) as any[];
+  const foodData    = (food.data ?? []) as any[];
+  const workoutData = (workouts.data ?? []) as any[];
+  const waterData   = (water.data ?? []) as any[];
+  const sleepData   = (sleep.data ?? []) as any[];
+  const stepsData   = (steps.data ?? []) as any[];
+  const p           = profile.data as any;
+  const measData    = (measurements.data ?? []) as any[];
 
-  const totalCal     = foodData.reduce((s:number,r:any)=>s+(r.calories??0),0);
-  const totalBurned  = workoutData.reduce((s:number,r:any)=>s+(r.calories_burned??0),0);
-  const totalWater   = waterData.reduce((s:number,r:any)=>s+(r.amount_ml??0),0);
-  const totalSteps   = stepsData.reduce((s:number,r:any)=>s+(r.steps??0),0);
-  const avgSleep     = sleepData.length > 0
+  const totalCal    = foodData.reduce((s:number,r:any)=>s+(r.calories??0),0);
+  const totalBurned = workoutData.reduce((s:number,r:any)=>s+(r.calories_burned??0),0);
+  const totalWater  = waterData.reduce((s:number,r:any)=>s+(r.amount_ml??0),0);
+  const totalSteps  = stepsData.reduce((s:number,r:any)=>s+(r.steps??0),0);
+  const avgSleep    = sleepData.length > 0
     ? sleepData.reduce((s:number,r:any)=>s+(r.duration_hours??0),0)/sleepData.length : 0;
 
-  // Build daily calorie chart data
   const calorieByDay: Record<string, number> = {};
   foodData.forEach((r:any) => {
     const d = r.logged_at?.split('T')[0];
@@ -81,7 +80,6 @@ async function loadStats(userId: string, period: Period) {
   };
 }
 
-// ── MINI BAR CHART ────────────────────────────────────────────
 function MiniBarChart({ data, goal, theme }: {
   data: { label: string; calories: number }[];
   goal: number; theme: typeof colors.dark;
@@ -103,7 +101,6 @@ function MiniBarChart({ data, goal, theme }: {
           );
         })}
       </View>
-      {/* Goal line */}
       <View style={[chart.goalLine, { bottom: 18 + (goal/max)*80, borderColor: GOLD + '80' }]} />
     </View>
   );
@@ -117,7 +114,6 @@ const chart = StyleSheet.create({
   goalLine:{ position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed' },
 });
 
-// ── STAT CARD ─────────────────────────────────────────────────
 function StatCard({ icon, label, value, sub, color, theme }: {
   icon: string; label: string; value: string; sub?: string;
   color: string; theme: typeof colors.dark;
@@ -141,7 +137,6 @@ const sc = StyleSheet.create({
   sub:   { fontSize: fontSize.xs, fontWeight: '700', marginTop: 1 },
 });
 
-// ── SECTION HEADER ────────────────────────────────────────────
 function SectionHeader({ title, icon, color, theme, onPress, actionLabel }: {
   title: string; icon: string; color: string; theme: typeof colors.dark;
   onPress?: () => void; actionLabel?: string;
@@ -170,7 +165,6 @@ const sh = StyleSheet.create({
   action: { fontSize: fontSize.sm, fontWeight: '600' },
 });
 
-// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function ProgressScreen() {
   const navigation   = useNavigation<any>();
   const { colorScheme } = useThemeStore();
@@ -199,8 +193,6 @@ export default function ProgressScreen() {
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-
-      {/* ── GRADIENT HEADER ── */}
       <LinearGradient
         colors={[PURPLE + 'DD', PINK + 'CC'] as [string, string]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -219,7 +211,6 @@ export default function ProgressScreen() {
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* ── PERIOD TABS ── */}
       <View style={[styles.periodTabs, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
         {PERIODS.map((p) => (
           <TouchableOpacity
@@ -304,6 +295,13 @@ export default function ProgressScreen() {
               <MiniBarChart data={data.chartDays} goal={data.calorieGoal} theme={theme} />
             </View>
           </>
+        )}
+
+        {/* ── MOOD TRENDS ── */}
+        {user?.id && (
+          <View style={{ marginHorizontal: spacing.lg, marginTop: spacing.lg }}>
+            <MoodTrendChart userId={user.id} theme={theme} />
+          </View>
         )}
 
         {/* ── STATS GRID ── */}

@@ -1,7 +1,16 @@
 import {
-  View, Text, StyleSheet,
-  ScrollView, TouchableOpacity, ActivityIndicator,
-  RefreshControl, Modal,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,10 +26,15 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { LeaderboardCategory } from '../services/LeaderboardService';
 import { AndroidSafeView } from '../../shared/AndriodSafeView';
 import { UserAvatar } from '../../shared/UserAvatar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { checkAndNotifyRankUp } from '../../../services/Leaderboardnotificationservice';
+
+const GOLD   = '#FFD133';
+const PURPLE = '#B280FF';
+const PINK   = '#FF6B9D';
 
 type Tab = 'Global' | 'Friends';
 
-// CHANGED: 6 categories — added Steps and Calorie Consistency
 const CATEGORIES: { value: LeaderboardCategory; label: string; icon: string; description: string }[] = [
   { value: 'overall',            label: 'Overall Activity', icon: 'trophy-outline',    description: 'Streaks + meals + water + fasting + referrals' },
   { value: 'streaks',            label: 'Streaks',          icon: 'flame-outline',     description: 'Longest active streaks' },
@@ -30,8 +44,6 @@ const CATEGORIES: { value: LeaderboardCategory; label: string; icon: string; des
   { value: 'calorie_consistency',label: 'Calorie Goals',    icon: 'checkmark-circle-outline', description: 'Most consistent calorie goal hitters (top 10)' },
 ];
 
-// ── DROPDOWN SELECTOR ─────────────────────────────────────────
-// CHANGED: Replaces horizontal scroll pills with a compact dropdown
 function CategoryDropdown({
   theme,
   activeCategory,
@@ -46,59 +58,40 @@ function CategoryDropdown({
 
   return (
     <View style={styles.dropdownWrap}>
-      {/* Trigger button */}
       <TouchableOpacity
         onPress={() => setOpen(true)}
-        style={[styles.dropdownTrigger, { backgroundColor: theme.card, borderColor: theme.accent }]}
+        style={[styles.dropdownTrigger, { backgroundColor: theme.card, borderColor: PURPLE }]}
         activeOpacity={0.8}
       >
-        <Ionicons name={active.icon as any} size={16} color={theme.accent} />
-        <Text style={[styles.dropdownTriggerText, { color: theme.accent }]}>
+        <Ionicons name={active.icon as any} size={16} color={PURPLE} />
+        <Text style={[styles.dropdownTriggerText, { color: PURPLE }]}>
           {active.label}
         </Text>
-        <Ionicons name="chevron-down" size={16} color={theme.accent} />
+        <Ionicons name="chevron-down" size={16} color={PURPLE} />
       </TouchableOpacity>
 
-      {/* Modal dropdown */}
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => setOpen(false)}
-        >
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setOpen(false)}>
           <View style={[styles.dropdownMenu, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Text style={[styles.dropdownMenuTitle, { color: theme.textSecondary }]}>
-              Select Leaderboard
-            </Text>
+            <Text style={[styles.dropdownMenuTitle, { color: theme.textSecondary }]}>Select Leaderboard</Text>
             {CATEGORIES.map((cat) => {
               const isActive = cat.value === activeCategory;
               return (
                 <TouchableOpacity
                   key={cat.value}
                   onPress={() => { onSelect(cat.value); setOpen(false); }}
-                  style={[
-                    styles.dropdownItem,
-                    { borderBottomColor: theme.border },
-                    isActive && { backgroundColor: theme.accentDim as string },
-                  ]}
+                  style={[styles.dropdownItem, { borderBottomColor: theme.border }, isActive && { backgroundColor: PURPLE + '15' }]}
                 >
-                  <View style={[styles.dropdownItemIcon, { backgroundColor: isActive ? theme.accent : theme.border + '40' }]}>
-                    <Ionicons name={cat.icon as any} size={16} color={isActive ? theme.bg : theme.textMuted} />
+                  <View style={[styles.dropdownItemIcon, { backgroundColor: isActive ? PURPLE : theme.border + '40' }]}>
+                    <Ionicons name={cat.icon as any} size={16} color={isActive ? '#fff' : theme.textMuted} />
                   </View>
                   <View style={styles.dropdownItemText}>
-                    <Text style={[styles.dropdownItemLabel, { color: isActive ? theme.accent : theme.textPrimary, fontWeight: isActive ? '700' : '500' }]}>
+                    <Text style={[styles.dropdownItemLabel, { color: isActive ? PURPLE : theme.textPrimary, fontWeight: isActive ? '700' : '500' }]}>
                       {cat.label}
                     </Text>
-                    <Text style={[styles.dropdownItemDesc, { color: theme.textMuted }]}>
-                      {cat.description}
-                    </Text>
+                    <Text style={[styles.dropdownItemDesc, { color: theme.textMuted }]}>{cat.description}</Text>
                   </View>
-                  {isActive && <Ionicons name="checkmark" size={18} color={theme.accent} />}
+                  {isActive && <Ionicons name="checkmark" size={18} color={PURPLE} />}
                 </TouchableOpacity>
               );
             })}
@@ -109,19 +102,8 @@ function CategoryDropdown({
   );
 }
 
-// ── CALORIE CONSISTENCY ROW ───────────────────────────────────
-// CHANGED: Calorie consistency leaderboard hides numbers — shows only rank + name
-function CalorieConsistencyRow({
-  entry,
-  theme,
-  onPress,
-}: {
-  entry: any;
-  theme: typeof colors.dark;
-  onPress: () => void;
-}) {
+function CalorieConsistencyRow({ entry, theme, onPress }: { entry: any; theme: typeof colors.dark; onPress: () => void; }) {
   const medals: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
-
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -135,9 +117,7 @@ function CalorieConsistencyRow({
         <Text style={styles.medal}>{medals[entry.rank]}</Text>
       ) : (
         <View style={[styles.rankBadge, { borderColor: theme.border }]}>
-          <Text style={[styles.rankBadgeText, { color: theme.textSecondary }]}>
-            {entry.rank}
-          </Text>
+          <Text style={[styles.rankBadgeText, { color: theme.textSecondary }]}>{entry.rank}</Text>
         </View>
       )}
       <UserAvatar uri={entry.avatar_url} name={entry.full_name} size={40} theme={theme} />
@@ -148,7 +128,6 @@ function CalorieConsistencyRow({
         </Text>
         <Text style={[styles.rowHandle, { color: theme.textMuted }]}>@{entry.calfit_id}</Text>
       </View>
-      {/* CHANGED: No number shown — only the consistency badge */}
       <View style={[styles.scoreWrap, { backgroundColor: theme.accent + '18' }]}>
         <Ionicons name="checkmark-circle" size={20} color={theme.accent} />
         <Text style={[styles.scoreLabel, { color: theme.textMuted }]}>consistent</Text>
@@ -157,7 +136,6 @@ function CalorieConsistencyRow({
   );
 }
 
-// ── MAIN SCREEN ───────────────────────────────────────────────
 export default function LeaderboardScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
@@ -181,41 +159,45 @@ export default function LeaderboardScreen() {
   const myEntry = entries.find((e) => e.isCurrentUser);
   const isCalorieConsistency = activeCategory === 'calorie_consistency';
 
-  // Score label for MyRankCard
-  const scoreLabel = {
-    overall:            'Activity Score',
-    streaks:            'Day Streak',
-    workouts:           'Workouts',
-    referrals:          'Referrals',
-    steps:              'Total Steps',
-    calorie_consistency:'Consistent Days',
-  }[activeCategory];
+  // ── Rank-up notification — fires when rank data loads ──
+  useFocusEffect(useCallback(() => {
+    if (myRank && user?.id) {
+      checkAndNotifyRankUp(user.id, myRank, activeCategory).catch(() => {});
+    }
+  }, [myRank, user?.id, activeCategory]));
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
+      {/* ── GRADIENT HEADER ── */}
+      <LinearGradient
+        colors={[PURPLE + 'EE', PINK + 'CC'] as [string, string]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Leaderboard</Text>
-        <View style={{ width: 26 }} />
-      </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Leaderboard</Text>
+          <Text style={styles.headerSub}>See how you rank this week</Text>
+        </View>
+        <View style={[styles.rankPill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+          <Text style={styles.rankPillText}>#{myRank > 0 ? myRank : '—'}</Text>
+          <Text style={styles.rankPillSub}>Your rank</Text>
+        </View>
+      </LinearGradient>
 
-      {/* Global / Friends tab toggle */}
+      {/* ── GLOBAL / FRIENDS TOGGLE ── */}
       <View style={[styles.tabToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {(['Global', 'Friends'] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             onPress={() => setActiveTab(tab)}
-            style={[styles.tabBtn, activeTab === tab && { backgroundColor: theme.accent }]}
+            style={[styles.tabBtn, activeTab === tab && { backgroundColor: PURPLE }]}
           >
             <Text style={[styles.tabBtnText, {
-              color: activeTab === tab ? theme.bg : theme.textMuted,
+              color: activeTab === tab ? '#fff' : theme.textMuted,
               fontWeight: activeTab === tab ? '700' : '400',
             }]}>
               {tab}
@@ -224,28 +206,21 @@ export default function LeaderboardScreen() {
         ))}
       </View>
 
-      {/* CHANGED: Dropdown replaces horizontal scroll pills */}
-      <CategoryDropdown
-        theme={theme}
-        activeCategory={activeCategory}
-        onSelect={changeCategory}
-      />
+      <CategoryDropdown theme={theme} activeCategory={activeCategory} onSelect={changeCategory} />
 
-      {/* Calorie consistency notice */}
       {isCalorieConsistency && (
-        <View style={[styles.noticeBar, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-          <Ionicons name="information-circle-outline" size={14} color={theme.accent} />
-          <Text style={[styles.noticeText, { color: theme.accent }]}>
+        <View style={[styles.noticeBar, { backgroundColor: PURPLE + '18', borderColor: PURPLE + '44' }]}>
+          <Ionicons name="information-circle-outline" size={14} color={PURPLE} />
+          <Text style={[styles.noticeText, { color: PURPLE }]}>
             Top 10 most consistent calorie goal hitters · Numbers hidden
           </Text>
         </View>
       )}
 
-      {/* Reset notice */}
       {!isCalorieConsistency && (
-        <View style={[styles.resetNotice, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-          <Ionicons name="refresh-outline" size={12} color={theme.accent} />
-          <Text style={[styles.resetText, { color: theme.accent }]}>
+        <View style={[styles.resetNotice, { backgroundColor: PURPLE + '12', borderColor: PURPLE + '33' }]}>
+          <Ionicons name="refresh-outline" size={12} color={PURPLE} />
+          <Text style={[styles.resetText, { color: PURPLE }]}>
             Resets every Monday · Overall tracks all app activity
           </Text>
         </View>
@@ -259,14 +234,6 @@ export default function LeaderboardScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={refresh}
-              tintColor={theme.accent}
-              colors={[theme.accent]}
-            />
-          }
         >
           {myEntry && !isCalorieConsistency && (
             <MyRankCard
@@ -318,118 +285,39 @@ export default function LeaderboardScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  title: { fontSize: fontSize.lg, fontWeight: '700' },
 
-  tabToggle: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 4,
-    gap: 4,
-  },
+  // ── GRADIENT HEADER ──
+  header:      { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
+  backBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
+  headerSub:   { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
+  rankPill:    { alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.lg },
+  rankPillText:{ fontSize: fontSize.xl, fontWeight: '900', color: '#fff' },
+  rankPillSub: { fontSize: 9, color: 'rgba(255,255,255,0.70)', fontWeight: '600', marginTop: 1 },
+
+  tabToggle: { flexDirection: 'row', marginHorizontal: spacing.lg, marginVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1, padding: 4, gap: 4 },
   tabBtn: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.sm, alignItems: 'center' },
   tabBtnText: { fontSize: fontSize.base },
-
-  // ── DROPDOWN ──
-  dropdownWrap: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  dropdownTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-  },
+  dropdownWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+  dropdownTrigger: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderRadius: radius.md, borderWidth: 1.5 },
   dropdownTriggerText: { flex: 1, fontSize: fontSize.base, fontWeight: '700' },
-  dropdownOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  dropdownMenu: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  dropdownMenuTitle: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    padding: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderBottomWidth: 0.5,
-  },
-  dropdownItemIcon: {
-    width: 34, height: 34, borderRadius: 17,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  dropdownOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: spacing.lg },
+  dropdownMenu: { borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
+  dropdownMenuTitle: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, padding: spacing.md, paddingBottom: spacing.sm },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderBottomWidth: 0.5 },
+  dropdownItemIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   dropdownItemText: { flex: 1 },
   dropdownItemLabel: { fontSize: fontSize.base },
   dropdownItemDesc: { fontSize: fontSize.xs, marginTop: 1 },
-
-  noticeBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-  },
+  noticeBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1 },
   noticeText: { fontSize: fontSize.xs, fontWeight: '600', flex: 1 },
-  resetNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-  },
+  resetNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1 },
   resetText: { fontSize: fontSize.xs, fontWeight: '600' },
-
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { paddingBottom: 120, paddingTop: spacing.sm },
-
-  // Shared row styles
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
   medal: { fontSize: 28, width: 36, textAlign: 'center' },
-  rankBadge: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
-  },
+  rankBadge: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   rankBadgeText: { fontSize: fontSize.base, fontWeight: '700' },
   rowInfo: { flex: 1 },
   rowName: { fontSize: fontSize.base, fontWeight: '700' },

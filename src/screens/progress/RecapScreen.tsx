@@ -86,6 +86,17 @@ interface RecapData {
 }
 
 // ── LOAD RECAP DATA ───────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// RecapScreen.tsx — SURGICAL FIX
+// Replace only the loadRecapData function (lines ~55–110 approx).
+// Everything else in the file stays exactly the same.
+//
+// BUGS FIXED (same as ProgressScreen):
+//   1. workout_logs  → workout_sessions  (wrong table — no data returned)
+//   2. duration_hours → hours            (wrong column — sleep always 0)
+//   3. exercise_name  → w.name           (wrong field — topWorkout always null)
+// ─────────────────────────────────────────────────────────────────
+
 async function loadRecapData(userId: string, type: RecapType): Promise<RecapData> {
   const now = new Date();
   let startDate: string;
@@ -107,39 +118,54 @@ async function loadRecapData(userId: string, type: RecapType): Promise<RecapData
   const [foodRes, waterRes, workoutRes, profileRes, stepsRes, sleepRes] = await Promise.all([
     supabase.from('food_logs').select('calories').eq('user_id', userId).gte('logged_at', startDate),
     supabase.from('water_logs').select('amount_ml').eq('user_id', userId).gte('logged_at', startDate),
-    supabase.from('workout_logs').select('calories_burned, exercise_name').eq('user_id', userId).gte('completed_at', startDate),
+    // FIX 1: correct table is workout_sessions, not workout_logs
+    supabase.from('workout_sessions')
+      .select('calories_burned, name, exercises')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .gte('completed_at', startDate),
     supabase.from('profiles').select('daily_calorie_goal, water_goal_ml, streak_count').eq('id', userId).single(),
     supabase.from('step_logs').select('steps').eq('user_id', userId).gte('date', startDate),
-    supabase.from('sleep_logs').select('duration_hours').eq('user_id', userId).gte('date', startDate),
+    // FIX 2: correct column is `hours`, not `duration_hours`
+    supabase.from('sleep_logs').select('hours').eq('user_id', userId).gte('date', startDate),
   ]);
 
-  const foods    = (foodRes.data ?? []) as any[];
-  const waters   = (waterRes.data ?? []) as any[];
+  const foods    = (foodRes.data    ?? []) as any[];
+  const waters   = (waterRes.data   ?? []) as any[];
   const workouts = (workoutRes.data ?? []) as any[];
   const profile  = profileRes.data as any;
-  const steps    = (stepsRes.data ?? []) as any[];
-  const sleeps   = (sleepRes.data ?? []) as any[];
+  const steps    = (stepsRes.data   ?? []) as any[];
+  const sleeps   = (sleepRes.data   ?? []) as any[];
 
   const caloriesConsumed = foods.reduce((s: number, r: any) => s + (r.calories ?? 0), 0);
   const waterMl          = waters.reduce((s: number, r: any) => s + (r.amount_ml ?? 0), 0);
   const caloriesBurned   = workouts.reduce((s: number, r: any) => s + (r.calories_burned ?? 0), 0);
   const stepsTotal       = steps.reduce((s: number, r: any) => s + (r.steps ?? 0), 0);
-  const sleepAvg         = sleeps.length > 0
-    ? sleeps.reduce((s: number, r: any) => s + (r.duration_hours ?? 0), 0) / sleeps.length
+  // FIX 2 continued: use `hours` not `duration_hours`
+  const sleepAvg = sleeps.length > 0
+    ? sleeps.reduce((s: number, r: any) => s + (r.hours ?? 0), 0) / sleeps.length
     : 0;
 
-  // Find most common workout
+  // FIX 3: workout_sessions uses `name` field, not `exercise_name`
+  // Also count sessions by name to find the most-done workout type
   const wCounts: Record<string, number> = {};
-  workouts.forEach((w: any) => { if (w.exercise_name) wCounts[w.exercise_name] = (wCounts[w.exercise_name] ?? 0) + 1; });
+  workouts.forEach((w: any) => {
+    if (w.name) wCounts[w.name] = (wCounts[w.name] ?? 0) + 1;
+  });
   const topWorkout = Object.keys(wCounts).sort((a, b) => wCounts[b] - wCounts[a])[0] ?? null;
 
   return {
-    caloriesConsumed, calorieGoal: profile?.daily_calorie_goal ?? 2000,
-    waterMl, waterGoalMl: profile?.water_goal_ml ?? 2500,
-    workoutsDone: workouts.length, caloriesBurned,
-    streakCount: profile?.streak_count ?? 0,
-    daysTracked: type === 'daily' ? 1 : type === 'weekly' ? 7 : 30,
-    topWorkout, periodLabel, stepsTotal,
+    caloriesConsumed,
+    calorieGoal:  profile?.daily_calorie_goal ?? 2000,
+    waterMl,
+    waterGoalMl:  profile?.water_goal_ml ?? 2500,
+    workoutsDone: workouts.length,
+    caloriesBurned,
+    streakCount:  profile?.streak_count ?? 0,
+    daysTracked:  type === 'daily' ? 1 : type === 'weekly' ? 7 : 30,
+    topWorkout,
+    periodLabel,
+    stepsTotal,
     sleepAvg: Math.round(sleepAvg * 10) / 10,
   };
 }

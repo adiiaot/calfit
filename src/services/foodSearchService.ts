@@ -55,7 +55,7 @@ export const searchFoods = async (query: string): Promise<FoodResult[]> => {
 };
 
 // ── LOCAL NIGERIAN FOOD DATABASE ──────────────────────────────
-const NIGERIAN_FOODS: FoodResult[] = [
+export const NIGERIAN_FOODS: FoodResult[] = [
   { id: 'ng_1',  name: 'Jollof Rice',       brand: 'Nigerian',  calories: 180, protein: 4,  carbs: 35, fat: 4,  servingSize: '1 cup (200g)' },
   { id: 'ng_2',  name: 'Egusi Soup',         brand: 'Nigerian',  calories: 320, protein: 14, carbs: 8,  fat: 26, servingSize: '1 bowl (250g)' },
   { id: 'ng_3',  name: 'Pounded Yam',        brand: 'Nigerian',  calories: 200, protein: 2,  carbs: 47, fat: 0,  servingSize: '1 wrap (200g)' },

@@ -10,62 +10,32 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../services/supabase';
 
-// ── WHY STEPS RESET TO 0 ON LOGIN ────────────────────────────
-// The old hook called getTodaySteps() which reads from the HARDWARE
-// pedometer (Expo Pedometer.getStepCountAsync). The pedometer gives
-// steps since midnight on the DEVICE — it does not persist across
-// app restarts beyond the OS. More critically, when a user logs
-// back in, the hook re-initialises and only adds DELTA steps from
-// that point forward, losing any steps already taken today.
-//
-// FIX: On init, load today's saved steps from Supabase first.
-// Then subscribe to the live pedometer. Track the delta between
-// where the pedometer starts and where it ends, and add that delta
-// to the Supabase baseline. This means steps always accumulate
-// correctly across sessions and login/logouts.
-//
-// ── WHY STEPS DON'T SYNC BETWEEN HOME AND ACTIVITY ───────────
-// Both HomeScreen and ActivityScreen called useSteps() independently,
-// creating two separate hook instances with separate state. They both
-// read from Supabase on init but then diverge as live pedometer
-// deltas are tracked per-instance.
-//
-// FIX: Steps are now written into Zustand (authStore) so any screen
-// reading `useAuthStore().liveSteps` gets the same live value.
-// useSteps() is the single source of truth — it updates Zustand.
-// All other screens just read from Zustand, not the hook directly.
-
 export function useSteps(goalSteps = 10000) {
-  const { user, profile, setLiveSteps } = useAuthStore();
-  const [steps, setStepsLocal]          = useState(0);
-  const [isAvailable, setIsAvailable]   = useState(false);
+  const { user, setLiveSteps } = useAuthStore();
+  const [steps, setStepsLocal]            = useState(0);
+  const [isAvailable, setIsAvailable]     = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
-  const [isLoading, setIsLoading]       = useState(true);
+  const [isLoading, setIsLoading]         = useState(true);
 
-  const unsubscribeRef    = useRef<(() => void) | null>(null);
-  const saveTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pedometerBaseRef  = useRef<number | null>(null);
-  const supabaseBaseRef   = useRef<number>(0);
-  const goalNotifiedRef   = useRef(false);
+  const unsubscribeRef   = useRef<(() => void) | null>(null);
+  const saveTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pedometerBaseRef = useRef<number | null>(null);
+  const supabaseBaseRef  = useRef<number>(0);
+  const goalNotifiedRef  = useRef(false);
 
-  const trackingEnabled =
-    (profile as any)?.tracking_preferences?.includes('Steps') ?? false;
-
-  // Sync steps to Zustand whenever local steps value changes.
-  // We do this in a useEffect, NOT inside the state setter, because
-  // calling setLiveSteps() inside a setState callback triggers a
-  // "Cannot update a component while rendering a different component" error.
+  // ── Sync to Zustand AFTER render (not during setState callback) ──
+  // Ensures HomeScreen + ActivityScreen always show the same value.
   useEffect(() => {
     if (setLiveSteps) setLiveSteps(steps);
   }, [steps]);
 
-  // Simple alias — just updates local state
-  const setSteps = setStepsLocal;
-
+  // Removed trackingEnabled from deps — steps should ALWAYS be tracked.
+  // tracking_preferences only controls whether the Steps CARD shows on Home,
+  // not whether the pedometer runs.
   useEffect(() => {
     init();
     return cleanup;
-  }, [trackingEnabled, user?.id]);
+  }, [user?.id]);
 
   const cleanup = () => {
     if (unsubscribeRef.current) unsubscribeRef.current();
@@ -79,10 +49,10 @@ export function useSteps(goalSteps = 10000) {
     const available = await isPedometerAvailable();
     setIsAvailable(available);
 
-    if (!available || !trackingEnabled) {
+    if (!available) {
       if (user?.id) {
         const saved = await loadSavedSteps(user.id);
-        setSteps(saved);
+        setStepsLocal(saved);
         supabaseBaseRef.current = saved;
       }
       setIsLoading(false);
@@ -93,20 +63,22 @@ export function useSteps(goalSteps = 10000) {
     setHasPermission(granted);
 
     if (!granted) {
+      if (user?.id) {
+        const saved = await loadSavedSteps(user.id);
+        setStepsLocal(saved);
+        supabaseBaseRef.current = saved;
+      }
       setIsLoading(false);
       return;
     }
 
-    // Step 1: Load today's baseline from Supabase
     const savedBase = user?.id ? await loadSavedSteps(user.id) : 0;
     supabaseBaseRef.current = savedBase;
-    setSteps(savedBase);
+    setStepsLocal(savedBase);
 
-    // Step 2: Get current pedometer reading as session base
     const pedometerNow = await getTodaySteps();
     pedometerBaseRef.current = pedometerNow;
 
-    // Step 3: Subscribe to live pedometer updates
     unsubscribeRef.current = subscribeToSteps(async (newPedometerSteps) => {
       if (pedometerBaseRef.current === null) {
         pedometerBaseRef.current = newPedometerSteps;
@@ -114,7 +86,7 @@ export function useSteps(goalSteps = 10000) {
       const sessionDelta = Math.max(0, newPedometerSteps - pedometerBaseRef.current);
       const totalToday   = supabaseBaseRef.current + sessionDelta;
 
-      setSteps(totalToday);
+      setStepsLocal(totalToday);
 
       if (user?.id && !goalNotifiedRef.current && totalToday >= goalSteps) {
         goalNotifiedRef.current = true;
@@ -130,7 +102,6 @@ export function useSteps(goalSteps = 10000) {
       }
     });
 
-    // Step 4: Save to Supabase every 5 minutes
     if (user?.id) {
       await saveStepsToSupabase(user.id, savedBase, goalSteps);
 
@@ -155,7 +126,6 @@ export function useSteps(goalSteps = 10000) {
   return { steps, calories, progress, percentage, isAvailable, hasPermission, isLoading, goalSteps };
 }
 
-// ── Load today's step count from Supabase ─────────────────────
 async function loadSavedSteps(userId: string): Promise<number> {
   try {
     const today = new Date().toISOString().split('T')[0];

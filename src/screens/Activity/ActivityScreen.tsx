@@ -9,6 +9,8 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
+  Image,
+  Animated,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import Svg, { Circle, Ellipse, Line, Path, Rect, G, Defs, RadialGradient, Stop } from 'react-native-svg';
@@ -137,6 +139,437 @@ function HistorySvg({ color }: { color: string }) {
   );
 }
 
+// ── EXERCISE DEMO MODAL ───────────────────────────────────────
+// Inlined to avoid import resolution issues.
+// Shows GIF + form tips when user taps the ▶ button on an exercise card.
+// ── EXERCISE ILLUSTRATIONS ────────────────────────────────────
+// Animated SVG stick-figure illustrations — no external URLs,
+// works offline, correct movement per exercise category.
+// Uses React Native's Animated API to loop the movement.
+
+function useLoopAnim(duration = 800) {
+  const anim = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration, useNativeDriver: false }),
+        Animated.timing(anim, { toValue: 0, duration, useNativeDriver: false }),
+      ])
+    ).start();
+    return () => anim.stopAnimation();
+  }, [duration]);
+  return anim;
+}
+
+// Squats / Legs — figure squats up and down
+function SquatIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(900);
+  const kneeAngle = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 28] });
+  const bodyY     = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
+  return (
+    <Animated.View style={{ transform: [{ translateY: bodyY as any }] }}>
+      <Svg width={120} height={160} viewBox="0 0 120 160">
+        {/* Head */}
+        <Circle cx="60" cy="28" r="14" fill={color} opacity={0.9} />
+        {/* Body */}
+        <Line x1="60" y1="42" x2="60" y2="88" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Arms */}
+        <Line x1="60" y1="55" x2="34" y2="72" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
+        <Line x1="60" y1="55" x2="86" y2="72" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
+        {/* Legs bent at knee */}
+        <Line x1="60" y1="88" x2="42" y2="116" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <Line x1="42" y1="116" x2="36" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <Line x1="60" y1="88" x2="78" y2="116" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <Line x1="78" y1="116" x2="84" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Feet */}
+        <Line x1="30" y1="148" x2="46" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="78" y1="148" x2="94" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// Push-ups / Chest — figure goes down and up horizontally
+function PushupIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(1000);
+  const bodyY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 20] });
+  return (
+    <Animated.View style={{ transform: [{ translateY: bodyY as any }] }}>
+      <Svg width={200} height={100} viewBox="0 0 200 100">
+        {/* Head */}
+        <Circle cx="28" cy="36" r="13" fill={color} opacity={0.9} />
+        {/* Body horizontal */}
+        <Line x1="40" y1="40" x2="140" y2="50" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Arms down */}
+        <Line x1="70" y1="42" x2="68" y2="72" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="110" y1="46" x2="108" y2="76" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        {/* Legs */}
+        <Line x1="140" y1="50" x2="175" y2="56" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Feet */}
+        <Line x1="168" y1="55" x2="184" y2="55" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        {/* Floor */}
+        <Line x1="10" y1="82" x2="190" y2="82" stroke={color} strokeWidth="2" opacity={0.25} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// Pull-ups / Back — figure pulls up from hanging
+function PullupIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(1100);
+  const bodyY = anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
+  return (
+    <Animated.View style={{ transform: [{ translateY: bodyY as any }] }}>
+      <Svg width={120} height={180} viewBox="0 0 120 180">
+        {/* Bar */}
+        <Line x1="10" y1="10" x2="110" y2="10" stroke={color} strokeWidth="6" strokeLinecap="round" opacity={0.5} />
+        {/* Arms up to bar */}
+        <Line x1="40" y1="10" x2="48" y2="42" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="80" y1="10" x2="72" y2="42" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        {/* Head */}
+        <Circle cx="60" cy="54" r="13" fill={color} opacity={0.9} />
+        {/* Body */}
+        <Line x1="60" y1="67" x2="60" y2="118" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Legs hanging */}
+        <Line x1="60" y1="118" x2="48" y2="155" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <Line x1="60" y1="118" x2="72" y2="155" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// Plank / Core — body moves slightly
+function PlankIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(1200);
+  const hipY = anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -6, 0] });
+  return (
+    <Animated.View style={{ transform: [{ translateY: hipY as any }] }}>
+      <Svg width={200} height={90} viewBox="0 0 200 90">
+        {/* Head */}
+        <Circle cx="24" cy="30" r="13" fill={color} opacity={0.9} />
+        {/* Body */}
+        <Line x1="36" y1="34" x2="148" y2="44" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Forearm support */}
+        <Line x1="62" y1="37" x2="62" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="48" y1="68" x2="76" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="100" y1="41" x2="100" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="86" y1="68" x2="114" y2="68" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        {/* Legs */}
+        <Line x1="148" y1="44" x2="180" y2="50" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Feet */}
+        <Line x1="172" y1="50" x2="188" y2="50" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        {/* Floor */}
+        <Line x1="10" y1="72" x2="190" y2="72" stroke={color} strokeWidth="2" opacity={0.25} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// Running / Cardio — figure runs in place
+function RunIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(500);
+  const legF  = anim.interpolate({ inputRange: [0, 1], outputRange: [20, -20] });
+  const legB  = anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 20] });
+  const armF  = anim.interpolate({ inputRange: [0, 1], outputRange: [-15, 15] });
+  const armB  = anim.interpolate({ inputRange: [0, 1], outputRange: [15, -15] });
+  return (
+    <Svg width={120} height={180} viewBox="0 0 120 180">
+      {/* Head */}
+      <Circle cx="60" cy="28" r="14" fill={color} opacity={0.9} />
+      {/* Body */}
+      <Line x1="60" y1="42" x2="60" y2="95" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      {/* Arms animated */}
+      <AnimatedLine
+        x1="60" y1="58"
+        x2={armF.interpolate({ inputRange: [-15,15], outputRange: ['38','82'] }) as any}
+        y2="78"
+        stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8}
+      />
+      <AnimatedLine
+        x1="60" y1="58"
+        x2={armB.interpolate({ inputRange: [-15,15], outputRange: ['38','82'] }) as any}
+        y2="78"
+        stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8}
+      />
+      {/* Legs animated */}
+      <AnimatedLine
+        x1="60" y1="95"
+        x2={legF.interpolate({ inputRange: [-20,20], outputRange: ['40','80'] }) as any}
+        y2="135"
+        stroke={color} strokeWidth="5" strokeLinecap="round"
+      />
+      <AnimatedLine
+        x1="60" y1="95"
+        x2={legB.interpolate({ inputRange: [-20,20], outputRange: ['40','80'] }) as any}
+        y2="135"
+        stroke={color} strokeWidth="5" strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+// Curl / Arms — arm curls up and down
+function CurlIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(800);
+  const forearmAngle = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] });
+  return (
+    <Svg width={120} height={180} viewBox="0 0 120 180">
+      {/* Head */}
+      <Circle cx="60" cy="28" r="14" fill={color} opacity={0.9} />
+      {/* Body */}
+      <Line x1="60" y1="42" x2="60" y2="105" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      {/* Static left arm */}
+      <Line x1="60" y1="58" x2="36" y2="82" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.5} />
+      <Line x1="36" y1="82" x2="30" y2="108" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.5} />
+      {/* Animated right arm — upper */}
+      <Line x1="60" y1="58" x2="84" y2="82" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      {/* Animated right arm — forearm curls up */}
+      <AnimatedLine
+        x1="84" y1="82"
+        x2={forearmAngle.interpolate({ inputRange: [-50, 0], outputRange: ['100', '90'] }) as any}
+        y2={forearmAngle.interpolate({ inputRange: [-50, 0], outputRange: ['60', '108'] }) as any}
+        stroke={color} strokeWidth="4" strokeLinecap="round"
+      />
+      {/* Legs */}
+      <Line x1="60" y1="105" x2="46" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      <Line x1="60" y1="105" x2="74" y2="148" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      <Line x1="38" y1="148" x2="54" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      <Line x1="68" y1="148" x2="84" y2="148" stroke={color} strokeWidth="4" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// Shoulder Press — arms press overhead
+function ShoulderPressIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(900);
+  const armY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -22] });
+  return (
+    <Animated.View style={{ transform: [{ translateY: armY as any }] }}>
+      <Svg width={120} height={180} viewBox="0 0 120 180">
+        {/* Head */}
+        <Circle cx="60" cy="38" r="14" fill={color} opacity={0.9} />
+        {/* Body */}
+        <Line x1="60" y1="52" x2="60" y2="108" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        {/* Arms pressing up */}
+        <Line x1="60" y1="65" x2="34" y2="50" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="34" y1="50" x2="24" y2="20" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="60" y1="65" x2="86" y2="50" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="86" y1="50" x2="96" y2="20" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        {/* Weight bar */}
+        <Line x1="14" y1="14" x2="106" y2="14" stroke={color} strokeWidth="5" strokeLinecap="round" opacity={0.7} />
+        {/* Legs */}
+        <Line x1="60" y1="108" x2="46" y2="150" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <Line x1="60" y1="108" x2="74" y2="150" stroke={color} strokeWidth="5" strokeLinecap="round" />
+        <Line x1="38" y1="150" x2="54" y2="150" stroke={color} strokeWidth="4" strokeLinecap="round" />
+        <Line x1="68" y1="150" x2="84" y2="150" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// Stretch / Flexibility — figure bends forward
+function StretchIllustration({ color }: { color: string }) {
+  const anim = useLoopAnim(1400);
+  const bendY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 18] });
+  return (
+    <Svg width={160} height={160} viewBox="0 0 160 160">
+      {/* Head tilting */}
+      <Circle cx="60" cy="30" r="14" fill={color} opacity={0.9} />
+      {/* Body bending forward */}
+      <Line x1="60" y1="44" x2="60" y2="88" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      {/* Arms reaching forward */}
+      <Line x1="60" y1="62" x2="110" y2="78" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
+      <Line x1="60" y1="62" x2="112" y2="86" stroke={color} strokeWidth="4" strokeLinecap="round" opacity={0.8} />
+      {/* Legs straight */}
+      <Line x1="60" y1="88" x2="48" y2="138" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      <Line x1="60" y1="88" x2="72" y2="138" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      {/* Feet */}
+      <Line x1="40" y1="138" x2="56" y2="138" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      <Line x1="66" y1="138" x2="82" y2="138" stroke={color} strokeWidth="4" strokeLinecap="round" />
+      {/* Floor */}
+      <Line x1="10" y1="144" x2="150" y2="144" stroke={color} strokeWidth="2" opacity={0.25} />
+    </Svg>
+  );
+}
+
+// Helper: create Animated versions of SVG Line
+const AnimatedLine = Animated.createAnimatedComponent(Line);
+
+// Pick the right illustration based on exercise name/category
+function ExerciseIllustration({ exercise, color }: { exercise: Exercise; color: string }) {
+  const name = exercise.name.toLowerCase();
+  const cat  = exercise.category;
+
+  if (name.includes('squat') || name.includes('lunge') || name.includes('leg press') || name.includes('calf') || name.includes('glute') || cat === 'Legs') {
+    return <SquatIllustration color={color} />;
+  }
+  if (name.includes('push') || name.includes('bench') || name.includes('chest') || name.includes('dip') || cat === 'Chest') {
+    return <PushupIllustration color={color} />;
+  }
+  if (name.includes('pull') || name.includes('row') || name.includes('lat') || name.includes('deadlift') || cat === 'Back') {
+    return <PullupIllustration color={color} />;
+  }
+  if (name.includes('plank') || name.includes('crunch') || name.includes('twist') || name.includes('leg raise') || cat === 'Core') {
+    return <PlankIllustration color={color} />;
+  }
+  if (name.includes('curl') || name.includes('tricep') || name.includes('hammer') || name.includes('skull') || cat === 'Arms') {
+    return <CurlIllustration color={color} />;
+  }
+  if (name.includes('press') || name.includes('raise') || name.includes('arnold') || name.includes('face') || cat === 'Shoulders') {
+    return <ShoulderPressIllustration color={color} />;
+  }
+  if (cat === 'Flexibility' || name.includes('yoga') || name.includes('stretch') || name.includes('pose') || name.includes('dog') || name.includes('foam')) {
+    return <StretchIllustration color={color} />;
+  }
+  // Default: cardio / running
+  return <RunIllustration color={color} />;
+}
+
+// ── EXERCISE DEMO MODAL ────────────────────────────────────────
+function ExerciseDemoModal({ visible, exercise, theme, onClose }: {
+  visible: boolean;
+  exercise: Exercise | null;
+  theme: typeof colors.light;
+  onClose: () => void;
+}) {
+  if (!exercise) return null;
+
+  const catColor  = CAT_COLORS[exercise.category] ?? theme.accent;
+  const DIFF_COLORS: Record<string, string> = {
+    beginner: theme.accent, intermediate: theme.amber, advanced: theme.red,
+  };
+  const diffColor = DIFF_COLORS[exercise.difficulty] ?? theme.accent;
+
+  const TIPS: Record<string, string[]> = {
+    Cardio:      ['Keep your core tight throughout', 'Breathe rhythmically', 'Land softly to protect joints'],
+    Chest:       ['Control the weight on the way down', 'Keep shoulder blades retracted', 'Full range of motion'],
+    Back:        ['Drive elbows back, not arms', 'Squeeze at the top', 'Keep spine neutral'],
+    Core:        ["Don't hold your breath", 'Slow and controlled beats fast', 'Quality over quantity'],
+    Legs:        ['Knees track over toes', 'Keep chest up throughout', 'Drive through the heels'],
+    Shoulders:   ['Avoid shrugging', 'Control at the top', 'Keep core braced'],
+    Arms:        ['Isolate the muscle — no swinging', 'Full extension on every rep', 'Squeeze at peak contraction'],
+    Flexibility: ['Never stretch into pain', 'Hold each position for 20-30s', 'Breathe into the stretch'],
+  };
+  const tips = TIPS[exercise.category] ?? ['Focus on form over weight', 'Breathe steadily', 'Rest when needed'];
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={dm.overlay}>
+        <TouchableOpacity style={dm.backdrop} onPress={onClose} activeOpacity={1} />
+        <View style={[dm.sheet, { backgroundColor: theme.surface }]}>
+
+          <LinearGradient
+            colors={[catColor + 'EE', catColor + '88'] as [string, string]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={dm.header}
+          >
+            <View style={dm.headerRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={dm.headerCat}>{exercise.category}</Text>
+                <Text style={dm.headerName}>{exercise.name}</Text>
+                <Text style={dm.headerMuscle}>{exercise.muscle_group}</Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={dm.closeBtn}>
+                <Ionicons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={dm.badges}>
+              <View style={[dm.badge, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+                <Ionicons name="flame-outline" size={11} color="#fff" />
+                <Text style={dm.badgeText}>{exercise.calories_per_minute} kcal/min</Text>
+              </View>
+              <View style={[dm.badge, { backgroundColor: diffColor + '44' }]}>
+                <Text style={[dm.badgeText, { color: diffColor }]}>{exercise.difficulty}</Text>
+              </View>
+              {exercise.equipment !== 'none' && (
+                <View style={[dm.badge, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+                  <Text style={dm.badgeText}>{exercise.equipment}</Text>
+                </View>
+              )}
+            </View>
+          </LinearGradient>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.body}>
+
+            {/* Animated illustration */}
+            <View style={[dm.illustrationCard, { backgroundColor: catColor + '12', borderColor: catColor + '33' }]}>
+              <Text style={[dm.sectionLabel, { color: theme.textSecondary }]}>Movement Demo</Text>
+              <View style={dm.illustrationBox}>
+                <ExerciseIllustration exercise={exercise} color={catColor} />
+              </View>
+              <Text style={[dm.illustrationHint, { color: theme.textMuted }]}>
+                Animated illustration — follow the movement pattern
+              </Text>
+            </View>
+
+            {/* Description */}
+            {!!exercise.description && (
+              <View style={[dm.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[dm.sectionLabel, { color: theme.textSecondary }]}>About</Text>
+                <Text style={[dm.bodyText, { color: theme.textPrimary }]}>{exercise.description}</Text>
+              </View>
+            )}
+
+            {/* Form tips */}
+            <View style={[dm.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[dm.sectionLabel, { color: theme.textSecondary }]}>Form Tips</Text>
+              {tips.map((tip, i) => (
+                <View key={i} style={dm.tipRow}>
+                  <View style={[dm.tipDot, { backgroundColor: catColor }]} />
+                  <Text style={[dm.bodyText, { color: theme.textPrimary }]}>{tip}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={{ height: 32 }} />
+          </ScrollView>
+
+          <View style={[dm.footer, { borderTopColor: theme.border, backgroundColor: theme.surface }]}>
+            <TouchableOpacity onPress={onClose} activeOpacity={0.85} style={dm.footerBtnWrap}>
+              <LinearGradient
+                colors={[catColor, catColor + 'BB'] as [string, string]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={dm.footerBtn}
+              >
+                <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                <Text style={dm.footerBtnText}>Got it — add to workout</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const dm = StyleSheet.create({
+  overlay:          { flex: 1, justifyContent: 'flex-end' },
+  backdrop:         { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
+  sheet:            { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%', overflow: 'hidden' },
+  header:           { padding: spacing.lg, paddingBottom: spacing.md },
+  headerRow:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
+  headerCat:        { fontSize: fontSize.xs, fontWeight: '700', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  headerName:       { fontSize: fontSize.xxl, fontWeight: '900', color: '#fff', lineHeight: 30 },
+  headerMuscle:     { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.70)', marginTop: 2 },
+  closeBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.20)', alignItems: 'center', justifyContent: 'center' },
+  badges:           { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+  badge:            { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: 99 },
+  badgeText:        { fontSize: fontSize.xs, fontWeight: '700', color: '#fff' },
+  body:             { padding: spacing.lg, gap: spacing.md },
+  sectionLabel:     { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
+  illustrationCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, alignItems: 'center' },
+  illustrationBox:  { paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center', minHeight: 180 },
+  illustrationHint: { fontSize: fontSize.xs, textAlign: 'center', marginTop: spacing.xs },
+  card:             { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, gap: spacing.xs },
+  bodyText:         { fontSize: fontSize.sm, lineHeight: 22 },
+  tipRow:           { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.xs },
+  tipDot:           { width: 6, height: 6, borderRadius: 3, marginTop: 8, flexShrink: 0 },
+  footer:           { padding: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1 },
+  footerBtnWrap:    { borderRadius: radius.lg, overflow: 'hidden' },
+  footerBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
+  footerBtnText:    { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
+});
+
 // ── DIFFICULTY BADGE ──────────────────────────────────────────
 function DifficultyBadge({ level, theme }: { level: string; theme: typeof colors.light }) {
   const colorMap: Record<string, string> = { beginner: theme.accent, intermediate: theme.amber, advanced: theme.red };
@@ -149,8 +582,9 @@ function DifficultyBadge({ level, theme }: { level: string; theme: typeof colors
 }
 
 // ── EXERCISE CARD ─────────────────────────────────────────────
-function ExerciseCard({ exercise, theme, isSelected, onToggle }: {
-  exercise: Exercise; theme: typeof colors.light; isSelected: boolean; onToggle: () => void;
+function ExerciseCard({ exercise, theme, isSelected, onToggle, onDemo }: {
+  exercise: Exercise; theme: typeof colors.light; isSelected: boolean;
+  onToggle: () => void; onDemo: () => void;
 }) {
   const catColor = CAT_COLORS[exercise.category] ?? theme.accent;
   return (
@@ -169,8 +603,18 @@ function ExerciseCard({ exercise, theme, isSelected, onToggle }: {
         </View>
         <View style={styles.exerciseCardRight}>
           <DifficultyBadge level={exercise.difficulty} theme={theme} />
-          <View style={[styles.selectCircle, { backgroundColor: isSelected ? catColor : 'transparent', borderColor: isSelected ? catColor : theme.border }]}>
-            {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {/* Demo button — shows GIF/description of how to do the exercise */}
+            <TouchableOpacity
+              onPress={(e) => { e.stopPropagation(); onDemo(); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.demoBtn, { backgroundColor: catColor + '18', borderColor: catColor + '44' }]}
+            >
+              <Ionicons name="play-circle-outline" size={16} color={catColor} />
+            </TouchableOpacity>
+            <View style={[styles.selectCircle, { backgroundColor: isSelected ? catColor : 'transparent', borderColor: isSelected ? catColor : theme.border }]}>
+              {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+            </View>
           </View>
         </View>
       </View>
@@ -606,10 +1050,11 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
 }
 
 // ── CATALOGUE TAB — now with equipment filter ─────────────────
-function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout, routineName, equipmentFilter, onEquipmentChange }: {
+function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout, routineName, equipmentFilter, onEquipmentChange, onShowDemo }: {
   theme: typeof colors.light; exercises: Exercise[]; selectedIds: Set<string>;
   onToggle: (ex: Exercise) => void; onAddToWorkout: () => void; routineName?: string;
   equipmentFilter: string; onEquipmentChange: (eq: string) => void;
+  onShowDemo: (ex: Exercise) => void;
 }) {
   const categories = ['All', 'Cardio', 'Chest', 'Back', 'Core', 'Legs', 'Shoulders', 'Arms', 'Flexibility'];
   const [activeCategory, setActiveCategory] = useState('All');
@@ -671,7 +1116,7 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
 
       <ScrollView contentContainerStyle={styles.tabContent}>
         {filtered.map((ex) => (
-          <ExerciseCard key={ex.id} exercise={ex} theme={theme} isSelected={selectedIds.has(ex.id)} onToggle={() => onToggle(ex)} />
+          <ExerciseCard key={ex.id} exercise={ex} theme={theme} isSelected={selectedIds.has(ex.id)} onToggle={() => onToggle(ex)} onDemo={() => onShowDemo(ex)} />
         ))}
         <View style={[styles.addManuallyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.addManuallyLabel, { color: theme.textSecondary }]}>Can't find it? Add manually:</Text>
@@ -882,6 +1327,7 @@ export default function WorkoutScreen() {
   const [prResult, setPrResult]                         = useState<PRResult | null>(null);
   const [postWorkoutMeal, setPostWorkoutMeal]           = useState<MealSuggestion | null>(null);
   const [loadingMealSuggestion, setLoadingMealSuggestion] = useState(false);
+  const [demoExercise, setDemoExercise]                   = useState<Exercise | null>(null);
 
   const workoutTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1095,7 +1541,8 @@ export default function WorkoutScreen() {
       {activeTab === 'Catalogue' && (
         <CatalogueTab theme={theme} exercises={catalogue} selectedIds={selectedIds}
           onToggle={handleToggleExercise} onAddToWorkout={handleAddToWorkout} routineName={pendingRoutineName}
-          equipmentFilter={equipmentFilter} onEquipmentChange={setEquipmentFilter} />
+          equipmentFilter={equipmentFilter} onEquipmentChange={setEquipmentFilter}
+          onShowDemo={(ex) => setDemoExercise(ex)} />
       )}
       {activeTab === 'Calories' && <CaloriesTab theme={theme} totalCalories={totalCaloriesBurned} weeklyData={weeklyCalories} />}
       {activeTab === 'Steps' && <StepsTab theme={theme} userId={user?.id ?? ''} goalSteps={goalSteps} />}
@@ -1113,6 +1560,13 @@ export default function WorkoutScreen() {
         meal={postWorkoutMeal}
         loadingMeal={loadingMealSuggestion}
         theme={theme}
+      />
+      {/* ── EXERCISE DEMO MODAL — GIF + form tips ── */}
+      <ExerciseDemoModal
+        visible={!!demoExercise}
+        exercise={demoExercise}
+        theme={theme}
+        onClose={() => setDemoExercise(null)}
       />
     </AndroidSafeView>
   );
@@ -1223,6 +1677,7 @@ const styles = StyleSheet.create({
   diffBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 },
   diffBadgeText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
   selectCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  demoBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   addManuallyCard: { marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', gap: spacing.sm },
   addManuallyLabel: { fontSize: fontSize.sm },
   addManuallyRow: { flexDirection: 'row', gap: spacing.sm },

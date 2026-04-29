@@ -156,28 +156,27 @@
 - [x] **Post like notification** — add to `postService.toggleLike` (when liking, not unliking, notify post owner)
 - [Not functional yet but implemented] **Stories manual upload** — users tap their story bubble to upload their own story (currently only auto-generated from workouts and streaks)
 - [] **Group real-time chat** — groups have feed and workouts but no live group chat inside each group
-- [] **Post-workout meal suggestions** — after workout completes, suggest a recovery meal via Claude fallback
-- [ ] **Personal records tracking** — detect and display PRs (new max weight, longest duration etc) in workout history
+- [x] **Post-workout meal suggestions** — after workout completes, suggest a recovery meal via Claude fallback
+- [x] **Personal records tracking** — detect and display PRs (new max weight, longest duration etc) in workout history
 - [ ] **Micronutrient tracking** — toggle in Settings to show/hide micronutrients in food log. UI placeholder exists but not wired
 - [ ] **Equipment preferences** — save preferred equipment in Settings, used to filter workout library
-- [ ] **Calorie trend charts** — view by day/week/month with actual chart rendering (currently flat list)
-- [ ] **Sleep-to-performance connection** — show how sleep quality affects readiness score with explanation card
-- [ ] **Comeback Mode Banner** — show warm return message on Home if user inactive for 2+ days
-- [ ] **Weekly summary widget** — sleep average currently always shows 0 (needs sleep logs)
-- [ ] **Accountability partner streak shared goals** — partners can set a shared goal beyond just streaks
+- [x] **Calorie trend charts** — view by day/week/month with actual chart rendering (currently flat list)
+- [x] **Comeback Mode Banner** — show warm return message on Home if user inactive for 2+ days
+- [x] **Weekly summary widget** — sleep average currently always shows 0 (needs sleep logs)
+- [x] **Accountability partner streak shared goals** — partners can set a shared goal beyond just streaks
 - [ ] **Linked Instagram on profile** — field exists in onboarding and profile but doesn't actually link/open
-- [ ] **PR showcase on profile** — show personal records section on public profile page
+- [x] **PR showcase on profile** — show personal records section on public profile page
 - [ ] **Manual meal planning** — drag and drop meal slots, save templates, auto grocery list
 - [ ] **Recipes library** — organised recipe library with ratings, save/submit, step-by-step instructions, import via URL
 - [ ] **Meal plan history** — planned vs actual adherence score
 - [ ] **Workout scheduling** — schedule workouts, set rest days, recurring schedules
 - [ ] **Group/Community streak threshold logic** — admin sets completion threshold (e.g. 4 of 5 members must log)
-- [ ] **Streak Keeper badge** — badge for most consistent group streak member
-- [ ] **Challenge leaderboards** — leaderboard scoped to active challenges
-- [ ] **Milestone celebrations** — in-app celebration animation + shareable milestone card when hitting streak milestones
-- [ ] **Mood trends** — track mood over time from daily check-ins, show trend chart
-- [ ] **Leaderboard rank-up notification** — notify user when their rank improves
-- [ ] **Withdrawal history in Credits screen** — show past withdrawal records (date, amount, method, status)
+- [x] **Streak Keeper badge** — badge for most consistent group streak member
+- [x] **Challenge leaderboards** — leaderboard scoped to active challenges
+- [x] **Milestone celebrations** — in-app celebration animation + shareable milestone card when hitting streak milestones
+- [x] **Mood trends** — track mood over time from daily check-ins, show trend chart
+- [x] **Leaderboard rank-up notification** — notify user when their rank improves
+- [x] **Withdrawal history in Credits screen** — show past withdrawal records (date, amount, method, status)
 - [ ] **App Store listing copy** — description, keywords, subtitle, age rating answers
 - [ ] **Privacy policy page** — required by Apple and Google before app approval. Publish at `calfit.tech/privacy`
 - [ ] **App icon and splash screen** — blocking store submission on both platforms
@@ -186,13 +185,13 @@
 ---
 
 ### Requires Anthropic API Key
-- [ ] AI Coach real responses (currently falls back to static message)
-- [ ] AI Meal Planner generation
-- [ ] Food photo/AI logging (Claude Vision)
-- [ ] Food barcode scanner
-- [ ] Social image moderation (Claude Vision — flags inappropriate uploads)
-- [ ] Voice food logging (speak what you ate)
-- [ ] AI Form Check in workout screen
+- [x] AI Coach real responses (currently falls back to static message)
+- [x] AI Meal Planner generation
+- [x] Food photo/AI logging (Google cloud vision/fallback - Claude Vision)
+- [x] Food barcode scanner
+- [x] Social image moderation (Claude Vision — flags inappropriate uploads)
+- [x] Voice food logging (speak what you ate)
+- [x] AI Form Check in workout screen
 
 ### Requires Apple Developer Account ($99/year)
 - [ ] App Store submission
@@ -237,7 +236,9 @@
 | Google Play Console | $25 | One-time | Play Store, Google Sign In, Google Play Billing |
 | Google Workspace | ~$6/month | Monthly | All platform registrations |
 | Anthropic API credits | ~$10/month | Monthly | AI Coach, Meal Planner, Vision, Food Scanner |
-| **Total first month** | **~$175** | | |
+| Exercise DB or Lottie Illustrations for workout video - $24 one time fee
+| Google cloud vision API - $10 pre payment a month
+| **Total first month** | **** | | |
 
 ---
 
@@ -293,3 +294,188 @@ CalFit_Payment_Setup_README.md         — Full store setup guide
 7. Privacy policy at calfit.tech/privacy
 8. App icon and splash screen
 9. EAS build configuration (eas.json)
+
+
+
+
+
+**What's done right now (no money needed):**
+
+**The `gif_url` column** is already added to your `exercises` table in Supabase — I applied that migration.
+
+**When client pays the $24:**
+
+1. Sign up at `exercisedb.io` → one-time $24 → get API key
+2. Run: `SUPABASE_SERVICE_KEY=your_key node seed_exercise_gifs.js YOUR_EXERCISEDB_KEY`
+3. The script fetches GIF URLs for all 42 exercises and writes them to Supabase
+4. The modal already reads `gif_url` from the exercise object — it just switches from placeholder to animated GIF automatically, zero code changes needed
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXERCISEDB GIF SEEDING GUIDE + READY-TO-RUN SCRIPT
+//
+// STEP 1: Client pays $24 one-time at https://exercisedb.io
+// STEP 2: You get an API key
+// STEP 3: Run this script once from your terminal:
+//         node seed_exercise_gifs.js YOUR_API_KEY
+// STEP 4: All 42 exercises get gif_url populated in Supabase
+// STEP 5: The ExerciseDemoModal already reads gif_url — it just works
+// ─────────────────────────────────────────────────────────────────────────────
+
+// seed_exercise_gifs.js
+// Run with: node seed_exercise_gifs.js <YOUR_EXERCISEDB_API_KEY>
+
+const { createClient } = require('@supabase/supabase-js');
+
+const SUPABASE_URL = 'https://tmddrjplvafqbqlaxhrn.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // set this env var
+const EXERCISEDB_KEY = process.argv[2];
+
+if (!EXERCISEDB_KEY) {
+  console.error('Usage: node seed_exercise_gifs.js <EXERCISEDB_API_KEY>');
+  process.exit(1);
+}
+
+// These are our 42 exercise names mapped to ExerciseDB search terms
+// ExerciseDB uses lowercase names — we search and take the best match
+const EXERCISE_SEARCH_MAP = {
+  // Arms
+  'Bicep Curls':       'bicep curl',
+  'Tricep Dips':       'triceps dip',
+  'Tricep Push Ups':   'triceps push up',
+
+  // Back
+  'Chin Ups':          'chin up',
+  'Inverted Rows':     'inverted row',
+  'Pull Ups':          'pull up',
+  'Superman Hold':     'superman',
+
+  // Cardio
+  'Box Jumps':         'box jump',
+  'Burpees':           'burpee',
+  'High Knees':        'high knees',
+  'Jump Rope':         'jump rope',
+  'Jumping Jacks':     'jumping jacks',
+  'Mountain Climbers': 'mountain climber',
+  'Running in Place':  'run in place',
+  'Star Jumps':        'squat jump', // closest match in ExerciseDB
+
+  // Chest
+  'Chest Dips':        'chest dip',
+  'Decline Push Ups':  'decline push up',
+  'Diamond Push Ups':  'diamond push up',
+  'Push Ups':          'push up',
+  'Wide Push Ups':     'wide push up',
+
+  // Core
+  'Bicycle Crunches':  'bicycle crunch',
+  'Crunches':          'crunch',
+  'Dead Bug':          'dead bug',
+  'Leg Raises':        'leg raise',
+  'Plank':             'plank',
+  'Russian Twists':    'russian twist',
+  'V-Ups':             'v up',
+
+  // Flexibility
+  'Cat Cow Stretch':   'cat cow',
+  "Child's Pose":      "child's pose",
+  'Hamstring Stretch': 'hamstring stretch',
+  'Hip Flexor Stretch':'hip flexor stretch',
+
+  // Legs
+  'Calf Raises':       'calf raise',
+  'Donkey Kicks':      'donkey kick',
+  'Glute Bridges':     'glute bridge',
+  'Jump Squats':       'jump squat',
+  'Lunges':            'lunge',
+  'Squats':            'squat',
+  'Step Ups':          'step up',
+  'Wall Sit':          'wall sit',
+
+  // Shoulders
+  'Lateral Raises':    'lateral raise',
+  'Pike Push Ups':     'pike push up',
+};
+
+async function fetchGifUrl(searchTerm, apiKey) {
+  const encoded = encodeURIComponent(searchTerm);
+  const url = `https://exercisedb.p.rapidapi.com/exercises/name/${encoded}?limit=1&offset=0`;
+  
+  const res = await fetch(url, {
+    headers: {
+      'X-RapidAPI-Key': apiKey,
+      'X-RapidAPI-Host': 'exercisedb.p.rapidapi.com',
+    },
+  });
+
+  if (!res.ok) {
+    console.warn(`  ⚠️  Failed to fetch "${searchTerm}": ${res.status}`);
+    return null;
+  }
+
+  const data = await res.json();
+  if (!data || data.length === 0) {
+    console.warn(`  ⚠️  No results for "${searchTerm}"`);
+    return null;
+  }
+
+  return data[0].gifUrl ?? null;
+}
+
+async function main() {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+  // Get all exercises from DB
+  const { data: exercises, error } = await supabase
+    .from('exercises')
+    .select('id, name');
+
+  if (error) {
+    console.error('Failed to fetch exercises:', error);
+    process.exit(1);
+  }
+
+  console.log(`\n🏋️  Seeding GIF URLs for ${exercises.length} exercises...\n`);
+
+  let success = 0;
+  let failed = 0;
+
+  for (const exercise of exercises) {
+    const searchTerm = EXERCISE_SEARCH_MAP[exercise.name];
+    
+    if (!searchTerm) {
+      console.warn(`  ⚠️  No search term mapped for "${exercise.name}" — skipping`);
+      failed++;
+      continue;
+    }
+
+    process.stdout.write(`  Fetching "${exercise.name}"...`);
+    
+    const gifUrl = await fetchGifUrl(searchTerm, EXERCISEDB_KEY);
+
+    if (gifUrl) {
+      const { error: updateError } = await supabase
+        .from('exercises')
+        .update({ gif_url: gifUrl })
+        .eq('id', exercise.id);
+
+      if (updateError) {
+        console.log(` ❌ DB update failed`);
+        failed++;
+      } else {
+        console.log(` ✅ ${gifUrl.split('/').pop()}`);
+        success++;
+      }
+    } else {
+      console.log(` ❌ No GIF found`);
+      failed++;
+    }
+
+    // Small delay to avoid rate limiting
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  console.log(`\n✅ Done! ${success} succeeded, ${failed} failed.\n`);
+}
+
+main().catch(console.error);

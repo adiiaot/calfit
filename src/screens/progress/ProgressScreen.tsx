@@ -191,8 +191,11 @@ const sh = StyleSheet.create({
 export default function ProgressScreen() {
   const navigation   = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { user, profile } = useAuthStore();
+  const { user, profile, liveSteps } = useAuthStore();
   const theme = colors[colorScheme];
+
+  // Read streak directly from profile in authStore — always current, no DB round-trip needed
+  const streakCount = (profile as any)?.streak_count ?? 0;
 
   const [period, setPeriod]       = useState<Period>('Week');
   const [data, setData]           = useState<Awaited<ReturnType<typeof loadStats>> | null>(null);
@@ -332,12 +335,34 @@ export default function ProgressScreen() {
           <>
             <SectionHeader title="Activity Summary" icon="stats-chart-outline" color={BLUE} theme={theme} />
             <View style={styles.statsGrid}>
-              <StatCard icon="restaurant-outline" label="Calories In"    value={data.totalCal.toLocaleString()}    sub={`/ ${data.calorieGoal.toLocaleString()} goal`} color={ORANGE}  theme={theme} />
-              <StatCard icon="flame-outline"      label="Calories Out"   value={data.totalBurned.toLocaleString()}  sub={`${data.workoutsDone} sessions`}               color={PINK}    theme={theme} />
-              <StatCard icon="water-outline"      label="Water Total"    value={`${(data.totalWater/1000).toFixed(1)}L`} sub={`/ ${(data.waterGoal/1000).toFixed(1)}L goal`} color={BLUE} theme={theme} />
-              <StatCard icon="footsteps-outline"  label="Total Steps"    value={data.totalSteps > 0 ? (data.totalSteps/1000).toFixed(1)+'k' : '—'} sub="steps tracked" color={GREEN}   theme={theme} />
-              <StatCard icon="moon-outline"       label="Avg Sleep"      value={data.avgSleep > 0 ? `${data.avgSleep.toFixed(1)}h` : '—'} sub="per night"     color={PURPLE}  theme={theme} />
-              <StatCard icon="bonfire-outline"    label="Streak"         value={`${data.streak}d`}                  sub="current streak"                                color={GOLD}    theme={theme} />
+              <StatCard icon="restaurant-outline" label="Calories In"
+                value={data.totalCal.toLocaleString()}
+                sub={`/ ${data.calorieGoal.toLocaleString()} goal`}
+                color={ORANGE} theme={theme} />
+              <StatCard icon="flame-outline"      label="Calories Out"
+                value={data.totalBurned > 0 ? data.totalBurned.toLocaleString() : '—'}
+                sub={data.workoutsDone > 0 ? `${data.workoutsDone} session${data.workoutsDone !== 1 ? 's' : ''}` : 'no sessions yet'}
+                color={PINK} theme={theme} />
+              <StatCard icon="water-outline"      label="Water Total"
+                value={`${(data.totalWater/1000).toFixed(1)}L`}
+                sub={`/ ${(data.waterGoal/1000).toFixed(1)}L goal`}
+                color={BLUE} theme={theme} />
+              <StatCard icon="footsteps-outline"  label="Total Steps"
+                value={(() => {
+                  // Prefer DB total; fall back to today's live steps if DB is empty
+                  const s = data.totalSteps > 0 ? data.totalSteps : liveSteps;
+                  return s > 0 ? (s >= 1000 ? (s / 1000).toFixed(1) + 'k' : s.toString()) : '—';
+                })()}
+                sub="steps tracked"
+                color={GREEN} theme={theme} />
+              <StatCard icon="moon-outline"       label="Avg Sleep"
+                value={data.avgSleep > 0 ? `${data.avgSleep.toFixed(1)}h` : '—'}
+                sub="per night"
+                color={PURPLE} theme={theme} />
+              <StatCard icon="bonfire-outline"    label="Streak"
+                value={streakCount > 0 ? `${streakCount}d` : '—'}
+                sub="current streak"
+                color={GOLD} theme={theme} />
             </View>
           </>
         )}

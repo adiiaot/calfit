@@ -26,19 +26,6 @@ interface AuthState {
   signOut:             () => Promise<void>;
 }
 
-// ── PROFILE COMPLETENESS CHECK ────────────────────────────────
-// A profile is "complete" if the user has gone through onboarding.
-// We check for goal — it's set in step 2 of onboarding and is the
-// earliest indicator that onboarding was completed.
-// Google/Apple users who skipped onboarding will have goal = null
-// from the auto-created trigger row, so they need onboarding.
-// BUT: if they previously completed onboarding, goal will be set.
-const isProfileComplete = (profile: Profile | null): boolean => {
-  if (!profile) return false;
-  // goal is set during onboarding step 2 — if it exists, onboarding was done
-  return !!profile.goal;
-};
-
 export const useAuthStore = create<AuthState>((set, get) => ({
   user:             null,
   session:          null,
@@ -50,25 +37,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   coachPersonality: 'balanced',
   liveSteps:        0,
 
-  setLiveSteps: (steps) => set({ liveSteps: steps }),
-  setOnboarding: (v) => set({ isOnboarding: v }),
+  setLiveSteps:        (steps) => set({ liveSteps: steps }),
+  setOnboarding:       (v) => set({ isOnboarding: v }),
   setCoachPersonality: (personality) => set({ coachPersonality: personality }),
 
   // ── SET SESSION ───────────────────────────────────────────
-  // Called on app start (getSession) and auth state changes.
-  // Determines whether to route to onboarding or main app:
+  // ROUTING LOGIC:
   //
-  //   No session          → show auth screens (Welcome/Login)
-  //   Session + no profile→ show onboarding (brand new user)
-  //   Session + incomplete→ show onboarding (started but didn't finish)
-  //   Session + complete  → go straight to main app
+  // isOnboarding is used as a LOCK by OnboardingScreen.
+  // When isOnboarding = true, AppNavigator shows auth stack
+  // regardless of whether user is authenticated.
   //
-  // WHY loadProfile before deciding: Google/Apple sign in creates a
-  // profile row via DB trigger, but it has goal = null. Email signup
-  // goes through OnboardingScreen which sets goal. So checking profile.goal
-  // is the reliable indicator of whether onboarding was completed.
+  // setSession must NEVER flip isOnboarding to false when the
+  // OnboardingScreen has explicitly set it to true — that would
+  // interrupt the onboarding flow mid-way.
+  //
+  // setSession ONLY sets isOnboarding = true for brand new users
+  // (no profile at all). For returning users it always sets false.
+  // OnboardingScreen manages its own lock via setOnboarding().
   setSession: async (session) => {
-    // If no session, clear everything and show auth screens
     if (!session) {
       set({
         session:         null,
@@ -80,14 +67,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return;
     }
 
-    // Set session immediately so UI can respond
+    // Set auth state immediately
     set({
       session,
       user:            session.user,
       isAuthenticated: true,
     });
 
-    // Load profile to determine routing
+    // Load profile
     try {
       const { getProfile } = await import('../services/profileService');
       const profile = await getProfile(session.user.id);
@@ -95,23 +82,39 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (profile) {
         set({ profile });
 
-        // Profile exists and is complete → go to main app
-        // isOnboarding stays false (or gets cleared if it was true)
-        if (isProfileComplete(profile)) {
-          set({ isOnboarding: false });
-        } else {
-          // Profile exists but incomplete (Google/Apple new user
-          // who hasn't done onboarding yet) → show onboarding
+        // ── KEY ROUTING DECISION ──────────────────────────
+        // Only change isOnboarding if it is currently false.
+        // If OnboardingScreen set it to true (mid-flow), we
+        // NEVER override it here — that would reset the flow.
+        //
+        // For returning users (profile exists with goal set):
+        //   isOnboarding stays false → goes to home screen
+        //
+        // For brand new OAuth users (profile exists, goal null):
+        //   isOnboarding = true → goes to onboarding
+        //   BUT only if it wasn't already set to true by OnboardingScreen
+
+        const currentlyOnboarding = get().isOnboarding;
+
+        if (!currentlyOnboarding) {
+          // Not in onboarding flow — decide based on profile completeness
+          const profileComplete = !!profile.goal;
+          if (!profileComplete) {
+            // Brand new OAuth user — needs onboarding
+            set({ isOnboarding: true });
+          }
+          // Returning user with complete profile → isOnboarding stays false → home
+        }
+        // If currentlyOnboarding = true, don't touch it — OnboardingScreen owns it
+
+      } else {
+        // No profile at all — only set onboarding if not already set
+        if (!get().isOnboarding) {
           set({ isOnboarding: true });
         }
-      } else {
-        // No profile at all — very new user, show onboarding
-        set({ isOnboarding: true });
       }
     } catch (error) {
-      console.error('[authStore] loadProfile error:', error);
-      // On error, default to showing onboarding rather than crashing
-      set({ isOnboarding: true });
+      console.error('[authStore] setSession error:', error);
     }
   },
 
@@ -119,9 +122,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { getProfile } = await import('../services/profileService');
       const profile = await getProfile(userId);
-      if (profile) {
-        set({ profile });
-      }
+      if (profile) set({ profile });
     } catch (error) {
       console.error('Failed to load profile:', error);
     }
@@ -129,9 +130,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   updateProfile: (updates) => {
     const current = get().profile;
-    if (current) {
-      set({ profile: { ...current, ...updates } });
-    }
+    if (current) set({ profile: { ...current, ...updates } });
   },
 
   signIn: async (email, password) => {
@@ -140,7 +139,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { supabase } = await import('../services/supabase');
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // onAuthStateChange fires → setSession called → routes correctly
     } finally {
       set({ isLoading: false });
     }
@@ -163,14 +161,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await supabase.auth.signOut();
     } catch {}
     set({
-      user:            null,
-      session:         null,
-      profile:         null,
-      isOnboarding:    false,
-      isAuthenticated: false,
-      userTier:        'free',
-      coachPersonality:'balanced',
-      liveSteps:       0,
+      user:             null,
+      session:          null,
+      profile:          null,
+      isOnboarding:     false,
+      isAuthenticated:  false,
+      userTier:         'free',
+      coachPersonality: 'balanced',
+      liveSteps:        0,
     });
   },
 }));

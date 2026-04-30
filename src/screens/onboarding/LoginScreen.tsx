@@ -1,27 +1,24 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, TextInput,
+  Alert, ActivityIndicator, Animated, Easing, ScrollView,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { makeRedirectUri } from 'expo-auth-session';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 
-// Required for OAuth redirect handling on mobile
 WebBrowser.maybeCompleteAuthSession();
+
+const GRAD_START = '#F0427C';
+const GRAD_MID   = '#FF6B35';
+const GREEN      = '#2DDC8C';
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
@@ -33,368 +30,248 @@ export default function LoginScreen() {
   const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+  const [showEmailForm, setShowEmailForm] = useState(false);
 
-  // ── DEEP LINK LISTENER ────────────────────────────────────
-  // Catches the redirect back from Safari after OAuth completes.
-  // Fires when the app is already open (warm start).
+  const emailAnim = useRef(new Animated.Value(0)).current;
+
+  const toggleEmail = () => {
+    const next = !showEmailForm;
+    setShowEmailForm(next);
+    Animated.timing(emailAnim, {
+      toValue: next ? 1 : 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
+
   useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      const url = event.url;
-      console.log('[OAuth] deep link received:', url);
-      if (!url) return;
-      if (url.includes('access_token') || url.includes('code=')) {
-        await handleOAuthCallback(url);
-      }
-    };
-
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Cold start — app opened via deep link
-    Linking.getInitialURL().then(url => {
-      if (url) console.log('[OAuth] initial URL:', url);
-      if (url && (url.includes('access_token') || url.includes('code='))) {
-        handleOAuthCallback(url);
-      }
+    const sub = Linking.addEventListener('url', async ({ url }) => {
+      if (url?.includes('access_token') || url?.includes('code=')) await handleOAuthCallback(url);
     });
-
-    return () => subscription.remove();
+    Linking.getInitialURL().then(url => {
+      if (url && (url.includes('access_token') || url.includes('code='))) handleOAuthCallback(url);
+    });
+    return () => sub.remove();
   }, []);
 
-  // ── OAUTH CALLBACK HANDLER ────────────────────────────────
-  // Parses tokens from the redirect URL.
-  // Supabase can return tokens two ways:
-  //   1. Hash fragment: #access_token=...&refresh_token=...
-  //   2. PKCE code:     ?code=... (exchanged for session)
   const handleOAuthCallback = async (url: string) => {
-    console.log('[OAuth] handling callback URL:', url);
     try {
-      let accessToken: string | null  = null;
-      let refreshToken: string | null = null;
-
-      // Try hash fragment first (implicit flow)
+      let at: string | null = null, rt: string | null = null;
       if (url.includes('#')) {
-        const hash   = url.split('#')[1];
-        const params = new URLSearchParams(hash);
-        accessToken  = params.get('access_token');
-        refreshToken = params.get('refresh_token');
-        console.log('[OAuth] hash fragment — accessToken found:', !!accessToken);
+        const p = new URLSearchParams(url.split('#')[1]);
+        at = p.get('access_token'); rt = p.get('refresh_token');
       }
-
-      // Try query string (PKCE flow)
-      if (!accessToken && url.includes('?')) {
-        const query  = url.split('?')[1]?.split('#')[0];
-        const params = new URLSearchParams(query);
-        const code   = params.get('code');
-        console.log('[OAuth] query string — code found:', !!code);
-
-        if (code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(url);
-          console.log('[OAuth] exchangeCodeForSession result:', { data: !!data, error });
-          if (error) throw error;
-          return; // authStore listener handles navigation
-        }
-
-        accessToken  = params.get('access_token');
-        refreshToken = params.get('refresh_token');
+      if (!at && url.includes('?')) {
+        const p = new URLSearchParams(url.split('?')[1]?.split('#')[0]);
+        const code = p.get('code');
+        if (code) { const { error } = await supabase.auth.exchangeCodeForSession(url); if (error) throw error; return; }
+        at = p.get('access_token'); rt = p.get('refresh_token');
       }
-
-      if (accessToken && refreshToken) {
-        console.log('[OAuth] setting session with tokens');
-        const { error } = await supabase.auth.setSession({
-          access_token:  accessToken,
-          refresh_token: refreshToken,
-        });
+      if (at && rt) {
+        const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
         if (error) throw error;
-        console.log('[OAuth] session set successfully');
-      } else {
-        console.warn('[OAuth] no tokens found in callback URL');
       }
     } catch (e: any) {
-      console.error('[OAuth] callback error:', e);
       Alert.alert('Sign In Failed', 'Could not complete sign in. Please try again.');
-    } finally {
-      setOauthLoading(null);
-    }
+    } finally { setOauthLoading(null); }
   };
 
   const handleSignIn = async () => {
-    if (!email || !password) {
-      Alert.alert('Missing fields', 'Please enter your email and password.');
-      return;
-    }
-    try {
-      await signIn(email, password);
-    } catch (error: any) {
-      Alert.alert('Sign In Failed', error.message);
-    }
+    if (!email || !password) { Alert.alert('Missing fields', 'Please enter your email and password.'); return; }
+    try { await signIn(email, password); }
+    catch (error: any) { Alert.alert('Sign In Failed', error.message); }
   };
 
-  // ── GOOGLE SIGN IN ────────────────────────────────────────
-  const handleGoogleSignIn = async () => {
-    setOauthLoading('google');
+  const doOAuth = async (provider: 'google' | 'apple') => {
+    setOauthLoading(provider);
     try {
-      // __DEV__ is true in Expo Go and local dev, false in production builds
-      const isExpoGo = __DEV__;
-
-      const redirectTo = isExpoGo
-  ? 'exp+calfit://'
-  : 'com.bigcutstore.calfit://';
-
-    console.log('[OAuth] Google redirectTo:', redirectTo);
-      console.log('[OAuth] isExpoGo:', isExpoGo);
-
+      const redirectTo = __DEV__ ? 'exp+calfit://' : 'com.bigcutstore.calfit://';
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
+        provider, options: { redirectTo, skipBrowserRedirect: true },
       });
-
       if (error) throw error;
-      if (!data.url) throw new Error('No OAuth URL returned');
-
-      console.log('[OAuth] opening browser...');
-
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        redirectTo,
-        {
-          showInRecents: false,
-          createTask:    false, // iOS: closes browser and returns to app after auth
-        }
-      );
-
-      console.log('[OAuth] browser result type:', result.type);
-      console.log('[OAuth] browser result url:', (result as any).url ?? 'none');
-
-      if (result.type === 'success' && (result as any).url) {
-        await handleOAuthCallback((result as any).url);
-      } else if (result.type === 'cancel' || result.type === 'dismiss') {
-        console.log('[OAuth] user cancelled or dismissed');
-        setOauthLoading(null);
-      } else {
-        console.log('[OAuth] unexpected result type:', result.type);
-        setOauthLoading(null);
-      }
+      if (!data.url) throw new Error('No OAuth URL');
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, { showInRecents: false, createTask: false });
+      if (result.type === 'success' && (result as any).url) await handleOAuthCallback((result as any).url);
+      else setOauthLoading(null);
     } catch (error: any) {
-      console.error('[OAuth] Google error:', error);
-      Alert.alert('Google Sign In Failed', error.message ?? 'Something went wrong. Please try again.');
-      setOauthLoading(null);
-    }
-  };
-
-  // ── APPLE SIGN IN ─────────────────────────────────────────
-  const handleAppleSignIn = async () => {
-    setOauthLoading('apple');
-    try {
-      const isExpoGo = __DEV__;
-
-   const redirectTo = isExpoGo
-  ? 'exp+calfit://'
-  : 'com.bigcutstore.calfit://';
-
-      console.log('[OAuth] Apple redirectTo:', redirectTo);
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) throw error;
-      if (!data.url) throw new Error('No OAuth URL returned');
-
-      const result = await WebBrowser.openAuthSessionAsync(
-  data.url,
-  redirectTo,
-  {
-    showInRecents: false,
-    createTask: false,
-  }
-);
-
-      console.log('[OAuth] Apple browser result:', result.type);
-
-      if (result.type === 'success' && (result as any).url) {
-        await handleOAuthCallback((result as any).url);
-      } else {
-        setOauthLoading(null);
-      }
-    } catch (error: any) {
-      console.error('[OAuth] Apple error:', error);
-      Alert.alert('Apple Sign In Failed', error.message ?? 'Something went wrong. Please try again.');
+      Alert.alert(`${provider === 'google' ? 'Google' : 'Apple'} Sign In Failed`, error.message ?? 'Something went wrong.');
       setOauthLoading(null);
     }
   };
 
   const handleForgotPassword = async () => {
-    if (!email) {
-      Alert.alert('Enter your email', 'Type your email address above, then tap Forgot Password.');
-      return;
-    }
+    if (!email) { Alert.alert('Enter your email', 'Type your email above first.'); return; }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'exp+calfit://reset-password',
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'exp+calfit://reset-password' });
       if (error) throw error;
-      Alert.alert('Check your email', `We sent a password reset link to ${email}`);
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
+      Alert.alert('Check your email', `Reset link sent to ${email}`);
+    } catch (error: any) { Alert.alert('Error', error.message); }
   };
+
+  const disabled = oauthLoading !== null || isLoading;
+
+  const emailMaxHeight = emailAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 420] });
+  const emailOpacity   = emailAnim;
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      <TouchableOpacity
-        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] })}
-        style={styles.backBtn}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-      </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-      <View style={styles.container}>
-        <View>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Welcome back</Text>
-          <Text style={[styles.sub, { color: theme.textSecondary }]}>Sign in to CalFit</Text>
-        </View>
-
-        {/* Google Sign In */}
+        {/* Back */}
         <TouchableOpacity
-          onPress={handleGoogleSignIn}
-          disabled={oauthLoading !== null || isLoading}
-          style={[styles.socialBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] })}
+          style={[styles.backBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
         >
-          {oauthLoading === 'google'
-            ? <ActivityIndicator size="small" color={theme.textPrimary} />
-            : <Text style={styles.googleIcon}>G</Text>}
-          <Text style={[styles.socialBtnText, { color: theme.textPrimary }]}>Continue with Google</Text>
+          <Ionicons name="chevron-back" size={20} color={theme.textPrimary} />
         </TouchableOpacity>
 
-        {/* Apple Sign In */}
-        <TouchableOpacity
-          onPress={handleAppleSignIn}
-          disabled={oauthLoading !== null || isLoading}
-          style={[styles.socialBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-        >
-          {oauthLoading === 'apple'
-            ? <ActivityIndicator size="small" color={theme.textPrimary} />
-            : <Ionicons name="logo-apple" size={20} color={theme.textPrimary} />}
-          <Text style={[styles.socialBtnText, { color: theme.textPrimary }]}>Continue with Apple</Text>
+        {/* Hero */}
+        <View style={styles.hero}>
+          <LinearGradient colors={[GRAD_START, GRAD_MID, '#FFB830']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logoCircle}>
+            <Text style={styles.logoLetter}>C</Text>
+          </LinearGradient>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Welcome back</Text>
+          <Text style={[styles.sub, { color: theme.textSecondary }]}>Sign in to continue your fitness journey</Text>
+        </View>
+
+        {/* Google card */}
+        <TouchableOpacity onPress={() => doOAuth('google')} disabled={disabled} activeOpacity={0.85}
+          style={[styles.oauthCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.oauthIconBox, { backgroundColor: '#fff', borderColor: '#E0E0E0' }]}>
+            {oauthLoading === 'google'
+              ? <ActivityIndicator size="small" color="#4285F4" />
+              : <Text style={styles.googleG}>G</Text>}
+          </View>
+          <View style={styles.oauthText}>
+            <Text style={[styles.oauthTitle, { color: theme.textPrimary }]}>Continue with Google</Text>
+            <Text style={[styles.oauthSub, { color: theme.textMuted }]}>Sign in with your Google account</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+        </TouchableOpacity>
+
+        {/* Apple card */}
+        <TouchableOpacity onPress={() => doOAuth('apple')} disabled={disabled} activeOpacity={0.85}
+          style={[styles.oauthCard, { backgroundColor: '#000', borderColor: '#222' }]}>
+          <View style={[styles.oauthIconBox, { backgroundColor: '#1C1C1E', borderColor: '#333' }]}>
+            {oauthLoading === 'apple'
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="logo-apple" size={22} color="#fff" />}
+          </View>
+          <View style={styles.oauthText}>
+            <Text style={[styles.oauthTitle, { color: '#fff' }]}>Continue with Apple</Text>
+            <Text style={[styles.oauthSub, { color: 'rgba(255,255,255,0.5)' }]}>Sign in with your Apple ID</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
 
         {/* Divider */}
         <View style={styles.divider}>
-          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-          <Text style={[styles.dividerText, { color: theme.textMuted }]}>or</Text>
-          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+          <View style={[styles.divLine, { backgroundColor: theme.border }]} />
+          <Text style={[styles.divText, { color: theme.textMuted }]}>or</Text>
+          <View style={[styles.divLine, { backgroundColor: theme.border }]} />
         </View>
 
-        {/* Email */}
-        <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Email</Text>
-        <View style={[styles.inputWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="your@email.com"
-            placeholderTextColor={theme.textMuted}
-            style={[styles.input, { color: theme.textPrimary }]}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        {/* Password */}
-        <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Password</Text>
-        <View style={[styles.inputWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••••"
-            placeholderTextColor={theme.textMuted}
-            style={[styles.input, { color: theme.textPrimary }]}
-            secureTextEntry={!showPassword}
-            autoCorrect={false}
-          />
-          <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={theme.textMuted}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotBtn}>
-          <Text style={[styles.forgotText, { color: theme.accent }]}>Forgot password?</Text>
-        </TouchableOpacity>
-
-        {/* Sign in */}
-        <TouchableOpacity
-          onPress={handleSignIn}
-          disabled={isLoading || oauthLoading !== null}
-          style={styles.signInBtnWrap}
-        >
-          <LinearGradient
-            colors={[theme.accent, theme.accent] as [string, string]}
-            style={styles.signInBtn}
-          >
-            {isLoading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.signInBtnText}>Sign In</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Biometric */}
-        <TouchableOpacity style={[styles.biometricBtn, { borderColor: theme.border }]}>
-          <Ionicons name="finger-print-outline" size={20} color={theme.textSecondary} />
-          <Text style={[styles.biometricText, { color: theme.textSecondary }]}>
-            Sign in with Face ID / Fingerprint
+        {/* Email toggle */}
+        <TouchableOpacity onPress={toggleEmail} disabled={disabled} activeOpacity={0.8}
+          style={[styles.emailToggle, {
+            backgroundColor: showEmailForm ? theme.accentDim as string : theme.card,
+            borderColor: showEmailForm ? theme.accent : theme.border,
+          }]}>
+          <Ionicons name="mail-outline" size={18} color={showEmailForm ? theme.accent : theme.textSecondary} />
+          <Text style={[styles.emailToggleText, { color: showEmailForm ? theme.accent : theme.textSecondary }]}>
+            {showEmailForm ? 'Hide email sign in' : 'Sign in with Email'}
           </Text>
+          <Ionicons name={showEmailForm ? 'chevron-up' : 'chevron-down'} size={15} color={showEmailForm ? theme.accent : theme.textMuted} />
         </TouchableOpacity>
+
+        {/* Collapsible email form */}
+        <Animated.View style={{ maxHeight: emailMaxHeight, opacity: emailOpacity, overflow: 'hidden' }}>
+          <View style={[styles.emailCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
+            <View style={[styles.inputRow, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+              <Ionicons name="mail-outline" size={16} color={theme.textMuted} />
+              <TextInput value={email} onChangeText={setEmail} placeholder="your@email.com"
+                placeholderTextColor={theme.textMuted} keyboardType="email-address"
+                autoCapitalize="none" autoCorrect={false} style={[styles.inputText, { color: theme.textPrimary }]} />
+            </View>
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
+            <View style={[styles.inputRow, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+              <Ionicons name="lock-closed-outline" size={16} color={theme.textMuted} />
+              <TextInput value={password} onChangeText={setPassword} placeholder="••••••••"
+                placeholderTextColor={theme.textMuted} secureTextEntry={!showPassword}
+                autoCorrect={false} style={[styles.inputText, { color: theme.textPrimary }]} />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={16} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={handleForgotPassword} style={{ alignSelf: 'flex-end', marginBottom: spacing.md }}>
+              <Text style={[styles.forgotText, { color: theme.accent }]}>Forgot password?</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleSignIn} disabled={disabled} activeOpacity={0.85}
+              style={{ borderRadius: radius.lg, overflow: 'hidden', opacity: disabled ? 0.6 : 1 }}>
+              <LinearGradient colors={[GRAD_START, GRAD_MID] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signInBtn}>
+                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.signInText}>Sign In</Text>}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
 
         {/* Sign up link */}
         <View style={styles.signUpRow}>
           <Text style={[styles.signUpText, { color: theme.textSecondary }]}>Don't have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Onboarding')}>
-            <Text style={[styles.signUpLink, { color: theme.accent }]}>Sign up free</Text>
+            <Text style={[styles.signUpLink, { color: GREEN }]}>Sign up free</Text>
           </TouchableOpacity>
         </View>
-      </View>
+
+        {/* Trust */}
+        <View style={styles.trustRow}>
+          {['🔒 Encrypted', '🚫 No spam', '✓ Cancel anytime'].map(t => (
+            <View key={t} style={[styles.trustBadge, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[styles.trustText, { color: theme.textMuted }]}>{t}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </AndroidSafeView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:          { flex: 1 },
-  backBtn:       { padding: spacing.lg, paddingBottom: 0 },
-  container:     { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
-  title:         { fontSize: 28, fontWeight: '800' },
-  sub:           { fontSize: fontSize.lg, marginTop: 4 },
-  socialBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
-  googleIcon:    { fontSize: 18, fontWeight: '900', color: '#4285F4' },
-  socialBtnText: { fontSize: fontSize.lg, fontWeight: '600' },
-  divider:       { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  dividerLine:   { flex: 1, height: 1 },
-  dividerText:   { fontSize: fontSize.sm },
-  inputLabel:    { fontSize: fontSize.sm, fontWeight: '600', marginBottom: -spacing.xs },
-  inputWrap:     { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: spacing.sm },
-  input:         { flex: 1, fontSize: fontSize.lg },
-  forgotBtn:     { alignSelf: 'flex-end' },
-  forgotText:    { fontSize: fontSize.base, fontWeight: '600' },
-  signInBtnWrap: { borderRadius: radius.lg, overflow: 'hidden' },
-  signInBtn:     { padding: spacing.lg, alignItems: 'center', borderRadius: radius.lg },
-  signInBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
-  biometricBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
-  biometricText: { fontSize: fontSize.base, fontWeight: '500' },
-  signUpRow:     { flexDirection: 'row', justifyContent: 'center' },
-  signUpText:    { fontSize: fontSize.base },
-  signUpLink:    { fontSize: fontSize.base, fontWeight: '700' },
+  safe:            { flex: 1 },
+  scroll:          { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  backBtn:         { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: spacing.sm },
+  hero:            { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
+  logoCircle:      { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  logoLetter:      { fontSize: 36, fontWeight: '900', color: '#fff' },
+  title:           { fontSize: 28, fontWeight: '900', textAlign: 'center' },
+  sub:             { fontSize: fontSize.base, textAlign: 'center', lineHeight: 22 },
+  oauthCard:       { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1.5, marginBottom: spacing.sm },
+  oauthIconBox:    { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
+  googleG:         { fontSize: 22, fontWeight: '900', color: '#4285F4' },
+  oauthText:       { flex: 1 },
+  oauthTitle:      { fontSize: fontSize.base, fontWeight: '700' },
+  oauthSub:        { fontSize: fontSize.xs, marginTop: 2 },
+  divider:         { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.md },
+  divLine:         { flex: 1, height: 1 },
+  divText:         { fontSize: fontSize.sm },
+  emailToggle:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, marginBottom: spacing.sm },
+  emailToggleText: { flex: 1, fontSize: fontSize.base, fontWeight: '600' },
+  emailCard:       { borderRadius: radius.xl, borderWidth: 1, padding: spacing.lg, gap: spacing.xs, marginBottom: spacing.sm },
+  fieldLabel:      { fontSize: fontSize.sm, fontWeight: '600', marginBottom: 4, marginTop: spacing.xs },
+  inputRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.xs },
+  inputText:       { flex: 1, fontSize: fontSize.base },
+  forgotText:      { fontSize: fontSize.sm, fontWeight: '600' },
+  signInBtn:       { padding: spacing.md + 2, alignItems: 'center', borderRadius: radius.lg },
+  signInText:      { fontSize: fontSize.lg, fontWeight: '800', color: '#fff' },
+  signUpRow:       { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.lg },
+  signUpText:      { fontSize: fontSize.base },
+  signUpLink:      { fontSize: fontSize.base, fontWeight: '700' },
+  trustRow:        { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.lg, flexWrap: 'wrap' },
+  trustBadge:      { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
+  trustText:       { fontSize: 10, fontWeight: '600' },
 });

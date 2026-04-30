@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "scheme": "com.bigcutstore.calfit",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -17,9 +18,8 @@
       "bundleIdentifier": "com.bigcutstore.calfit",
       "usesAppleSignIn": true,
       "infoPlist": {
-  "NSMotionUsageDescription": "CalFit uses motion data to count your steps automatically."
-}
-      
+        "NSMotionUsageDescription": "CalFit uses motion data to count your steps automatically."
+      }
     },
     "android": {
       "package": "com.bigcutstore.calfit",
@@ -27,6 +27,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080A0F"
       },
+      "googleServicesFile": "./google-services.json",
       "permissions": ["ACTIVITY_RECOGNITION"],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -36,7 +37,14 @@
     },
     "plugins": [
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#0DAE6C",
+          "sounds": []
+        }
+      ]
     ],
     "assetBundlePatterns": [
       "**/*",

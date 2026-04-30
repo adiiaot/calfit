@@ -323,12 +323,11 @@ export default function SettingsScreen() {
             toggle: true, toggleValue: prefs.micronutrients, onToggle: handleMicronutrients,
           },
           {
-            label: 'Equipment Preferences',
-            value: 'Filter workouts by your gear',
-            icon: 'barbell-outline', iconColor: ORANGE,
-            onPress: () => Alert.alert('Equipment Preferences',
-              'Tell CalFit what equipment you have and workouts will be filtered to match. Coming in the next update.', [{ text: 'OK' }]),
-          },
+  label: 'Equipment Preferences',
+  value: 'Filter workouts by your gear',
+  icon: 'barbell-outline', iconColor: ORANGE,
+  onPress: () => navigation.navigate('EquipmentPreferences' as never),
+},
         ]} />
 
         {/* ── NOTIFICATIONS ── */}

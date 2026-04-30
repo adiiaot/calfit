@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // src/modules/live/screens/GoLiveScreen.tsx
 //
-// WHO CAN USE: Premium tier only. Pro and Free users see an upgrade prompt.
-// FLOW: Enter title → pick category → preview camera → Go Live
-//       When live: timer + viewer count + mic/camera toggles + End Stream
+// RtcSurfaceView is loaded lazily via require() so this file doesn't crash
+// Expo Go at import time. The camera preview and live view both check
+// isAgoraAvailable() and show a friendly message in Expo Go.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -28,14 +28,30 @@ import {
   createStreamRecord,
   endStreamRecord,
   destroyEngine,
+  isAgoraAvailable,
 } from '../../../services/AgoraService';
-import { RtcSurfaceView, VideoSourceType } from 'react-native-agora';
 
 const RED    = '#FF5959';
 const ORANGE = '#FFB347';
-const PURPLE = '#B280FF';
 
 const CATEGORIES = ['Fitness', 'Nutrition', 'Wellness', 'Q&A', 'Challenges'];
+
+// Lazy load RtcSurfaceView — only available in dev client / production builds
+const getRtcSurfaceView = () => {
+  try {
+    return require('react-native-agora').RtcSurfaceView;
+  } catch {
+    return null;
+  }
+};
+
+const getVideoSourceType = () => {
+  try {
+    return require('react-native-agora').VideoSourceType;
+  } catch {
+    return null;
+  }
+};
 
 // ── UPGRADE GATE ──────────────────────────────────────────────
 function UpgradeGate({ theme, onClose }: { theme: typeof colors.light; onClose: () => void }) {
@@ -67,29 +83,25 @@ export default function GoLiveScreen() {
   const { user, profile, userTier } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const isPremium = userTier === 'premium';
+  const isPremium   = userTier === 'premium';
+  const agoraReady  = isAgoraAvailable();
 
-  // Pre-live form state
   const [title, setTitle]       = useState('');
   const [category, setCategory] = useState('Fitness');
   const [starting, setStarting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-
-  // Live state
   const [isLive, setIsLive]         = useState(false);
   const [streamId, setStreamId]     = useState<string | null>(null);
   const [micMuted, setMicMuted]     = useState(false);
   const [camOff, setCamOff]         = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
-  const [duration, setDuration]     = useState(0); // seconds
+  const [duration, setDuration]     = useState(0);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Start camera preview when screen mounts (Premium only)
   useEffect(() => {
-    if (!isPremium) return;
+    if (!isPremium || !agoraReady) return;
     let mounted = true;
-
     const startPreview = async () => {
       try {
         await initBroadcaster();
@@ -98,17 +110,13 @@ export default function GoLiveScreen() {
         console.error('Preview error:', e);
       }
     };
-
     startPreview();
-
     return () => {
       mounted = false;
-      // Stop preview but don't destroy engine yet — user might go live
-      try { leaveChannel(); } catch (_) {}
+      try { leaveChannel(); } catch {}
     };
-  }, [isPremium]);
+  }, [isPremium, agoraReady]);
 
-  // Duration timer while live
   useEffect(() => {
     if (isLive) {
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
@@ -133,12 +141,14 @@ export default function GoLiveScreen() {
       return;
     }
     if (!user?.id) return;
-
+    if (!agoraReady) {
+      Alert.alert('Not available', 'Live streaming requires a production build. It will work when the app is built for the store.');
+      return;
+    }
     setStarting(true);
     try {
       const record = await createStreamRecord(user.id, title.trim(), category);
       if (!record) throw new Error('Could not create stream');
-
       await joinChannel(record.channelName);
       setStreamId(record.id);
       setIsLive(true);
@@ -152,29 +162,18 @@ export default function GoLiveScreen() {
   const handleEndStream = () => {
     Alert.alert('End Stream?', 'Your live stream will end for all viewers.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'End Stream', style: 'destructive', onPress: async () => {
-          await leaveChannel();
-          if (streamId) await endStreamRecord(streamId);
-          destroyEngine();
-          setIsLive(false);
-          navigation.goBack();
-        },
-      },
+      { text: 'End Stream', style: 'destructive', onPress: async () => {
+        await leaveChannel();
+        if (streamId) await endStreamRecord(streamId);
+        destroyEngine();
+        setIsLive(false);
+        navigation.goBack();
+      }},
     ]);
   };
 
-  const handleToggleMic = async () => {
-    const next = !micMuted;
-    setMicMuted(next);
-    await toggleMic(next);
-  };
-
-  const handleToggleCam = async () => {
-    const next = !camOff;
-    setCamOff(next);
-    await toggleCamera(next);
-  };
+  const handleToggleMic = () => { const next = !micMuted; setMicMuted(next); toggleMic(next); };
+  const handleToggleCam = () => { const next = !camOff; setCamOff(next); toggleCamera(next); };
 
   // ── UPGRADE GATE ──────────────────────────────────────────
   if (!isPremium) {
@@ -196,22 +195,17 @@ export default function GoLiveScreen() {
 
   // ── LIVE VIEW ─────────────────────────────────────────────
   if (isLive) {
+    const RtcSurfaceView = getRtcSurfaceView();
+    const VideoSourceType = getVideoSourceType();
     return (
       <View style={styles.liveContainer}>
-        {/* Camera feed */}
-        {previewing && !camOff && (
+        {RtcSurfaceView && VideoSourceType && previewing && !camOff && (
           <RtcSurfaceView
             style={StyleSheet.absoluteFill}
             canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
           />
         )}
-
-        {/* Dark overlay at top and bottom */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.6)', 'transparent']}
-          style={styles.liveTopOverlay}
-        >
-          {/* Live badge + duration */}
+        <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent']} style={styles.liveTopOverlay}>
           <View style={styles.liveBadgeRow}>
             <View style={styles.liveBadge}>
               <View style={styles.liveDot} />
@@ -219,19 +213,12 @@ export default function GoLiveScreen() {
             </View>
             <Text style={styles.liveDuration}>{formatDuration(duration)}</Text>
           </View>
-
-          {/* Viewer count */}
           <View style={styles.viewerBadge}>
             <Ionicons name="eye-outline" size={14} color="#fff" />
             <Text style={styles.viewerText}>{viewerCount}</Text>
           </View>
         </LinearGradient>
-
-        {/* Bottom controls */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.7)']}
-          style={styles.liveBottomOverlay}
-        >
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.liveBottomOverlay}>
           <Text style={styles.liveTitleText} numberOfLines={1}>{title}</Text>
           <View style={styles.liveControls}>
             <TouchableOpacity onPress={handleToggleMic} style={[styles.liveCtrlBtn, micMuted && styles.ctrlBtnOff]}>
@@ -253,14 +240,12 @@ export default function GoLiveScreen() {
   }
 
   // ── PRE-LIVE SETUP ────────────────────────────────────────
+  const RtcSurfaceView = getRtcSurfaceView();
+  const VideoSourceType = getVideoSourceType();
+
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-      {/* Header */}
-      <LinearGradient
-        colors={[RED, ORANGE] as [string, string]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
+      <LinearGradient colors={[RED, ORANGE] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
@@ -272,7 +257,7 @@ export default function GoLiveScreen() {
 
         {/* Camera preview */}
         <View style={styles.previewBox}>
-          {previewing ? (
+          {agoraReady && previewing && RtcSurfaceView && VideoSourceType ? (
             <RtcSurfaceView
               style={StyleSheet.absoluteFill}
               canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
@@ -280,7 +265,9 @@ export default function GoLiveScreen() {
           ) : (
             <View style={styles.previewPlaceholder}>
               <Ionicons name="videocam-outline" size={40} color="#ffffff66" />
-              <Text style={styles.previewPlaceholderText}>Camera preview</Text>
+              <Text style={styles.previewPlaceholderText}>
+                {agoraReady ? 'Camera preview' : 'Camera preview available in production build'}
+              </Text>
             </View>
           )}
           <View style={styles.previewBadge}>
@@ -293,8 +280,7 @@ export default function GoLiveScreen() {
           <Text style={[styles.label, { color: theme.textSecondary }]}>Stream title</Text>
           <View style={[styles.inputWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <TextInput
-              value={title}
-              onChangeText={setTitle}
+              value={title} onChangeText={setTitle}
               placeholder="e.g. Morning HIIT with Coach Favour"
               placeholderTextColor={theme.textMuted}
               style={[styles.input, { color: theme.textPrimary }]}
@@ -308,20 +294,12 @@ export default function GoLiveScreen() {
           <Text style={[styles.label, { color: theme.textSecondary }]}>Category</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catRow}>
             {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                onPress={() => setCategory(cat)}
-                style={[
-                  styles.catPill,
-                  {
-                    backgroundColor: category === cat ? RED : theme.card,
-                    borderColor: category === cat ? RED : theme.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.catPillText, { color: category === cat ? '#fff' : theme.textSecondary }]}>
-                  {cat}
-                </Text>
+              <TouchableOpacity key={cat} onPress={() => setCategory(cat)}
+                style={[styles.catPill, {
+                  backgroundColor: category === cat ? RED : theme.card,
+                  borderColor: category === cat ? RED : theme.border,
+                }]}>
+                <Text style={[styles.catPillText, { color: category === cat ? '#fff' : theme.textSecondary }]}>{cat}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -344,19 +322,10 @@ export default function GoLiveScreen() {
         </View>
 
         {/* Go Live button */}
-        <TouchableOpacity
-          onPress={handleGoLive}
-          disabled={starting || !title.trim()}
-          style={[styles.goLiveBtn, { opacity: starting || !title.trim() ? 0.5 : 1 }]}
-        >
-          <LinearGradient
-            colors={[RED, ORANGE] as [string, string]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.goLiveBtnGrad}
-          >
-            {starting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
+        <TouchableOpacity onPress={handleGoLive} disabled={starting || !title.trim()}
+          style={[styles.goLiveBtn, { opacity: starting || !title.trim() ? 0.5 : 1 }]}>
+          <LinearGradient colors={[RED, ORANGE] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.goLiveBtnGrad}>
+            {starting ? <ActivityIndicator color="#fff" /> : (
               <>
                 <View style={styles.goLiveDot} />
                 <Text style={styles.goLiveBtnText}>Go Live</Text>
@@ -371,7 +340,6 @@ export default function GoLiveScreen() {
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe:              { flex: 1 },
   header:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
@@ -380,7 +348,7 @@ const styles = StyleSheet.create({
   scroll:            { padding: spacing.lg, gap: spacing.lg },
   previewBox:        { height: 220, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#111', position: 'relative' },
   previewPlaceholder:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  previewPlaceholderText: { color: '#ffffff66', fontSize: fontSize.sm },
+  previewPlaceholderText: { color: '#ffffff66', fontSize: fontSize.sm, textAlign: 'center', paddingHorizontal: spacing.lg },
   previewBadge:      { position: 'absolute', top: spacing.sm, left: spacing.sm, backgroundColor: '#000000AA', paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm },
   previewBadgeText:  { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   section:           { gap: spacing.sm },
@@ -400,8 +368,6 @@ const styles = StyleSheet.create({
   goLiveDot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   goLiveBtnText:     { color: '#fff', fontSize: fontSize.lg, fontWeight: '800' },
   gateWrap:          { flex: 1, padding: spacing.lg, justifyContent: 'center' },
-
-  // Live view
   liveContainer:     { flex: 1, backgroundColor: '#000' },
   liveTopOverlay:    { paddingTop: 52, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   liveBadgeRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

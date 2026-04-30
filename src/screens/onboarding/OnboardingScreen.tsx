@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
+import { HumanVerify } from '../../components/HumanVerify';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
@@ -267,58 +268,233 @@ function Step14CalfitId({ theme, value, onChange }: { theme: typeof colors.light
 }
 
 // ── STEP 15 — ACCOUNT ─────────────────────────────────────────
-// FIX: Google/Apple buttons now have working onPress handlers
-// They save onboarding data first, then trigger OAuth
-function Step15Account({ theme, email, setEmail, password, setPassword, onGoogleSignUp, onAppleSignUp }: {
+/// ─────────────────────────────────────────────────────────────────────────────
+// REPLACE Step15Account in OnboardingScreen.tsx with this version.
+// Also add the s15 styles to your StyleSheet.
+//
+// BEFORE USING:
+//   npx expo install react-native-webview
+//   Place HCaptcha.tsx at: src/components/HCaptcha.tsx
+//
+// Add to your .env:
+//   EXPO_PUBLIC_HCAPTCHA_SITE_KEY=10000000-ffff-ffff-ffff-000000000001
+//   (test key — works immediately. Replace with real key from hcaptcha.com)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPLACE Step15Account in OnboardingScreen.tsx with this version.
+//
+// CHANGES FROM PREVIOUS VERSION:
+//   - HCaptcha → HumanVerify (math challenge, no WebView, no external API)
+//   - Works in Expo Go immediately
+//   - No domain registration needed
+//
+// IMPORT TO ADD at top of OnboardingScreen.tsx:
+//   import { HumanVerify, HumanVerifyRef } from '../../components/HumanVerify';
+//
+// Remove the old HCaptcha import.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Step15Account({ theme, email, setEmail, password, setPassword, onGoogleSignUp, onAppleSignUp, isLoading }: {
   theme: typeof colors.light;
   email: string; setEmail: (v: string) => void;
   password: string; setPassword: (v: string) => void;
   onGoogleSignUp: () => void;
-  onAppleSignUp: () => void;
+  onAppleSignUp:  () => void;
+  isLoading:      boolean;
 }) {
-  const [showPwd, setShowPwd] = useState(false);
+  const [showPwd, setShowPwd]             = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [verified, setVerified]           = useState(false);
+  const [pendingAction, setPendingAction] = useState<'google' | 'apple' | 'email' | null>(null);
+
+  const verifyRef = useRef<any>(null);
+  const emailAnim = useRef(new Animated.Value(0)).current;
+
+  const GRAD_START = '#F0427C';
+  const GRAD_MID   = '#FF6B35';
+
+  const toggleEmail = () => {
+    const next = !showEmailForm;
+    setShowEmailForm(next);
+    Animated.timing(emailAnim, {
+      toValue: next ? 1 : 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // Require verification before any action
+  const requireVerify = (action: 'google' | 'apple' | 'email') => {
+    if (verified) {
+      fireAction(action);
+      return;
+    }
+    setPendingAction(action);
+    verifyRef.current?.show();
+  };
+
+  const onVerified = () => {
+    setVerified(true);
+    if (pendingAction) {
+      fireAction(pendingAction);
+      setPendingAction(null);
+    }
+  };
+
+  const fireAction = (action: 'google' | 'apple' | 'email') => {
+    if (action === 'google') onGoogleSignUp();
+    else if (action === 'apple') onAppleSignUp();
+    else if (!showEmailForm) toggleEmail();
+  };
+
+  const emailMaxH = emailAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 340] });
+
   return (
     <StepWrap>
-      <StepTitle text={`Almost there!\nCreate your account`} theme={theme} />
-      <StepSub text="Your plan is ready. Set your email and password to save it." theme={theme} />
+      {/* Human verification modal */}
+      <HumanVerify ref={verifyRef} onVerified={onVerified} />
 
-      {/* Google — now wired */}
-      <TouchableOpacity onPress={onGoogleSignUp} style={[styles.socialAuthBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={styles.socialAuthIcon}>G</Text>
-        <Text style={[styles.socialAuthText, { color: theme.textPrimary }]}>Continue with Google</Text>
+      {/* Header */}
+      <View style={s15.headerWrap}>
+        <LinearGradient
+          colors={[GRAD_START, GRAD_MID, '#FFB830']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={s15.logoCircle}
+        >
+          <Text style={s15.logoLetter}>C</Text>
+        </LinearGradient>
+        <StepTitle text={`Almost there!\nCreate your account`} theme={theme} />
+        <StepSub text="Your personalised plan is ready. Create your account to save it." theme={theme} />
+      </View>
+
+      {/* Verification status badge */}
+      <View style={[s15.securityBadge, {
+        backgroundColor: verified ? (theme.accentDim as string) : theme.card,
+        borderColor: verified ? theme.accent : theme.border,
+      }]}>
+        <Ionicons
+          name={verified ? 'shield-checkmark' : 'shield-checkmark-outline'}
+          size={16}
+          color={verified ? theme.accent : theme.textMuted}
+        />
+        <Text style={[s15.securityText, { color: verified ? theme.accent : theme.textMuted }]}>
+          {verified ? '✓ Security verified — choose how to sign up' : 'Tap any option below to verify you\'re human'}
+        </Text>
+      </View>
+
+      {/* Google */}
+      <TouchableOpacity
+        onPress={() => requireVerify('google')}
+        disabled={isLoading}
+        activeOpacity={0.85}
+        style={[s15.oauthCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
+        <View style={[s15.oauthIcon, { backgroundColor: '#fff', borderColor: '#E0E0E0' }]}>
+          {isLoading && pendingAction === 'google'
+            ? <ActivityIndicator size="small" color="#4285F4" />
+            : <Text style={s15.googleG}>G</Text>}
+        </View>
+        <View style={s15.oauthText}>
+          <Text style={[s15.oauthTitle, { color: theme.textPrimary }]}>Continue with Google</Text>
+          <Text style={[s15.oauthSub, { color: theme.textMuted }]}>Fastest — one tap setup</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
       </TouchableOpacity>
 
-      {/* Apple — now wired */}
-      <TouchableOpacity onPress={onAppleSignUp} style={[styles.socialAuthBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Ionicons name="logo-apple" size={20} color={theme.textPrimary} />
-        <Text style={[styles.socialAuthText, { color: theme.textPrimary }]}>Continue with Apple</Text>
+      {/* Apple */}
+      <TouchableOpacity
+        onPress={() => requireVerify('apple')}
+        disabled={isLoading}
+        activeOpacity={0.85}
+        style={[s15.oauthCard, { backgroundColor: '#000', borderColor: '#222' }]}
+      >
+        <View style={[s15.oauthIcon, { backgroundColor: '#1C1C1E', borderColor: '#333' }]}>
+          {isLoading && pendingAction === 'apple'
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Ionicons name="logo-apple" size={20} color="#fff" />}
+        </View>
+        <View style={s15.oauthText}>
+          <Text style={[s15.oauthTitle, { color: '#fff' }]}>Continue with Apple</Text>
+          <Text style={[s15.oauthSub, { color: 'rgba(255,255,255,0.5)' }]}>Sign in with Apple ID</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
       </TouchableOpacity>
 
-      <View style={styles.orRow}>
-        <View style={[styles.orLine, { backgroundColor: theme.border }]} />
-        <Text style={[styles.orText, { color: theme.textMuted }]}>or</Text>
-        <View style={[styles.orLine, { backgroundColor: theme.border }]} />
+      {/* Divider */}
+      <View style={s15.divider}>
+        <View style={[s15.divLine, { backgroundColor: theme.border }]} />
+        <Text style={[s15.divText, { color: theme.textMuted }]}>or</Text>
+        <View style={[s15.divLine, { backgroundColor: theme.border }]} />
       </View>
-      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
-      <View style={[styles.fieldInput, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: spacing.md }]}>
-        <Ionicons name="mail-outline" size={18} color={theme.textMuted} />
-        <TextInput value={email} onChangeText={setEmail} placeholder="your@email.com" placeholderTextColor={theme.textMuted} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} style={[styles.fieldTextInput, { color: theme.textPrimary }]} />
-      </View>
-      <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
-      <View style={[styles.fieldInput, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: spacing.md }]}>
-        <Ionicons name="lock-closed-outline" size={18} color={theme.textMuted} />
-        <TextInput value={password} onChangeText={setPassword} placeholder="Min. 8 characters" placeholderTextColor={theme.textMuted} secureTextEntry={!showPwd} autoCorrect={false} style={[styles.fieldTextInput, { color: theme.textPrimary }]} />
-        <TouchableOpacity onPress={() => setShowPwd(!showPwd)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={18} color={theme.textMuted} />
-        </TouchableOpacity>
-      </View>
-      <View style={[styles.privacyCard, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-        <Ionicons name="shield-checkmark-outline" size={18} color={theme.accent} />
-        <Text style={[styles.privacyText, { color: theme.textPrimary }]}>Your data is encrypted and never sold. Delete your account anytime from Settings.</Text>
+
+      {/* Email toggle */}
+      <TouchableOpacity
+        onPress={() => requireVerify('email')}
+        activeOpacity={0.8}
+        style={[s15.emailToggle, {
+          backgroundColor: showEmailForm ? (theme.accentDim as string) : theme.card,
+          borderColor: showEmailForm ? theme.accent : theme.border,
+        }]}
+      >
+        <Ionicons name="mail-outline" size={18} color={showEmailForm ? theme.accent : theme.textSecondary} />
+        <Text style={[s15.emailToggleText, { color: showEmailForm ? theme.accent : theme.textSecondary }]}>
+          {showEmailForm ? 'Hide email form' : 'Sign up with Email'}
+        </Text>
+        <Ionicons
+          name={showEmailForm ? 'chevron-up' : 'chevron-down'}
+          size={15}
+          color={showEmailForm ? theme.accent : theme.textMuted}
+        />
+      </TouchableOpacity>
+
+      {/* Collapsible email form */}
+      <Animated.View style={{ maxHeight: emailMaxH, opacity: emailAnim, overflow: 'hidden' }}>
+        <View style={[s15.emailCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[s15.fieldLabel, { color: theme.textSecondary }]}>Email address</Text>
+          <View style={[s15.inputRow, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+            <Ionicons name="mail-outline" size={16} color={theme.textMuted} />
+            <TextInput
+              value={email} onChangeText={setEmail}
+              placeholder="your@email.com" placeholderTextColor={theme.textMuted}
+              keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
+              style={[s15.inputText, { color: theme.textPrimary }]}
+            />
+          </View>
+          <Text style={[s15.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
+          <View style={[s15.inputRow, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+            <Ionicons name="lock-closed-outline" size={16} color={theme.textMuted} />
+            <TextInput
+              value={password} onChangeText={setPassword}
+              placeholder="Min. 8 characters" placeholderTextColor={theme.textMuted}
+              secureTextEntry={!showPwd} autoCorrect={false}
+              style={[s15.inputText, { color: theme.textPrimary }]}
+            />
+            <TouchableOpacity onPress={() => setShowPwd(!showPwd)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <View style={[s15.emailNote, { backgroundColor: theme.accentDim as string, borderColor: theme.accent + '44' }]}>
+            <Ionicons name="information-circle-outline" size={14} color={theme.accent} />
+            <Text style={[s15.emailNoteText, { color: theme.textSecondary }]}>
+              Tap "Create My Account" below after filling in your details
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Privacy */}
+      <View style={[s15.privacyRow, { backgroundColor: theme.accentDim as string, borderColor: theme.accent + '33' }]}>
+        <Ionicons name="shield-checkmark-outline" size={16} color={theme.accent} />
+        <Text style={[s15.privacyText, { color: theme.textSecondary }]}>
+          Your data is encrypted and never sold. Delete your account anytime from Settings.
+        </Text>
       </View>
     </StepWrap>
   );
 }
+
 
 // ── GENERATING ────────────────────────────────────────────────
 function StepGenerating({ theme, onComplete }: { theme: typeof colors.light; onComplete: () => void }) {
@@ -692,7 +868,13 @@ export default function OnboardingScreen() {
       case 'fact3':      return <FactScreen theme={theme} factIndex={2} />;
       case 'sleep':      return <Step13Sleep theme={theme} selected={sleepGoal} onSelect={setSleepGoal} />;
       case 'calfitid':   return <Step14CalfitId theme={theme} value={calfitId} onChange={setCalfitId} />;
-      case 'account':    return <Step15Account theme={theme} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onGoogleSignUp={handleGoogleSignUp} onAppleSignUp={handleAppleSignUp} />;
+     case 'account': return <Step15Account
+  theme={theme} email={email} setEmail={setEmail}
+  password={password} setPassword={setPassword}
+  onGoogleSignUp={handleGoogleSignUp}
+  onAppleSignUp={handleAppleSignUp}
+  isLoading={isLoading}
+/>;
       case 'generating': return <StepGenerating theme={theme} onComplete={() => setStep('paywall')} />;
       case 'paywall':    return <StepPaywall theme={theme} calorieGoal={estimatedCalories} onPayNow={handlePayNow} onTrial={handleTrial} onSkip={handleSkip} />;
       default: return null;
@@ -741,6 +923,35 @@ export default function OnboardingScreen() {
     </AndroidSafeView>
   );
 }
+
+// ── s15 STYLES — add before existing styles in OnboardingScreen ───────────────
+const s15 = StyleSheet.create({
+  headerWrap:      { alignItems: 'center', marginBottom: spacing.md },
+  logoCircle:      { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  logoLetter:      { fontSize: 28, fontWeight: '900', color: '#fff' },
+  securityBadge:   { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md },
+  securityText:    { flex: 1, fontSize: fontSize.sm, fontWeight: '600' },
+  oauthCard:       { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.xl, borderWidth: 1.5, marginBottom: spacing.sm },
+  oauthIcon:       { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
+  googleG:         { fontSize: 20, fontWeight: '900', color: '#4285F4' },
+  oauthText:       { flex: 1 },
+  oauthTitle:      { fontSize: fontSize.base, fontWeight: '700' },
+  oauthSub:        { fontSize: fontSize.xs, marginTop: 2 },
+  divider:         { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.sm },
+  divLine:         { flex: 1, height: 1 },
+  divText:         { fontSize: fontSize.sm },
+  emailToggle:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, marginBottom: spacing.sm },
+  emailToggleText: { flex: 1, fontSize: fontSize.base, fontWeight: '600' },
+  emailCard:       { borderRadius: radius.xl, borderWidth: 1, padding: spacing.md, gap: spacing.xs, marginBottom: spacing.sm },
+  fieldLabel:      { fontSize: fontSize.sm, fontWeight: '600', marginBottom: 4, marginTop: spacing.xs },
+  inputRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.xs },
+  inputText:       { flex: 1, fontSize: fontSize.base },
+  emailNote:       { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, marginTop: spacing.xs },
+  emailNoteText:   { flex: 1, fontSize: fontSize.xs, lineHeight: 16 },
+  privacyRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, marginTop: spacing.md },
+  privacyText:     { flex: 1, fontSize: fontSize.xs, lineHeight: 18 },
+});
+
 
 // ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({

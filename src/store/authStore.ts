@@ -47,15 +47,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setCoachPersonality: (personality) => set({ coachPersonality: personality }),
 
   setSession: async (session) => {
-    set({
-      session,
-      user: session?.user ?? null,
-      isAuthenticated: !!session,
-    });
-    if (session?.user) {
-      get().loadProfile(session.user.id);
+  set({
+    session,
+    user: session?.user ?? null,
+    isAuthenticated: !!session,
+  });
+  if (session?.user) {
+    const profile = await get().loadProfile(session.user.id);
+    // If no profile yet (shouldn't happen after trigger, but just in case)
+    // route to onboarding so user can fill in their fitness details
+    if (!get().profile) {
+      set({ isOnboarding: true });
     }
-  },
+  }
+},
 
   loadProfile: async (userId: string) => {
     try {

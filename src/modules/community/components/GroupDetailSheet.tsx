@@ -95,8 +95,7 @@ function ExercisePickerModal({ theme, visible, groupId, currentUserId, onClose, 
 
           {!selected ? (
             <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                style={styles.categoryScroll}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
                 {CATEGORIES.map(cat => (
                   <TouchableOpacity key={cat} onPress={() => setActiveCategory(cat)}
                     style={[styles.catPill, {
@@ -132,8 +131,8 @@ function ExercisePickerModal({ theme, visible, groupId, currentUserId, onClose, 
                 {selected.category} · ~{selected.calories_per_minute} kcal/min
               </Text>
               {[
-                { label: 'Sets', values: ['1','2','3','4','5'], val: sets, set: setSets },
-                { label: 'Reps', values: ['8','10','12','15','20'], val: reps, set: setReps },
+                { label: 'Sets',     values: ['1','2','3','4','5'],                         val: sets,     set: setSets },
+                { label: 'Reps',     values: ['8','10','12','15','20'],                     val: reps,     set: setReps },
                 { label: 'Duration', values: ['15 min','20 min','30 min','45 min','60 min'], val: duration, set: setDuration },
               ].map(field => (
                 <View key={field.label}>
@@ -226,39 +225,44 @@ function WorkoutCard({ workout, theme, isOwner, currentUserId, onComplete, onDel
 
 // ── MAIN COMPONENT ────────────────────────────────────────────
 export function GroupDetailSheet({ group, theme, visible, currentUserId, currentUserName, onClose }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('Workouts');
-  const [workouts, setWorkouts] = useState<GroupWorkout[]>([]);
+  const [activeTab, setActiveTab]     = useState<Tab>('Workouts');
+  const [workouts, setWorkouts]       = useState<GroupWorkout[]>([]);
   const [loadingWorkouts, setLoadingWorkouts] = useState(true);
-  const [showPicker, setShowPicker] = useState(false);
-  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [showPicker, setShowPicker]   = useState(false);
+  const [members, setMembers]         = useState<GroupMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
-  const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [messages, setMessages]       = useState<GroupMessage[]>([]);
   const [loadingChat, setLoadingChat] = useState(true);
-  const [chatInput, setChatInput] = useState('');
-  const [sendingMsg, setSendingMsg] = useState(false);
+  const [chatInput, setChatInput]     = useState('');
+  const [sendingMsg, setSendingMsg]   = useState(false);
   const chatListRef = useRef<FlatList>(null);
-  const channelRef = useRef<any>(null);
+  const channelRef  = useRef<any>(null);
 
   useEffect(() => {
     if (!visible) return;
-    loadWorkouts(); loadMembers(); loadMessages();
+    loadWorkouts();
+    loadMembers();
+    loadMessages();
 
-    // Clean up old channel, create new one with unique name
+    // ── REALTIME subscription ─────────────────────────────
+    // Reads sender_name directly from the INSERT payload —
+    // no extra profile fetch needed per incoming message.
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     const channel = supabase
       .channel(`grp_${group.id}_${Date.now()}`)
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${group.id}` },
-        async (payload) => {
+        (payload) => {
           const msg = payload.new as any;
           if (msg.user_id === currentUserId) return; // own messages added optimistically
-          const { data: prof } = await supabase.from('profiles')
-            .select('full_name, calfit_id').eq('id', msg.user_id).single();
           const newMsg: GroupMessage = {
-            id: msg.id, user_id: msg.user_id, content: msg.content,
-            created_at: msg.created_at,
-            sender_name: prof?.full_name ?? 'CalFit User',
-            sender_calfit_id: prof?.calfit_id ?? '',
+            id:               msg.id,
+            user_id:          msg.user_id,
+            content:          msg.content,
+            created_at:       msg.created_at,
+            sender_name:      msg.sender_name || 'CalFit User',
+            sender_calfit_id: '',
           };
           setMessages(prev => prev.find(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
           setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -267,7 +271,12 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
       .subscribe();
     channelRef.current = channel;
 
-    return () => { if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; } };
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [visible, group.id]);
 
   const loadWorkouts = async () => {
@@ -284,24 +293,42 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
       .select('user_id, role, profiles:user_id (full_name, calfit_id, streak_count)')
       .eq('group_id', group.id);
     if (data) setMembers((data as any[]).map(m => ({
-      user_id: m.user_id, role: m.role,
-      full_name: m.profiles?.full_name ?? 'CalFit User',
-      calfit_id: m.profiles?.calfit_id ?? '',
+      user_id:      m.user_id,
+      role:         m.role,
+      full_name:    m.profiles?.full_name  ?? 'CalFit User',
+      calfit_id:    m.profiles?.calfit_id  ?? '',
       streak_count: m.profiles?.streak_count ?? 0,
     })));
     setLoadingMembers(false);
   };
 
+  // ── LOAD MESSAGES ─────────────────────────────────────────
+  // KEY FIX: reads sender_name directly from the column instead of
+  // joining profiles. Faster, and works correctly now that the
+  // sender_name column exists and is populated on every insert.
   const loadMessages = async () => {
     setLoadingChat(true);
-    const { data } = await supabase.from('group_messages')
-      .select('id, user_id, content, created_at, profiles:user_id (full_name, calfit_id)')
-      .eq('group_id', group.id).order('created_at', { ascending: true }).limit(100);
-    if (data) setMessages((data as any[]).map(m => ({
-      id: m.id, user_id: m.user_id, content: m.content, created_at: m.created_at,
-      sender_name: m.profiles?.full_name ?? 'CalFit User',
-      sender_calfit_id: m.profiles?.calfit_id ?? '',
-    })));
+    const { data, error } = await supabase
+      .from('group_messages')
+      .select('id, user_id, content, created_at, sender_name')
+      .eq('group_id', group.id)
+      .order('created_at', { ascending: true })
+      .limit(100);
+
+    if (error) console.error('loadMessages error:', error.message);
+
+    if (data) {
+      setMessages(
+        (data as any[]).map(m => ({
+          id:               m.id,
+          user_id:          m.user_id,
+          content:          m.content,
+          created_at:       m.created_at,
+          sender_name:      m.sender_name || 'CalFit User',
+          sender_calfit_id: '',
+        }))
+      );
+    }
     setLoadingChat(false);
     setTimeout(() => chatListRef.current?.scrollToEnd({ animated: false }), 200);
   };
@@ -325,7 +352,11 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
     ]);
   };
 
-  // ── CHAT: optimistic send so message appears immediately ──
+  // ── SEND MESSAGE ──────────────────────────────────────────
+  // KEY FIX: sender_name is now written to the DB column on insert.
+  // This means:
+  //   1. loadMessages() can read it directly (no profile join needed)
+  //   2. Realtime payload carries sender_name to other users instantly
   const handleSendMessage = async () => {
     const content = chatInput.trim();
     if (!content || sendingMsg) return;
@@ -334,41 +365,58 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
 
     const optimisticId = `opt_${Date.now()}`;
     const optimistic: GroupMessage = {
-      id: optimisticId, user_id: currentUserId, content,
-      created_at: new Date().toISOString(),
-      sender_name: currentUserName, sender_calfit_id: '',
+      id:               optimisticId,
+      user_id:          currentUserId,
+      content,
+      created_at:       new Date().toISOString(),
+      sender_name:      currentUserName,
+      sender_calfit_id: '',
     };
     setMessages(prev => [...prev, optimistic]);
     setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 50);
 
-    const { data, error } = await supabase.from('group_messages')
-      .insert({ group_id: group.id, user_id: currentUserId, content })
-      .select().single();
+    const { data, error } = await supabase
+      .from('group_messages')
+      .insert({
+        group_id:    group.id,
+        user_id:     currentUserId,
+        content,
+        sender_name: currentUserName,   // ← written to column so it persists
+      })
+      .select()
+      .single();
 
     setSendingMsg(false);
+
     if (error) {
       setMessages(prev => prev.filter(m => m.id !== optimisticId));
       Alert.alert('Error', 'Could not send message. Please try again.');
       return;
     }
+
     if (data) {
-      setMessages(prev => prev.map(m =>
-        m.id === optimisticId ? { ...optimistic, id: data.id, created_at: data.created_at } : m
-      ));
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === optimisticId
+            ? { ...optimistic, id: data.id, created_at: data.created_at }
+            : m
+        )
+      );
     }
   };
 
-  const formatTime = (dateStr: string) => new Date(dateStr)
-    .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const formatTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
   return (
     <>
       <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
         <View style={styles.overlay}>
           <TouchableOpacity style={styles.dismiss} onPress={onClose} />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
-
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
             {/* Header */}
             <View style={[styles.header, { borderBottomColor: theme.border }]}>
               <View style={styles.headerLeft}>
@@ -400,7 +448,7 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
               ))}
             </View>
 
-            {/* WORKOUTS */}
+            {/* WORKOUTS TAB */}
             {activeTab === 'Workouts' && (
               <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
                 {group.is_owner && (
@@ -410,28 +458,33 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
                     <Text style={[styles.addWorkoutBtnText, { color: theme.accent }]}>Add Exercise from Catalogue</Text>
                   </TouchableOpacity>
                 )}
-                {loadingWorkouts ? <ActivityIndicator color={theme.accent} style={{ marginTop: spacing.xl }} />
-                  : workouts.length === 0 ? (
-                    <View style={styles.emptyState}>
-                      <Ionicons name="barbell-outline" size={32} color={theme.textMuted} />
-                      <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                        {group.is_owner ? 'Tap "Add Exercise" to pick from the catalogue.' : 'No exercises added yet.'}
-                      </Text>
-                    </View>
-                  ) : workouts.map(w => (
-                    <WorkoutCard key={w.id} workout={w} theme={theme}
-                      isOwner={group.is_owner ?? false} currentUserId={currentUserId}
-                      onComplete={() => handleComplete(w.id)}
-                      onDelete={() => handleDeleteWorkout(w.id)} />
-                  ))}
+                {loadingWorkouts
+                  ? <ActivityIndicator color={theme.accent} style={{ marginTop: spacing.xl }} />
+                  : workouts.length === 0
+                    ? (
+                      <View style={styles.emptyState}>
+                        <Ionicons name="barbell-outline" size={32} color={theme.textMuted} />
+                        <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                          {group.is_owner ? 'Tap "Add Exercise" to pick from the catalogue.' : 'No exercises added yet.'}
+                        </Text>
+                      </View>
+                    )
+                    : workouts.map(w => (
+                      <WorkoutCard key={w.id} workout={w} theme={theme}
+                        isOwner={group.is_owner ?? false} currentUserId={currentUserId}
+                        onComplete={() => handleComplete(w.id)}
+                        onDelete={() => handleDeleteWorkout(w.id)} />
+                    ))
+                }
                 <View style={{ height: 40 }} />
               </ScrollView>
             )}
 
-            {/* MEMBERS */}
+            {/* MEMBERS TAB */}
             {activeTab === 'Members' && (
               <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
-                {loadingMembers ? <ActivityIndicator color={theme.accent} style={{ marginTop: spacing.xl }} />
+                {loadingMembers
+                  ? <ActivityIndicator color={theme.accent} style={{ marginTop: spacing.xl }} />
                   : members.map(m => (
                     <View key={m.user_id} style={[styles.memberRow, { borderBottomColor: theme.border }]}>
                       <View style={[styles.memberAvatar, { backgroundColor: theme.accentDim as string }]}>
@@ -455,18 +508,24 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
                         <Text style={[styles.memberStreakText, { color: theme.accent }]}>{m.streak_count}</Text>
                       </View>
                     </View>
-                  ))}
+                  ))
+                }
                 <View style={{ height: 40 }} />
               </ScrollView>
             )}
 
-            {/* CHAT */}
+            {/* CHAT TAB */}
             {activeTab === 'Chat' && (
               <View style={styles.chatContainer}>
-                {loadingChat ? <View style={styles.chatLoading}><ActivityIndicator color={theme.accent} /></View>
+                {loadingChat
+                  ? <View style={styles.chatLoading}><ActivityIndicator color={theme.accent} /></View>
                   : (
-                    <FlatList ref={chatListRef} data={messages} keyExtractor={item => item.id}
-                      contentContainerStyle={styles.chatList} showsVerticalScrollIndicator={false}
+                    <FlatList
+                      ref={chatListRef}
+                      data={messages}
+                      keyExtractor={item => item.id}
+                      contentContainerStyle={styles.chatList}
+                      showsVerticalScrollIndicator={false}
                       ListEmptyComponent={
                         <View style={styles.emptyState}>
                           <Ionicons name="chatbubbles-outline" size={32} color={theme.textMuted} />
@@ -496,27 +555,45 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
                             </View>
                           </View>
                         );
-                      }} />
-                  )}
+                      }}
+                    />
+                  )
+                }
                 <View style={[styles.chatInputRow, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
                   <View style={[styles.chatInput, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-                    <TextInput value={chatInput} onChangeText={setChatInput}
-                      placeholder="Message the group..." placeholderTextColor={theme.textMuted}
+                    <TextInput
+                      value={chatInput}
+                      onChangeText={setChatInput}
+                      placeholder="Message the group..."
+                      placeholderTextColor={theme.textMuted}
                       style={[styles.chatInputText, { color: theme.textPrimary }]}
-                      multiline maxLength={500} onSubmitEditing={handleSendMessage} />
+                      multiline
+                      maxLength={500}
+                      onSubmitEditing={handleSendMessage}
+                    />
                   </View>
-                  <TouchableOpacity onPress={handleSendMessage} disabled={sendingMsg || !chatInput.trim()}
-                    style={[styles.sendBtn, { backgroundColor: chatInput.trim() ? theme.accent : theme.border }]}>
-                    {sendingMsg ? <ActivityIndicator size="small" color={theme.bg} />
-                      : <Ionicons name="send" size={18} color={theme.bg} />}
+                  <TouchableOpacity
+                    onPress={handleSendMessage}
+                    disabled={sendingMsg || !chatInput.trim()}
+                    style={[styles.sendBtn, { backgroundColor: chatInput.trim() ? theme.accent : theme.border }]}
+                  >
+                    {sendingMsg
+                      ? <ActivityIndicator size="small" color={theme.bg} />
+                      : <Ionicons name="send" size={18} color={theme.bg} />
+                    }
                   </TouchableOpacity>
                 </View>
               </View>
             )}
-    <ExercisePickerModal theme={theme} visible={showPicker}
-              groupId={group.id} currentUserId={currentUserId}
+
+            <ExercisePickerModal
+              theme={theme}
+              visible={showPicker}
+              groupId={group.id}
+              currentUserId={currentUserId}
               onClose={() => setShowPicker(false)}
-              onAdded={workout => { setWorkouts(prev => [...prev, workout]); setShowPicker(false); }} />
+              onAdded={workout => { setWorkouts(prev => [...prev, workout]); setShowPicker(false); }}
+            />
 
           </KeyboardAvoidingView>
         </View>
@@ -526,90 +603,76 @@ export function GroupDetailSheet({ group, theme, visible, currentUserId, current
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  dismiss: { flex: 1 },
-  sheet: {
-    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1,
-    maxHeight: '92%', minHeight: '60%',
-  },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: spacing.lg, borderBottomWidth: 1,
-  },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
-  groupEmoji: { fontSize: 28 },
-  groupName: { fontSize: fontSize.lg, fontWeight: '700' },
-  groupMeta: { fontSize: fontSize.xs, marginTop: 2 },
-  tabRow: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: spacing.lg },
-  tab: { flex: 1, paddingVertical: spacing.md, alignItems: 'center' },
-  tabText: { fontSize: fontSize.sm },
-  tabContent: { flex: 1, padding: spacing.lg },
-  addWorkoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.xs, padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 1, marginBottom: spacing.md,
-  },
-  addWorkoutBtnText: { fontSize: fontSize.base, fontWeight: '700' },
-  workoutCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm },
-  workoutCardTop: { flexDirection: 'row', gap: spacing.sm },
-  workoutCardInfo: { flex: 1 },
-  workoutName: { fontSize: fontSize.base, fontWeight: '700' },
-  workoutDesc: { fontSize: fontSize.sm, lineHeight: 18, marginTop: 2 },
-  workoutMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs, flexWrap: 'wrap' },
-  diffBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.xs },
-  diffText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  workoutDuration: { fontSize: fontSize.xs },
-  completedCount: { fontSize: fontSize.xs },
-  completeBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.xs, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1,
-  },
-  completeBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
-  memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderBottomWidth: 1, gap: spacing.md },
-  memberAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  overlay:          { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  dismiss:          { flex: 1 },
+  sheet:            { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, maxHeight: '92%', minHeight: '60%' },
+  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
+  headerLeft:       { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  groupEmoji:       { fontSize: 28 },
+  groupName:        { fontSize: fontSize.lg, fontWeight: '700' },
+  groupMeta:        { fontSize: fontSize.xs, marginTop: 2 },
+  tabRow:           { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: spacing.lg },
+  tab:              { flex: 1, paddingVertical: spacing.md, alignItems: 'center' },
+  tabText:          { fontSize: fontSize.sm },
+  tabContent:       { flex: 1, padding: spacing.lg },
+  addWorkoutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.md },
+  addWorkoutBtnText:{ fontSize: fontSize.base, fontWeight: '700' },
+  workoutCard:      { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm },
+  workoutCardTop:   { flexDirection: 'row', gap: spacing.sm },
+  workoutCardInfo:  { flex: 1 },
+  workoutName:      { fontSize: fontSize.base, fontWeight: '700' },
+  workoutDesc:      { fontSize: fontSize.sm, lineHeight: 18, marginTop: 2 },
+  workoutMeta:      { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs, flexWrap: 'wrap' },
+  diffBadge:        { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.xs },
+  diffText:         { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  workoutDuration:  { fontSize: fontSize.xs },
+  completedCount:   { fontSize: fontSize.xs },
+  completeBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1 },
+  completeBtnText:  { fontSize: fontSize.sm, fontWeight: '700' },
+  memberRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderBottomWidth: 1, gap: spacing.md },
+  memberAvatar:     { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   memberAvatarText: { fontSize: fontSize.lg, fontWeight: '700' },
-  memberInfo: { flex: 1 },
-  memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  memberName: { fontSize: fontSize.base, fontWeight: '600' },
-  memberCalfitId: { fontSize: fontSize.xs, marginTop: 2 },
-  memberStreak: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  memberInfo:       { flex: 1 },
+  memberNameRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  memberName:       { fontSize: fontSize.base, fontWeight: '600' },
+  memberCalfitId:   { fontSize: fontSize.xs, marginTop: 2 },
+  memberStreak:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
   memberStreakText: { fontSize: fontSize.sm, fontWeight: '700' },
-  ownerBadge: { paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: radius.xs, borderWidth: 1 },
-  ownerBadgeText: { fontSize: 9, fontWeight: '700' },
-  chatContainer: { flex: 1 },
-  chatLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  chatList: { padding: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
-  msgRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' },
-  msgRowMe: { flexDirection: 'row-reverse' },
-  msgAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  msgAvatarText: { fontSize: fontSize.sm, fontWeight: '700' },
-  msgBubble: { maxWidth: '75%', padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, gap: 2 },
-  msgSender: { fontSize: 10, fontWeight: '700' },
-  msgContent: { fontSize: fontSize.base, lineHeight: 20 },
-  msgTime: { fontSize: 9, alignSelf: 'flex-end', marginTop: 2 },
-  chatInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, padding: spacing.md, borderTopWidth: 1 },
-  chatInput: { flex: 1, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxHeight: 100 },
-  chatInputText: { fontSize: fontSize.base },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  categoryScroll: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, maxHeight: 52 },
-  catPill: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, borderWidth: 1, marginRight: spacing.xs },
-  catPillText: { fontSize: fontSize.sm, fontWeight: '600' },
-  exerciseList: { padding: spacing.lg, gap: spacing.sm },
-  exerciseRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
-  exerciseInfo: { flex: 1 },
-  exerciseName: { fontSize: fontSize.base, fontWeight: '600' },
-  exerciseMeta: { fontSize: fontSize.xs, marginTop: 2 },
-  configLabel: { fontSize: fontSize.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md },
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '600', marginHorizontal: spacing.lg, marginBottom: spacing.xs, marginTop: spacing.md },
-  setsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, flexWrap: 'wrap' },
-  setPill: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, minWidth: 48, alignItems: 'center' },
-  setPillText: { fontSize: fontSize.base, fontWeight: '700' },
-  diffRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  diffPill: { paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center' },
-  diffPillText: { fontSize: fontSize.xs, fontWeight: '600' },
-  saveBtn: { margin: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center' },
-  saveBtnText: { fontSize: fontSize.base, fontWeight: '700' },
-  emptyState: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm },
-  emptyText: { fontSize: fontSize.sm, textAlign: 'center', maxWidth: 220 },
+  ownerBadge:       { paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: radius.xs, borderWidth: 1 },
+  ownerBadgeText:   { fontSize: 9, fontWeight: '700' },
+  chatContainer:    { flex: 1 },
+  chatLoading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  chatList:         { padding: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
+  msgRow:           { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' },
+  msgRowMe:         { flexDirection: 'row-reverse' },
+  msgAvatar:        { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  msgAvatarText:    { fontSize: fontSize.sm, fontWeight: '700' },
+  msgBubble:        { maxWidth: '75%', padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, gap: 2 },
+  msgSender:        { fontSize: 10, fontWeight: '700' },
+  msgContent:       { fontSize: fontSize.base, lineHeight: 20 },
+  msgTime:          { fontSize: 9, alignSelf: 'flex-end', marginTop: 2 },
+  chatInputRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, padding: spacing.md, borderTopWidth: 1 },
+  chatInput:        { flex: 1, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxHeight: 100 },
+  chatInputText:    { fontSize: fontSize.base },
+  sendBtn:          { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  categoryScroll:   { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, maxHeight: 52 },
+  catPill:          { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, borderWidth: 1, marginRight: spacing.xs },
+  catPillText:      { fontSize: fontSize.sm, fontWeight: '600' },
+  exerciseList:     { padding: spacing.lg, gap: spacing.sm },
+  exerciseRow:      { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
+  exerciseInfo:     { flex: 1 },
+  exerciseName:     { fontSize: fontSize.base, fontWeight: '600' },
+  exerciseMeta:     { fontSize: fontSize.xs, marginTop: 2 },
+  configLabel:      { fontSize: fontSize.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md },
+  fieldLabel:       { fontSize: fontSize.sm, fontWeight: '600', marginHorizontal: spacing.lg, marginBottom: spacing.xs, marginTop: spacing.md },
+  setsRow:          { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, flexWrap: 'wrap' },
+  setPill:          { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, minWidth: 48, alignItems: 'center' },
+  setPillText:      { fontSize: fontSize.base, fontWeight: '700' },
+  diffRow:          { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  diffPill:         { paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center' },
+  diffPillText:     { fontSize: fontSize.xs, fontWeight: '600' },
+  saveBtn:          { margin: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, alignItems: 'center' },
+  saveBtnText:      { fontSize: fontSize.base, fontWeight: '700' },
+  emptyState:       { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm },
+  emptyText:        { fontSize: fontSize.sm, textAlign: 'center', maxWidth: 220 },
 });

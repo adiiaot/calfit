@@ -281,23 +281,9 @@ CalFit_Payment_Setup_README.md         — Full store setup guide
 - Google Play: 85% to BigCut (15% small business rate for first $1M/year)
 - Referral commission: 15% of referred user's subscription for 5 years
 
----
-
-## 📋 SUGGESTED BUILD ORDER (next sessions)
-
-1. Sleep tracker screen
-2. 
-3. Post like notification in postService
-4. Personal records tracking
-5. Post-workout meal suggestions
-6. Leaderboard rank-up notification
-7. Privacy policy at calfit.tech/privacy
-8. App icon and splash screen
-9. EAS build configuration (eas.json)
 
 
-
-
+#WHAT TO DO WHEN CLIENT PAYS THE $24.99 FOR THE WORKOUTS VIDEO 
 
 **What's done right now (no money needed):**
 

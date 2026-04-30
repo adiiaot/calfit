@@ -75,6 +75,11 @@ import AccountabilityScreen from '../modules/accountability/screens/Accountabili
 
 // ── LIVE MODULE ───────────────────────────────────────────────
 import LiveScreen from '../modules/live/screens/LiveScreen';
+import GoLiveScreen from '../modules/live/screens/Golivescreen';
+import WatchLiveScreen from '../modules/live/screens/Watchlivescreen';
+
+// ── SETTINGS MODULE ───────────────────────────────────────────
+import EquipmentPreferencesScreen from '../screens/settings/EquipmentPreferenceScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
@@ -179,32 +184,37 @@ export default function AppNavigator() {
           </>
         ) : (
           <>
-            <RootStack.Screen name="Main"                component={TabNavigator} />
-            <RootStack.Screen name="Settings"            component={SettingsScreen} />
-            <RootStack.Screen name="Progress"            component={ProgressScreen} />
-            <RootStack.Screen name="Streaks"             component={StreaksScreen} />
-            <RootStack.Screen name="FoodScanner"         component={FoodScannerScreen} />
-            <RootStack.Screen name="Notifications"       component={NotificationsScreen} />
-            <RootStack.Screen name="EditProfile"         component={EditProfileScreen} />
-            <RootStack.Screen name="Goals"               component={GoalsScreen} />
-            <RootStack.Screen name="QuickStart"          component={QuickStartScreen} />
-            <RootStack.Screen name="Subscription"        component={SubscriptionScreen} />
-            <RootStack.Screen name="Credits"             component={CreditsScreen} />
-            <RootStack.Screen name="PurchaseCredits"     component={PurchaseCreditsScreen} />
-            <RootStack.Screen name="Language"            component={LanguageScreen} />
-            <RootStack.Screen name="Privacy"             component={PrivacyScreen} />
-            <RootStack.Screen name="DownloadData"        component={DownloadDataScreen} />
-            <RootStack.Screen name="Recap"               component={RecapScreen} />
-            <RootStack.Screen name="IntermittentFasting" component={IntermittentFastingScreen} />
-            <RootStack.Screen name="Sleep"               component={SleepScreen} />
-            <RootStack.Screen name="Coach"               component={CoachScreen} />
-            <RootStack.Screen name="Profile"             component={ProfileScreen} />
-            <RootStack.Screen name="Leaderboard"         component={LeaderboardScreen} />
-            <RootStack.Screen name="Community"           component={CommunityScreen} />
-            <RootStack.Screen name="Chat"                component={ChatScreen} />
-            <RootStack.Screen name="Accountability"      component={AccountabilityScreen} />
-            <RootStack.Screen name="Live"                component={LiveScreen} />
-            <RootStack.Screen name="BodyMeasurements"    component={BodyMeasurementsScreen} />
+            <RootStack.Screen name="Main"                    component={TabNavigator} />
+            <RootStack.Screen name="Settings"                component={SettingsScreen} />
+            <RootStack.Screen name="Progress"                component={ProgressScreen} />
+            <RootStack.Screen name="Streaks"                 component={StreaksScreen} />
+            <RootStack.Screen name="FoodScanner"             component={FoodScannerScreen} />
+            <RootStack.Screen name="Notifications"           component={NotificationsScreen} />
+            <RootStack.Screen name="EditProfile"             component={EditProfileScreen} />
+            <RootStack.Screen name="Goals"                   component={GoalsScreen} />
+            <RootStack.Screen name="QuickStart"              component={QuickStartScreen} />
+            <RootStack.Screen name="Subscription"            component={SubscriptionScreen} />
+            <RootStack.Screen name="Credits"                 component={CreditsScreen} />
+            <RootStack.Screen name="PurchaseCredits"         component={PurchaseCreditsScreen} />
+            <RootStack.Screen name="Language"                component={LanguageScreen} />
+            <RootStack.Screen name="Privacy"                 component={PrivacyScreen} />
+            <RootStack.Screen name="DownloadData"            component={DownloadDataScreen} />
+            <RootStack.Screen name="Recap"                   component={RecapScreen} />
+            <RootStack.Screen name="IntermittentFasting"     component={IntermittentFastingScreen} />
+            <RootStack.Screen name="Sleep"                   component={SleepScreen} />
+            <RootStack.Screen name="Coach"                   component={CoachScreen} />
+            <RootStack.Screen name="Profile"                 component={ProfileScreen} />
+            <RootStack.Screen name="Leaderboard"             component={LeaderboardScreen} />
+            <RootStack.Screen name="Community"               component={CommunityScreen} />
+            <RootStack.Screen name="Chat"                    component={ChatScreen} />
+            <RootStack.Screen name="Accountability"          component={AccountabilityScreen} />
+            <RootStack.Screen name="Live"                    component={LiveScreen} />
+            <RootStack.Screen name="BodyMeasurements"        component={BodyMeasurementsScreen} />
+
+            {/* ── NEW SCREENS ADDED ── */}
+            <RootStack.Screen name="GoLive"                  component={GoLiveScreen} />
+            <RootStack.Screen name="WatchLive"               component={WatchLiveScreen} />
+            <RootStack.Screen name="EquipmentPreferences"    component={EquipmentPreferencesScreen} />
           </>
         )}
       </RootStack.Navigator>

@@ -8,15 +8,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
+import { supabase } from '../../services/supabase';
 
 // Required for OAuth redirect handling on mobile
 WebBrowser.maybeCompleteAuthSession();
@@ -32,6 +34,84 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
 
+  // ── DEEP LINK LISTENER ────────────────────────────────────
+  // When Safari redirects back to the app after OAuth, this catches
+  // the URL and extracts the Supabase tokens from the fragment/params.
+  // Works in both Expo Go (exp+calfit://) and production builds.
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      const url = event.url;
+      if (!url) return;
+
+      // Supabase returns tokens in the URL fragment (#access_token=...)
+      // We need to parse both hash fragments and query params
+      if (url.includes('access_token') || url.includes('code=')) {
+        await handleOAuthCallback(url);
+      }
+    };
+
+    // Listen for deep links while app is open
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Also check if app was opened via deep link (cold start)
+    Linking.getInitialURL().then(url => {
+      if (url && (url.includes('access_token') || url.includes('code='))) {
+        handleOAuthCallback(url);
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  const handleOAuthCallback = async (url: string) => {
+    try {
+      // Supabase PKCE flow returns a code, exchange it for a session
+      // Parse the URL — tokens can be in hash fragment or query string
+      let accessToken: string | null = null;
+      let refreshToken: string | null = null;
+
+      // Try hash fragment first (implicit flow)
+      if (url.includes('#')) {
+        const hash = url.split('#')[1];
+        const params = new URLSearchParams(hash);
+        accessToken  = params.get('access_token');
+        refreshToken = params.get('refresh_token');
+      }
+
+      // Try query string (PKCE flow)
+      if (!accessToken && url.includes('?')) {
+        const query = url.split('?')[1]?.split('#')[0];
+        const params = new URLSearchParams(query);
+        const code = params.get('code');
+
+        if (code) {
+          // Exchange code for session via Supabase
+          const { data, error } = await supabase.auth.exchangeCodeForSession(url);
+          if (error) throw error;
+          // Session is set automatically — authStore listener handles navigation
+          return;
+        }
+
+        accessToken  = params.get('access_token');
+        refreshToken = params.get('refresh_token');
+      }
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token:  accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) throw error;
+        // authStore onAuthStateChange listener handles navigation automatically
+      }
+    } catch (e: any) {
+      console.error('[OAuth] callback error:', e);
+      Alert.alert('Sign In Failed', 'Could not complete sign in. Please try again.');
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   const handleSignIn = async () => {
     if (!email || !password) {
       Alert.alert('Missing fields', 'Please enter your email and password.');
@@ -39,21 +119,26 @@ export default function LoginScreen() {
     }
     try {
       await signIn(email, password);
-      // Auth listener in App.tsx handles redirect
     } catch (error: any) {
       Alert.alert('Sign In Failed', error.message);
     }
   };
 
   // ── GOOGLE SIGN IN ────────────────────────────────────────
-  // Uses Supabase OAuth → opens browser → redirects back to app
-  // Requires Supabase Dashboard → Auth → Providers → Google enabled
-  // and Google OAuth credentials configured
+  // WHY exp+calfit scheme:
+  //   In Expo Go the app runs under Expo's container, not your bundle ID.
+  //   Expo Go uses exp+{slug} as the deep link scheme.
+  //   Your slug in app.json is "calfit" so the scheme is "exp+calfit".
+  //   In a production EAS build this switches to com.bigcutstore.calfit.
   const handleGoogleSignIn = async () => {
     setOauthLoading('google');
     try {
-      const { supabase } = await import('../../services/supabase');
-      const redirectTo = makeRedirectUri({ scheme: 'com.bigcutstore.calfit' });
+      // Detect if running in Expo Go or production build
+      const isExpoGo = typeof __DEV__ !== 'undefined' && __DEV__;
+
+    const redirectTo = makeRedirectUri({
+  scheme: isExpoGo ? 'exp+calfit' : 'com.bigcutstore.calfit',
+});
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -66,34 +151,35 @@ export default function LoginScreen() {
       if (error) throw error;
       if (!data.url) throw new Error('No OAuth URL returned');
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      // Open browser — it will redirect back to redirectTo when done
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectTo
+      );
 
       if (result.type === 'success' && result.url) {
-        const url = new URL(result.url);
-        const accessToken = url.searchParams.get('access_token');
-        const refreshToken = url.searchParams.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-          // Auth listener handles redirect to main app
-        }
+        await handleOAuthCallback(result.url);
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        // User closed browser — not an error
+        setOauthLoading(null);
       }
     } catch (error: any) {
       Alert.alert('Google Sign In Failed', error.message ?? 'Something went wrong. Please try again.');
-    } finally {
       setOauthLoading(null);
     }
   };
 
   // ── APPLE SIGN IN ─────────────────────────────────────────
-  // Uses Supabase OAuth → opens browser → redirects back to app
-  // Requires Supabase Dashboard → Auth → Providers → Apple enabled
-  // and Apple Developer account with Sign in with Apple configured
+  // Requires Apple Developer account + Sign In with Apple capability.
+  // The button shows on iOS — will work once Apple Dev account is set up.
   const handleAppleSignIn = async () => {
     setOauthLoading('apple');
     try {
-      const { supabase } = await import('../../services/supabase');
-      const redirectTo = makeRedirectUri({ scheme: 'com.bigcutstore.calfit' });
+      const isExpoGo = typeof __DEV__ !== 'undefined' && __DEV__;
+
+    const redirectTo = makeRedirectUri({
+  scheme: isExpoGo ? 'exp+calfit' : 'com.bigcutstore.calfit',
+});
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
@@ -106,20 +192,18 @@ export default function LoginScreen() {
       if (error) throw error;
       if (!data.url) throw new Error('No OAuth URL returned');
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectTo
+      );
 
       if (result.type === 'success' && result.url) {
-        const url = new URL(result.url);
-        const accessToken = url.searchParams.get('access_token');
-        const refreshToken = url.searchParams.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        }
+        await handleOAuthCallback(result.url);
+      } else {
+        setOauthLoading(null);
       }
     } catch (error: any) {
       Alert.alert('Apple Sign In Failed', error.message ?? 'Something went wrong. Please try again.');
-    } finally {
       setOauthLoading(null);
     }
   };
@@ -130,9 +214,8 @@ export default function LoginScreen() {
       return;
     }
     try {
-      const { supabase } = await import('../../services/supabase');
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'com.bigcutstore.calfit://reset-password',
+        redirectTo: 'exp+calfit://reset-password',
       });
       if (error) throw error;
       Alert.alert('Check your email', `We sent a password reset link to ${email}`);
@@ -216,8 +299,15 @@ export default function LoginScreen() {
             secureTextEntry={!showPassword}
             autoCorrect={false}
           />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textMuted} />
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
+              color={theme.textMuted}
+            />
           </TouchableOpacity>
         </View>
 
@@ -262,45 +352,28 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  backBtn: { padding: spacing.lg, paddingBottom: 0 },
-  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
-
-  title: { fontSize: 28, fontWeight: '800' },
-  sub: { fontSize: fontSize.lg, marginTop: 4 },
-
-  socialBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1,
-  },
+  safe:       { flex: 1 },
+  backBtn:    { padding: spacing.lg, paddingBottom: 0 },
+  container:  { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
+  title:      { fontSize: 28, fontWeight: '800' },
+  sub:        { fontSize: fontSize.lg, marginTop: 4 },
+  socialBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
   googleIcon: { fontSize: 18, fontWeight: '900', color: '#4285F4' },
   socialBtnText: { fontSize: fontSize.lg, fontWeight: '600' },
-
-  divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  dividerLine: { flex: 1, height: 1 },
-  dividerText: { fontSize: fontSize.sm },
-
+  divider:    { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  dividerLine:{ flex: 1, height: 1 },
+  dividerText:{ fontSize: fontSize.sm },
   inputLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: -spacing.xs },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: spacing.sm,
-  },
-  input: { flex: 1, fontSize: fontSize.lg },
-
-  forgotBtn: { alignSelf: 'flex-end' },
+  inputWrap:  { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: spacing.sm },
+  input:      { flex: 1, fontSize: fontSize.lg },
+  forgotBtn:  { alignSelf: 'flex-end' },
   forgotText: { fontSize: fontSize.base, fontWeight: '600' },
-
   signInBtnWrap: { borderRadius: radius.lg, overflow: 'hidden' },
-  signInBtn: { padding: spacing.lg, alignItems: 'center', borderRadius: radius.lg },
+  signInBtn:  { padding: spacing.lg, alignItems: 'center', borderRadius: radius.lg },
   signInBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
-
-  biometricBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1,
-  },
+  biometricBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
   biometricText: { fontSize: fontSize.base, fontWeight: '500' },
-
-  signUpRow: { flexDirection: 'row', justifyContent: 'center' },
+  signUpRow:  { flexDirection: 'row', justifyContent: 'center' },
   signUpText: { fontSize: fontSize.base },
   signUpLink: { fontSize: fontSize.base, fontWeight: '700' },
 });

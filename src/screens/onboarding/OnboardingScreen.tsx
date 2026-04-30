@@ -172,7 +172,7 @@ function Step2Goal({ theme, selected, onSelect }: { theme: typeof colors.light; 
   return (<StepWrap><StepTitle text={`What's your\nprimary goal?`} theme={theme} /><StepSub text="We'll build your entire plan around this." theme={theme} /><View style={styles.gridRow}>{goals.map((g) => <GridTile key={g.label} label={g.label} emoji={g.emoji} selected={selected === g.label} onPress={() => onSelect(g.label)} theme={theme} />)}</View></StepWrap>);
 }
 function Step3Gender({ theme, selected, onSelect }: { theme: typeof colors.light; selected: string; onSelect: (g: string) => void }) {
-  return (<StepWrap><StepTitle text="Which best describes you?" theme={theme} /><StepSub text="This helps us calculate your calorie needs accurately." theme={theme} /><View style={styles.levelList}>{[{ label: 'Male', emoji: '♂️' }, { label: 'Female', emoji: '♀️' }, { label: 'Other', emoji: '⚧️' }].map((o) => <Tile key={o.label} label={o.label} emoji={o.emoji} selected={selected === o.label} onPress={() => onSelect(o.label)} theme={theme} />)}</View></StepWrap>);
+  return (<StepWrap><StepTitle text="Which best describes you?" theme={theme} /><StepSub text="This helps us calculate your calorie needs accurately." theme={theme} /><View style={styles.levelList}>{[{ label: 'Male', emoji: '♂️' }, { label: 'Female', emoji: '♀️' },].map((o) => <Tile key={o.label} label={o.label} emoji={o.emoji} selected={selected === o.label} onPress={() => onSelect(o.label)} theme={theme} />)}</View></StepWrap>);
 }
 function Step4Age({ theme, value, onChange }: { theme: typeof colors.light; value: string; onChange: (v: string) => void }) {
   return (<StepWrap><StepTitle text="How old are you?" theme={theme} /><StepSub text="Your metabolism and calorie targets depend on this." theme={theme} /><View style={styles.bigInputWrap}><TextInput value={value} onChangeText={onChange} placeholder="25" placeholderTextColor={theme.textMuted} keyboardType="number-pad" maxLength={3} style={[styles.bigInput, { color: theme.textPrimary, borderColor: value ? theme.accent : theme.border }]} /><Text style={[styles.bigInputSuffix, { color: theme.textSecondary }]}>years</Text></View></StepWrap>);
@@ -560,11 +560,6 @@ export default function OnboardingScreen() {
     await saveProfileData(sessionData.user.id);
   }
 }
-
-// Small delay to let authStore settle before we advance the step
-// Without this, the auth listener and setStep race each other
-await new Promise(resolve => setTimeout(resolve, 300));
-setStep('generating');
 
       // Proceed to generating screen
       setStep('generating');

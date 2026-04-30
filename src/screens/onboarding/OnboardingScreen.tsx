@@ -550,16 +550,21 @@ export default function OnboardingScreen() {
         refreshToken = params.get('refresh_token');
       }
 
-      if (accessToken && refreshToken) {
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken, refresh_token: refreshToken,
-        });
-        if (sessionError) throw sessionError;
+    if (accessToken && refreshToken) {
+  const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+    access_token: accessToken, refresh_token: refreshToken,
+  });
+  if (sessionError) throw sessionError;
 
-        if (sessionData.user) {
-          await saveProfileData(sessionData.user.id);
-        }
-      }
+  if (sessionData.user) {
+    await saveProfileData(sessionData.user.id);
+  }
+}
+
+// Small delay to let authStore settle before we advance the step
+// Without this, the auth listener and setStep race each other
+await new Promise(resolve => setTimeout(resolve, 300));
+setStep('generating');
 
       // Proceed to generating screen
       setStep('generating');

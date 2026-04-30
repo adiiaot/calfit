@@ -15,7 +15,7 @@ import { setupNotificationHandler } from './src/services/reminderService';
 setupNotificationHandler();
 
 export default function App() {
-  const { setSession, setOnboarding, user } = useAuthStore();
+  const { setSession, user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
 
@@ -26,13 +26,15 @@ export default function App() {
   });
 
   useEffect(() => {
-    // Load existing session on app start
+    // On app start — restore existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+
       if (session?.user) {
         setTimeout(async () => {
           try {
-            const { data } = await supabase.from('profiles').select('last_active_date').eq('id', session.user.id).single();
+            const { data } = await supabase.from('profiles')
+              .select('last_active_date').eq('id', session.user.id).single();
             if (data) {
               const { checkAndSendStreakReminder } = await import('./src/services/notificationService');
               await checkAndSendStreakReminder(session.user.id, data.last_active_date);
@@ -42,31 +44,14 @@ export default function App() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // setSession handles auth state — does NOT touch isOnboarding
+    // Auth state changes — ONLY call setSession.
+    // Never touch isOnboarding here — OnboardingScreen owns that flag.
+    // setSession loads the profile for display but does NOT change routing.
+    // Routing is controlled exclusively by isOnboarding which is set by:
+    //   - OnboardingScreen.setOnboarding(true)  → locks to onboarding
+    //   - OnboardingScreen.handleSkip/Trial/Pay → setOnboarding(false) → home
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-
-      // When a new user signs in via OAuth for the first time (SIGNED_IN event),
-      // check if their profile has a goal. If not, they need onboarding + paywall.
-      // We only do this for SIGNED_IN events — not TOKEN_REFRESHED etc.
-      if (event === 'SIGNED_IN' && session?.user) {
-        // Small delay to let setSession/loadProfile settle first
-        setTimeout(async () => {
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('goal')
-              .eq('id', session.user.id)
-              .single();
-
-            // No goal = brand new OAuth user who hasn't done onboarding
-            if (!profile?.goal) {
-              setOnboarding(true);
-            }
-            // Has goal = returning user → isOnboarding stays false → home screen
-          } catch {}
-        }, 500);
-      }
     });
 
     return () => subscription.unsubscribe();

@@ -8,8 +8,10 @@ interface AuthState {
   user: User | null; session: Session | null; profile: Profile | null;
   isLoading: boolean; isAuthenticated: boolean; isOnboarding: boolean;
   userTier: 'free' | 'pro' | 'premium'; coachPersonality: CoachPersonality; liveSteps: number;
-  setLiveSteps: (steps: number) => void; setSession: (session: Session | null) => void;
-  setOnboarding: (v: boolean) => void; loadProfile: (userId: string) => Promise<void>;
+  setLiveSteps: (steps: number) => void;
+  setSession: (session: Session | null) => void;
+  setOnboarding: (v: boolean) => void;
+  loadProfile: (userId: string) => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => void;
   setCoachPersonality: (personality: CoachPersonality) => void;
   signIn: (email: string, password: string) => Promise<void>;
@@ -21,28 +23,59 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null, session: null, profile: null, isLoading: false,
   isAuthenticated: false, isOnboarding: false, userTier: 'free',
   coachPersonality: 'balanced', liveSteps: 0,
+
   setLiveSteps: (steps) => set({ liveSteps: steps }),
   setOnboarding: (v) => set({ isOnboarding: v }),
-  setCoachPersonality: (personality) => set({ coachPersonality: personality }),
+  setCoachPersonality: (p) => set({ coachPersonality: p }),
+
   setSession: (session) => {
     if (!session) {
       set({ session: null, user: null, profile: null, isAuthenticated: false, isOnboarding: false });
       return;
     }
     set({ session, user: session.user, isAuthenticated: true });
-    get().loadProfile(session.user.id);
+
+    // Only load profile if OnboardingScreen is NOT currently running.
+    // If isOnboarding=true, OnboardingScreen owns the flow — don't interfere.
+    // loadProfile might flip isOnboarding based on profile state which would
+    // unmount OnboardingScreen mid-flow.
+    if (!get().isOnboarding) {
+      get().loadProfile(session.user.id);
+    }
   },
+
   loadProfile: async (userId: string) => {
     try {
       const { getProfile } = await import('../services/profileService');
       const profile = await getProfile(userId);
-      if (profile) set({ profile });
-    } catch (error) { console.error('[authStore] loadProfile error:', error); }
+
+      if (profile) {
+        set({ profile });
+
+        // Only change isOnboarding if OnboardingScreen hasn't locked it.
+        // If isOnboarding is already true (mid-flow), leave it alone.
+        if (!get().isOnboarding) {
+          // No goal = brand new OAuth user from LoginScreen who needs onboarding
+          // Has goal = returning user → stay on home screen (isOnboarding stays false)
+          if (!profile.goal) {
+            set({ isOnboarding: true });
+          }
+        }
+      } else {
+        if (!get().isOnboarding) {
+          set({ isOnboarding: true });
+        }
+      }
+    } catch (e) {
+      console.error('[authStore] loadProfile error:', e);
+    }
   },
+
   updateProfile: (updates) => {
     const current = get().profile;
     if (current) set({ profile: { ...current, ...updates } });
   },
+
   signIn: async (email, password) => {
     set({ isLoading: true });
     try {
@@ -51,6 +84,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) throw error;
     } finally { set({ isLoading: false }); }
   },
+
   signUp: async (email, password) => {
     set({ isLoading: true });
     try {
@@ -59,8 +93,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) throw error;
     } finally { set({ isLoading: false }); }
   },
+
   signOut: async () => {
-    try { const { supabase } = await import('../services/supabase'); await supabase.auth.signOut(); } catch {}
+    try {
+      const { supabase } = await import('../services/supabase');
+      await supabase.auth.signOut();
+    } catch {}
     set({ user: null, session: null, profile: null, isOnboarding: false, isAuthenticated: false, userTier: 'free', coachPersonality: 'balanced', liveSteps: 0 });
   },
 }));

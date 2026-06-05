@@ -296,7 +296,20 @@ export default function AccountabilityScreen() {
   const myStreak = (profile as any)?.streak_count ?? 0;
   const myAvatar = (profile as any)?.avatar_url ?? null;
 
-  const firstPartner     = partners[0]?.partner_profile as any;
+  const safePartners = partners
+    .filter(p => p !== null && p !== undefined)
+    .map(p => ({
+      ...p,
+      partner_profile: p.partner_profile ?? {
+        full_name: 'CalFit User',
+        calfit_id: '',
+        streak_count: 0,
+        avatar_url: null,
+        goal: '',
+      } as any,
+    }));
+
+  const firstPartner     = safePartners[0]?.partner_profile as any;
   const partnerStreak    = firstPartner?.streak_count ?? 0;
   const partnerName      = firstPartner?.full_name ?? 'Partner';
   const partnerAvatar    = firstPartner?.avatar_url ?? null;
@@ -317,7 +330,7 @@ export default function AccountabilityScreen() {
           <Text style={styles.headerTitle}>Accountability</Text>
           <Text style={styles.headerSub}>Keep each other on track</Text>
         </View>
-        {partners.length < MAX_PARTNERS && (
+        {safePartners.length < MAX_PARTNERS && (
           <TouchableOpacity onPress={() => setShowInvite(true)} style={styles.addBtn}>
             <Ionicons name="person-add-outline" size={16} color="#fff" />
             <Text style={styles.addBtnText}>Add</Text>
@@ -329,7 +342,7 @@ export default function AccountabilityScreen() {
       <View style={[styles.limitBar, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
         <Ionicons name="people-outline" size={13} color={theme.accent} />
         <Text style={[styles.limitText, { color: theme.accent }]}>
-          {partners.length}/{MAX_PARTNERS} partners · Fitness progress only is shared
+          {safePartners.length}/{MAX_PARTNERS} partners · Fitness progress only is shared
         </Text>
       </View>
 
@@ -345,7 +358,7 @@ export default function AccountabilityScreen() {
             <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={BLUE} colors={[BLUE]} />
           }
         >
-          {partners.length === 0 ? (
+          {safePartners.length === 0 ? (
             <>
               {/* Empty state with feature preview */}
               <View style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg, marginTop: spacing.lg }]}>
@@ -399,11 +412,11 @@ export default function AccountabilityScreen() {
               </View>
 
               {/* Shared goal */}
-              {partners[0] && (
+              {safePartners[0] && (
                 <SharedGoalCard
                   theme={theme}
                   partnerName={partnerName}
-                  partnerId={(partners[0] as any).partner_id}
+                  partnerId={(safePartners[0] as any)?.partner_id}
                   currentUserId={user?.id ?? ''}
                 />
               )}
@@ -411,9 +424,9 @@ export default function AccountabilityScreen() {
               {/* Quick actions row */}
               <View style={styles.actionsRow}>
                 <TouchableOpacity
-                  onPress={() => partners[0] && handleMessage(
-                    (partners[0] as any).partner_id,
-                    partners[0]
+                  onPress={() => safePartners[0] && handleMessage(
+                    (safePartners[0] as any)?.partner_id,
+                    safePartners[0]
                   )}
                   style={[styles.actionBtn, { backgroundColor: BLUE + '18', borderColor: BLUE + '40' }]}
                 >
@@ -442,27 +455,27 @@ export default function AccountabilityScreen() {
                   Your Partners
                 </Text>
               </View>
-              {partners.map((partner) => (
+              {safePartners.map((partner) => (
                 <PartnerCard
                   key={(partner as any).id}
                   partner={partner}
                   theme={theme}
                   currentUserId={user?.id ?? ''}
                   onMessage={() => handleMessage((partner as any).partner_id, partner)}
-                  onRemove={() => handleRemove((partner as any).partner_id, (partner as any).partner_profile?.full_name ?? 'Partner')}
+                  onRemove={() => handleRemove((partner as any).partner_id, (partner as any).partner_profile?.full_name ?? 'CalFit User')}
                   onProfilePress={() => navigation.navigate('Profile' as never, { userId: (partner as any).partner_id } as never)}
                 />
               ))}
 
               {/* Add more button if slots remain */}
-              {partners.length < MAX_PARTNERS && (
+              {safePartners.length < MAX_PARTNERS && (
                 <TouchableOpacity
                   onPress={() => setShowInvite(true)}
                   style={[styles.addMoreBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
                 >
                   <Ionicons name="person-add-outline" size={18} color={theme.accent} />
                   <Text style={[styles.addMoreText, { color: theme.accent }]}>
-                    Add another partner ({MAX_PARTNERS - partners.length} slot{MAX_PARTNERS - partners.length !== 1 ? 's' : ''} left)
+                    Add another partner ({MAX_PARTNERS - safePartners.length} slot{MAX_PARTNERS - safePartners.length !== 1 ? 's' : ''} left)
                   </Text>
                 </TouchableOpacity>
               )}

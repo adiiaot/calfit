@@ -231,6 +231,16 @@ export const checkAndSendStreakReminder = async (
   );
   
 };
+export const sendWelcomeNotification = async (userId: string, userName: string) => {
+  await sendNotification(
+    userId,
+    'welcome',
+    `Welcome to CalFit, ${userName}! 🎉`,
+    'Your personalised fitness plan is ready. Start tracking your calories, workouts, and more!',
+    'Get Started'
+  );
+};
+
 export const notifyKudosReceived = async (
   postOwnerId: string,
   reactorName: string,

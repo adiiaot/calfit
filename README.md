@@ -1,6 +1,6 @@
-# CalFit — AI-Powered Fitness & Nutrition App
+# Fitness Space — AI-Powered Fitness & Nutrition App
 
-> **Contract Project** · Developed by [AOT](https://github.com/adiiaot) for Fabs Development
+> Developed by [AOT](https://github.com/adiiaot) under the AOT NETWORK
 
 [![React Native](https://img.shields.io/badge/React_Native-0.74-61DAFB?style=flat&logo=react)](https://reactnative.dev)
 [![Expo](https://img.shields.io/badge/Expo-51-000020?style=flat&logo=expo)](https://expo.dev)
@@ -13,10 +13,7 @@
 
 ## Overview
 
-CalFit is a comprehensive health and fitness tracking mobile application built for iOS and Android using React Native and Expo. It combines calorie tracking, AI-powered coaching, workout logging, social features, and a referral-based earnings system into a single, beautifully designed platform.
-
-The app is built with a modular architecture — core components, including the social and chat system, are designed as reusable modules that can be extracted and dropped into future BigCut white-label partner applications without rebuilding from scratch.
-
+Fitness Space is a comprehensive health and fitness tracking mobile application built for iOS and Android using React Native and Expo. It combines calorie, steps and sleep tracking for recovery, workout logging, and streaks system into a single, beautifully designed platform.
 ---
 
 ## Live Prototype
@@ -32,17 +29,17 @@ The app is built with a modular architecture — core components, including the 
 | Screen | Description |
 |--------|-------------|
 | Welcome | Brand intro, feature highlights, sign up / login CTAs |
-| Login | Google, Apple, email/password, Face ID / Fingerprint |
-| Onboarding | 7-step personalisation flow — goal, body stats, activity, tracking, diet, CalFit ID, preferences |
+| Login | Google, Apple, email/password |
+| Onboarding | 7-step personalisation flow — goal, body stats, activity, tracking, diet, CalFit ID, preferences | TO BE EDITED
 | Home Dashboard | Readiness score, calorie donut ring, streak day dots, friends ticker, mood check-in |
 | Calorie Tracker | Donut ring summary, Claude Vision food scanner, water intake, meal sections |
-| Food Scanner | AI food detection via Claude Vision — Scan Food / Barcode / Food Label modes |
-| Meal Planner | 1–30 day plans, manual or AI-generated with Coach preference questions |
+| Food Scanner | AI food detection via Claude Vision — Scan Food / Barcode / Food Label modes | TO BE REMOVED
+| Meal Planner | 1–30 day plans, manual or AI-generated with Coach preference questions | TO BE REMOVED
 | Workout | Today / Calories / Steps / History tabs — exercises, step bar chart, activity timeline |
-| Social Feed | Stories, posts, kudos reactions, discovery + following tabs |
+| Social Feed | Stories, posts, kudos reactions, discovery + following tabs | TO BE REMOVED
 | Streaks | Personal streak with day dots + gold badge, partner streak, group streak, milestone badges |
-| Earnings | Wallet balance, CalFit Points store, referral summary, payout methods |
-| Community | Group cards, challenges with progress bars, create group |
+| Earnings | Wallet balance, CalFit Points store, referral summary, payout methods | TO BE REMOVED
+| Community | Group cards, challenges with progress bars, create group | TO BE REMOVED
 | My Progress | Weight chart, stats grid, streak progress, body measurements |
 | Settings | Profile, preferences, connected apps, privacy controls |
 

@@ -171,9 +171,10 @@ function TabNavigator() {
 export default function AppNavigator() {
   const { user, isOnboarding } = useAuthStore();
   const showAuth = !user || isOnboarding;
+  const navKey = (user && !isOnboarding) ? `authed-${user.id}` : 'guest';
 
   return (
-    <NavigationContainer key={user ? `authed-${user.id}` : 'guest'}>
+    <NavigationContainer key={navKey}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {showAuth ? (
           <>

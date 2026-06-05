@@ -3,33 +3,48 @@ import {
   Alert, ActivityIndicator, Animated, Easing, ScrollView,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 
-WebBrowser.maybeCompleteAuthSession();
-
 const GRAD_START = '#F0427C';
 const GRAD_MID   = '#FF6B35';
 const GREEN      = '#2DDC8C';
 
+const demoSignIn = async () => {
+  const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+  if (anonError || !anonData?.session) {
+    const mockId = 'demo-' + Date.now();
+    useAuthStore.setState({
+      session: { user: { id: mockId, email: 'demo@calfit.app' } } as any,
+      user: { id: mockId, email: 'demo@calfit.app' } as any,
+      isAuthenticated: true,
+      isOnboarding: false,
+    });
+    await supabase.from('profiles').upsert({
+      id: mockId, full_name: 'Demo User', goal: 'Get Fit',
+    });
+  } else {
+    await supabase.from('profiles').upsert({
+      id: anonData.session.user.id, full_name: 'Demo User', goal: 'Get Fit',
+    });
+  }
+};
+
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { signIn, isLoading } = useAuthStore();
   const theme = colors[colorScheme];
 
   const [email, setEmail]               = useState('');
   const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+  const [loading, setLoading]           = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
 
   const emailAnim = useRef(new Animated.Value(0)).current;
@@ -45,72 +60,15 @@ export default function LoginScreen() {
     }).start();
   };
 
-  useEffect(() => {
-    const sub = Linking.addEventListener('url', async ({ url }) => {
-      if (url?.includes('access_token') || url?.includes('code=')) await handleOAuthCallback(url);
-    });
-    Linking.getInitialURL().then(url => {
-      if (url && (url.includes('access_token') || url.includes('code='))) handleOAuthCallback(url);
-    });
-    return () => sub.remove();
-  }, []);
-
-  const handleOAuthCallback = async (url: string) => {
-    try {
-      let at: string | null = null, rt: string | null = null;
-      if (url.includes('#')) {
-        const p = new URLSearchParams(url.split('#')[1]);
-        at = p.get('access_token'); rt = p.get('refresh_token');
-      }
-      if (!at && url.includes('?')) {
-        const p = new URLSearchParams(url.split('?')[1]?.split('#')[0]);
-        const code = p.get('code');
-        if (code) { const { error } = await supabase.auth.exchangeCodeForSession(url); if (error) throw error; return; }
-        at = p.get('access_token'); rt = p.get('refresh_token');
-      }
-      if (at && rt) {
-        const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
-        if (error) throw error;
-      }
-    } catch (e: any) {
-      Alert.alert('Sign In Failed', 'Could not complete sign in. Please try again.');
-    } finally { setOauthLoading(null); }
+  const handleDemoSignIn = async () => {
+    setLoading(true);
+    await demoSignIn();
+    setLoading(false);
   };
 
-  const handleSignIn = async () => {
-    if (!email || !password) { Alert.alert('Missing fields', 'Please enter your email and password.'); return; }
-    try { await signIn(email, password); }
-    catch (error: any) { Alert.alert('Sign In Failed', error.message); }
+  const handleForgotPassword = () => {
+    Alert.alert('Demo Mode', 'Password reset is disabled in demo mode. Tap any option above to sign in instantly.');
   };
-
-  const doOAuth = async (provider: 'google' | 'apple') => {
-    setOauthLoading(provider);
-    try {
-      const redirectTo = __DEV__ ? 'exp+calfit://' : 'com.bigcutstore.calfit://';
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider, options: { redirectTo, skipBrowserRedirect: true },
-      });
-      if (error) throw error;
-      if (!data.url) throw new Error('No OAuth URL');
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, { showInRecents: false, createTask: false });
-      if (result.type === 'success' && (result as any).url) await handleOAuthCallback((result as any).url);
-      else setOauthLoading(null);
-    } catch (error: any) {
-      Alert.alert(`${provider === 'google' ? 'Google' : 'Apple'} Sign In Failed`, error.message ?? 'Something went wrong.');
-      setOauthLoading(null);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!email) { Alert.alert('Enter your email', 'Type your email above first.'); return; }
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'exp+calfit://reset-password' });
-      if (error) throw error;
-      Alert.alert('Check your email', `Reset link sent to ${email}`);
-    } catch (error: any) { Alert.alert('Error', error.message); }
-  };
-
-  const disabled = oauthLoading !== null || isLoading;
 
   const emailMaxHeight = emailAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 420] });
   const emailOpacity   = emailAnim;
@@ -133,35 +91,41 @@ export default function LoginScreen() {
             <Text style={styles.logoLetter}>C</Text>
           </LinearGradient>
           <Text style={[styles.title, { color: theme.textPrimary }]}>Welcome back</Text>
-          <Text style={[styles.sub, { color: theme.textSecondary }]}>Sign in to continue your fitness journey</Text>
+          <Text style={[styles.sub, { color: theme.textSecondary }]}>Demo mode — tap any option to sign in instantly</Text>
+        </View>
+
+        {/* Demo badge */}
+        <View style={[styles.demoBadge, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
+          <Ionicons name="lock-open-outline" size={14} color={theme.accent} />
+          <Text style={[styles.demoBadgeText, { color: theme.accent }]}>Authentication disabled for demo</Text>
         </View>
 
         {/* Google card */}
-        <TouchableOpacity onPress={() => doOAuth('google')} disabled={disabled} activeOpacity={0.85}
+        <TouchableOpacity onPress={handleDemoSignIn} disabled={loading} activeOpacity={0.85}
           style={[styles.oauthCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={[styles.oauthIconBox, { backgroundColor: '#fff', borderColor: '#E0E0E0' }]}>
-            {oauthLoading === 'google'
+            {loading
               ? <ActivityIndicator size="small" color="#4285F4" />
               : <Text style={styles.googleG}>G</Text>}
           </View>
           <View style={styles.oauthText}>
             <Text style={[styles.oauthTitle, { color: theme.textPrimary }]}>Continue with Google</Text>
-            <Text style={[styles.oauthSub, { color: theme.textMuted }]}>Sign in with your Google account</Text>
+            <Text style={[styles.oauthSub, { color: theme.textMuted }]}>Demo — one tap access</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
         </TouchableOpacity>
 
         {/* Apple card */}
-        <TouchableOpacity onPress={() => doOAuth('apple')} disabled={disabled} activeOpacity={0.85}
+        <TouchableOpacity onPress={handleDemoSignIn} disabled={loading} activeOpacity={0.85}
           style={[styles.oauthCard, { backgroundColor: '#000', borderColor: '#222' }]}>
           <View style={[styles.oauthIconBox, { backgroundColor: '#1C1C1E', borderColor: '#333' }]}>
-            {oauthLoading === 'apple'
+            {loading
               ? <ActivityIndicator size="small" color="#fff" />
               : <Ionicons name="logo-apple" size={22} color="#fff" />}
           </View>
           <View style={styles.oauthText}>
             <Text style={[styles.oauthTitle, { color: '#fff' }]}>Continue with Apple</Text>
-            <Text style={[styles.oauthSub, { color: 'rgba(255,255,255,0.5)' }]}>Sign in with your Apple ID</Text>
+            <Text style={[styles.oauthSub, { color: 'rgba(255,255,255,0.5)' }]}>Demo — one tap access</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
@@ -174,7 +138,7 @@ export default function LoginScreen() {
         </View>
 
         {/* Email toggle */}
-        <TouchableOpacity onPress={toggleEmail} disabled={disabled} activeOpacity={0.8}
+        <TouchableOpacity onPress={toggleEmail} disabled={loading} activeOpacity={0.8}
           style={[styles.emailToggle, {
             backgroundColor: showEmailForm ? theme.accentDim as string : theme.card,
             borderColor: showEmailForm ? theme.accent : theme.border,
@@ -186,7 +150,7 @@ export default function LoginScreen() {
           <Ionicons name={showEmailForm ? 'chevron-up' : 'chevron-down'} size={15} color={showEmailForm ? theme.accent : theme.textMuted} />
         </TouchableOpacity>
 
-        {/* Collapsible email form */}
+        {/* Collapsible email form (demo — UI only) */}
         <Animated.View style={{ maxHeight: emailMaxHeight, opacity: emailOpacity, overflow: 'hidden' }}>
           <View style={[styles.emailCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
@@ -209,10 +173,10 @@ export default function LoginScreen() {
             <TouchableOpacity onPress={handleForgotPassword} style={{ alignSelf: 'flex-end', marginBottom: spacing.md }}>
               <Text style={[styles.forgotText, { color: theme.accent }]}>Forgot password?</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSignIn} disabled={disabled} activeOpacity={0.85}
-              style={{ borderRadius: radius.lg, overflow: 'hidden', opacity: disabled ? 0.6 : 1 }}>
+            <TouchableOpacity onPress={handleDemoSignIn} disabled={loading} activeOpacity={0.85}
+              style={{ borderRadius: radius.lg, overflow: 'hidden', opacity: loading ? 0.6 : 1 }}>
               <LinearGradient colors={[GRAD_START, GRAD_MID] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signInBtn}>
-                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.signInText}>Sign In</Text>}
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.signInText}>Sign In (Demo)</Text>}
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -259,6 +223,8 @@ const styles = StyleSheet.create({
   divider:         { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.md },
   divLine:         { flex: 1, height: 1 },
   divText:         { fontSize: fontSize.sm },
+  demoBadge:       { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md },
+  demoBadgeText:   { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
   emailToggle:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, marginBottom: spacing.sm },
   emailToggleText: { flex: 1, fontSize: fontSize.base, fontWeight: '600' },
   emailCard:       { borderRadius: radius.xl, borderWidth: 1, padding: spacing.lg, gap: spacing.xs, marginBottom: spacing.sm },

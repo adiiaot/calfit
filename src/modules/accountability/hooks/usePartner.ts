@@ -37,7 +37,7 @@ export function usePartner(userId: string) {
 
   const remove = async (partnerId: string): Promise<void> => {
     await removePartner(userId, partnerId);
-    setPartners((prev) => prev.filter((p) => p.partner_id !== partnerId));
+    setPartners((prev) => prev.filter((p) => p && p.partner_id !== partnerId));
   };
 
   return { partners, isLoading, isAdding, add, remove, reload: load };

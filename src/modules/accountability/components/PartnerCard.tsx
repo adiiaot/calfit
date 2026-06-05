@@ -4,6 +4,8 @@ import { colors, spacing, radius, fontSize } from '../../../theme';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { PartnerData } from '../services/PartnerService';
 
+const ORANGE = '#FFB347';
+
 interface Props {
   partner: PartnerData;
   theme: typeof colors.dark;
@@ -81,8 +83,8 @@ export function PartnerCard({
 
       {/* Stats */}
       <View style={styles.statsRow}>
-        <View style={[styles.stat, { backgroundColor: theme.orange + '18' }]}>
-          <Text style={[styles.statValue, { color: theme.orange }]}>
+        <View style={[styles.stat, { backgroundColor: ORANGE + '18' }]}>
+          <Text style={[styles.statValue, { color: ORANGE }]}>
             {profile.streak_count ?? 0}🔥
           </Text>
           <Text style={[styles.statLabel, { color: theme.textMuted }]}>Streak</Text>

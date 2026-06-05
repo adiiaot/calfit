@@ -16,16 +16,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as WebBrowser from 'expo-web-browser';
-import { HumanVerify } from '../../components/HumanVerify';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-
-WebBrowser.maybeCompleteAuthSession();
 
 // ── USERNAME VALIDATION ───────────────────────────────────────
 const validateUsername = (v: string): string | null => {
@@ -305,10 +301,7 @@ function Step15Account({ theme, email, setEmail, password, setPassword, onGoogle
 }) {
   const [showPwd, setShowPwd]             = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
-  const [verified, setVerified]           = useState(false);
-  const [pendingAction, setPendingAction] = useState<'google' | 'apple' | 'email' | null>(null);
 
-  const verifyRef = useRef<any>(null);
   const emailAnim = useRef(new Animated.Value(0)).current;
 
   const GRAD_START = '#F0427C';
@@ -325,37 +318,10 @@ function Step15Account({ theme, email, setEmail, password, setPassword, onGoogle
     }).start();
   };
 
-  // Require verification before any action
-  const requireVerify = (action: 'google' | 'apple' | 'email') => {
-    if (verified) {
-      fireAction(action);
-      return;
-    }
-    setPendingAction(action);
-    verifyRef.current?.show();
-  };
-
-  const onVerified = () => {
-    setVerified(true);
-    if (pendingAction) {
-      fireAction(pendingAction);
-      setPendingAction(null);
-    }
-  };
-
-  const fireAction = (action: 'google' | 'apple' | 'email') => {
-    if (action === 'google') onGoogleSignUp();
-    else if (action === 'apple') onAppleSignUp();
-    else if (!showEmailForm) toggleEmail();
-  };
-
   const emailMaxH = emailAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 340] });
 
   return (
     <StepWrap>
-      {/* Human verification modal */}
-      <HumanVerify ref={verifyRef} onVerified={onVerified} />
-
       {/* Header */}
       <View style={s15.headerWrap}>
         <LinearGradient
@@ -369,30 +335,23 @@ function Step15Account({ theme, email, setEmail, password, setPassword, onGoogle
         <StepSub text="Your personalised plan is ready. Create your account to save it." theme={theme} />
       </View>
 
-      {/* Verification status badge */}
-      <View style={[s15.securityBadge, {
-        backgroundColor: verified ? (theme.accentDim as string) : theme.card,
-        borderColor: verified ? theme.accent : theme.border,
-      }]}>
-        <Ionicons
-          name={verified ? 'shield-checkmark' : 'shield-checkmark-outline'}
-          size={16}
-          color={verified ? theme.accent : theme.textMuted}
-        />
-        <Text style={[s15.securityText, { color: verified ? theme.accent : theme.textMuted }]}>
-          {verified ? '✓ Security verified — choose how to sign up' : 'Tap any option below to verify you\'re human'}
+      {/* Demo badge */}
+      <View style={[s15.securityBadge, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
+        <Ionicons name="lock-open-outline" size={16} color={theme.accent} />
+        <Text style={[s15.securityText, { color: theme.accent }]}>
+          Demo mode — tap any option to continue instantly
         </Text>
       </View>
 
       {/* Google */}
       <TouchableOpacity
-        onPress={() => requireVerify('google')}
+        onPress={onGoogleSignUp}
         disabled={isLoading}
         activeOpacity={0.85}
         style={[s15.oauthCard, { backgroundColor: theme.card, borderColor: theme.border }]}
       >
         <View style={[s15.oauthIcon, { backgroundColor: '#fff', borderColor: '#E0E0E0' }]}>
-          {isLoading && pendingAction === 'google'
+          {isLoading
             ? <ActivityIndicator size="small" color="#4285F4" />
             : <Text style={s15.googleG}>G</Text>}
         </View>
@@ -405,13 +364,13 @@ function Step15Account({ theme, email, setEmail, password, setPassword, onGoogle
 
       {/* Apple */}
       <TouchableOpacity
-        onPress={() => requireVerify('apple')}
+        onPress={onAppleSignUp}
         disabled={isLoading}
         activeOpacity={0.85}
         style={[s15.oauthCard, { backgroundColor: '#000', borderColor: '#222' }]}
       >
         <View style={[s15.oauthIcon, { backgroundColor: '#1C1C1E', borderColor: '#333' }]}>
-          {isLoading && pendingAction === 'apple'
+          {isLoading
             ? <ActivityIndicator size="small" color="#fff" />
             : <Ionicons name="logo-apple" size={20} color="#fff" />}
         </View>
@@ -431,7 +390,7 @@ function Step15Account({ theme, email, setEmail, password, setPassword, onGoogle
 
       {/* Email toggle */}
       <TouchableOpacity
-        onPress={() => requireVerify('email')}
+        onPress={toggleEmail}
         activeOpacity={0.8}
         style={[s15.emailToggle, {
           backgroundColor: showEmailForm ? (theme.accentDim as string) : theme.card,
@@ -449,7 +408,7 @@ function Step15Account({ theme, email, setEmail, password, setPassword, onGoogle
         />
       </TouchableOpacity>
 
-      {/* Collapsible email form */}
+      {/* Collapsible email form (demo — just for UI showcase) */}
       <Animated.View style={{ maxHeight: emailMaxH, opacity: emailAnim, overflow: 'hidden' }}>
         <View style={[s15.emailCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[s15.fieldLabel, { color: theme.textSecondary }]}>Email address</Text>
@@ -594,7 +553,7 @@ function StepPaywall({ theme, calorieGoal, onPayNow, onTrial, onSkip }: {
 export default function OnboardingScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
-  const { setOnboarding } = useAuthStore();
+  const { setOnboarding, user } = useAuthStore();
   const theme = colors[colorScheme];
 
   type StepKey = 'welcome' | 'goal' | 'gender' | 'age' | 'fact1' | 'stats' | 'target'
@@ -688,101 +647,73 @@ export default function OnboardingScreen() {
     });
   };
 
-  // ── GOOGLE SIGN UP FROM ONBOARDING ───────────────────────
-  // Opens browser → OAuth → returns → saves profile data → goes to generating
+  // ── DEMO SIGN UP (was Google OAuth) ──────────────────────
+  // Demo mode: creates anonymous session instead of real OAuth
   const handleGoogleSignUp = async () => {
     setIsLoading(true);
     try {
-      setOnboarding(true); // lock nav so auth listener doesn't redirect mid-flow
+      setOnboarding(true);
 
-      const redirectTo = __DEV__ ? 'exp+calfit://' : 'com.bigcutstore.calfit://';
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo, skipBrowserRedirect: true },
-      });
-
-      if (error) throw error;
-      if (!data.url) throw new Error('No OAuth URL');
-
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, {
-        showInRecents: false, createTask: false,
-      });
-
-      if (result.type !== 'success' || !(result as any).url) {
-        setOnboarding(false);
-        setIsLoading(false);
-        return;
+      const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError || !anonData?.session) {
+        const mockId = 'demo-' + Date.now();
+        useAuthStore.setState({
+          session: { user: { id: mockId, email: 'demo@calfit.app' } } as any,
+          user: { id: mockId, email: 'demo@calfit.app' } as any,
+          isAuthenticated: true,
+          isOnboarding: true,
+        });
+        await saveProfileData(mockId);
+      } else {
+        useAuthStore.setState({
+          session: anonData.session,
+          user: anonData.session.user,
+          isAuthenticated: true,
+          isOnboarding: true,
+        });
+        if (anonData.user) await saveProfileData(anonData.user.id);
       }
 
-      // Parse tokens from callback URL
-      const callbackUrl = (result as any).url as string;
-      let accessToken: string | null  = null;
-      let refreshToken: string | null = null;
-
-      if (callbackUrl.includes('#')) {
-        const params = new URLSearchParams(callbackUrl.split('#')[1]);
-        accessToken  = params.get('access_token');
-        refreshToken = params.get('refresh_token');
-      }
-
-    if (accessToken && refreshToken) {
-  const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-    access_token: accessToken, refresh_token: refreshToken,
-  });
-  if (sessionError) throw sessionError;
-
-  if (sessionData.user) {
-    await saveProfileData(sessionData.user.id);
-  }
-}
-
-      // Proceed to generating screen
       setStep('generating');
     } catch (e: any) {
       setOnboarding(false);
-      Alert.alert('Google Sign Up Failed', e.message ?? 'Please try again.');
+      Alert.alert('Demo Sign Up', e.message ?? 'Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ── APPLE SIGN UP FROM ONBOARDING ────────────────────────
-  // Same pattern as Google — wired and ready for when Apple Dev account arrives
+  // ── DEMO SIGN UP (was Apple OAuth) ───────────────────────
+  // Demo mode: creates anonymous session instead of real OAuth
   const handleAppleSignUp = async () => {
     setIsLoading(true);
     try {
       setOnboarding(true);
-      const redirectTo = __DEV__ ? 'exp+calfit://' : 'com.bigcutstore.calfit://';
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: { redirectTo, skipBrowserRedirect: true },
-      });
-      if (error) throw error;
-      if (!data.url) throw new Error('No OAuth URL');
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, {
-        showInRecents: false, createTask: false,
-      });
-
-      if (result.type !== 'success' || !(result as any).url) {
-        setOnboarding(false); setIsLoading(false); return;
+      const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError || !anonData?.session) {
+        const mockId = 'demo-' + Date.now();
+        useAuthStore.setState({
+          session: { user: { id: mockId, email: 'demo@calfit.app' } } as any,
+          user: { id: mockId, email: 'demo@calfit.app' } as any,
+          isAuthenticated: true,
+          isOnboarding: true,
+        });
+        await saveProfileData(mockId);
+      } else {
+        useAuthStore.setState({
+          session: anonData.session,
+          user: anonData.session.user,
+          isAuthenticated: true,
+          isOnboarding: true,
+        });
+        if (anonData.user) await saveProfileData(anonData.user.id);
       }
 
-      const callbackUrl = (result as any).url as string;
-      if (callbackUrl.includes('#')) {
-        const params    = new URLSearchParams(callbackUrl.split('#')[1]);
-        const at        = params.get('access_token');
-        const rt        = params.get('refresh_token');
-        if (at && rt) {
-          const { data: sd } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
-          if (sd.user) await saveProfileData(sd.user.id);
-        }
-      }
       setStep('generating');
     } catch (e: any) {
       setOnboarding(false);
-      Alert.alert('Apple Sign Up Failed', e.message ?? 'Please try again.');
+      Alert.alert('Demo Sign Up', e.message ?? 'Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -795,28 +726,37 @@ export default function OnboardingScreen() {
     if (step === 'stats'  && (!height || !weight))   { Alert.alert('Required', 'Please enter your height and weight.'); return; }
 
     if (step === 'account') {
-      if (!email || !password) { Alert.alert('Almost there!', 'Please enter your email and password.'); return; }
-      if (password.length < 8) { Alert.alert('Weak password', 'Password must be at least 8 characters.'); return; }
       try {
         setIsLoading(true);
-        setOnboarding(true); // lock before signUp
+        setOnboarding(true);
 
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) { setOnboarding(false); throw error; }
-
-        if (data.user) {
-          await saveProfileData(data.user.id);
+        // Demo mode: create anonymous Supabase session instead of real signup.
+        // This gives a real user ID for Supabase queries without email/password.
+        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+        if (anonError || !anonData?.session) {
+          // Fallback: mock session if anonymous auth is not enabled
+          const mockId = 'demo-' + Date.now();
+          useAuthStore.setState({
+            session: { user: { id: mockId, email: 'demo@calfit.app' } } as any,
+            user: { id: mockId, email: 'demo@calfit.app' } as any,
+            isAuthenticated: true,
+            isOnboarding: true,
+          });
+          await saveProfileData(mockId);
+        } else {
+          useAuthStore.setState({
+            session: anonData.session,
+            user: anonData.session.user,
+            isAuthenticated: true,
+            isOnboarding: true,
+          });
+          if (anonData.user) await saveProfileData(anonData.user.id);
         }
 
-        // FIX: proceed to generating regardless of email confirmation status.
-        // If email confirmation is required, data.session will be null but
-        // data.user exists. We still show the generating + paywall flow.
-        // The user will confirm email in background — they can use the app
-        // immediately on free tier. Supabase will gate certain actions until confirmed.
         setStep('generating');
       } catch (err: any) {
         setOnboarding(false);
-        Alert.alert('Sign Up Failed', err.message);
+        Alert.alert('Demo Mode', err.message);
       } finally {
         setIsLoading(false);
       }
@@ -826,20 +766,19 @@ export default function OnboardingScreen() {
     goNext();
   };
 
-  // FIX: paywall handlers now call setOnboarding(false) AFTER navigating
-  // so the user lands on the main app when they come back from SubscriptionScreen
+  // Demo paywall: no real payments or notifications.
+  // All three paths just unlock the main app.
   const handleTrial = () => {
-    setOnboarding(false); // release lock first
-    navigation.navigate('Subscription', { plan: 'pro', trial: true, fromOnboarding: true });
+    setOnboarding(false);
   };
 
   const handlePayNow = () => {
-    setOnboarding(false); // release lock first
+    setOnboarding(false);
     navigation.navigate('Subscription', { plan: 'pro', trial: false, fromOnboarding: true });
   };
 
   const handleSkip = () => {
-    setOnboarding(false); // releases to main app via AppNavigator
+    setOnboarding(false);
   };
 
   const btnLabel = isLoading ? ''

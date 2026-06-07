@@ -146,10 +146,11 @@ npx expo run:ios
 | partners | Accountability partner relationships |
 | notes | User journal entries |
 
+```
+
+
 ````
 
-<div class="support-section">
-  <h3>Support AOT Network</h3>
+## Support AOT Network
   <p>Love the product? Buy me a tip to support ongoing development.</p>
   <a href="https://selar.com/showlove/aotayo" class="tip-button">Buy me a coffee ☕</a>
-</div>

@@ -20,7 +20,7 @@ const GREEN  = '#2DDC8C';
 const PURPLE = '#B280FF';
 const RED    = '#FF5959';
 
-type FilterTab = 'All' | 'Unread' | 'Activity' | 'Achievements' | 'Social' | 'System';
+type FilterTab = 'All' | 'Unread' | 'Activity' | 'Achievements' | 'System';
 
 interface Notification {
   id: string; type: string; title: string; message: string;
@@ -35,7 +35,6 @@ function getNotifStyle(type: string): { icon: string; color: string } {
     workout:     { icon: 'barbell',            color: BLUE   },
     nutrition:   { icon: 'restaurant',         color: GREEN  },
     community:   { icon: 'people',             color: PURPLE },
-    referral:    { icon: 'gift',               color: GOLD   },
     upgrade:     { icon: 'star',               color: GOLD   },
     system:      { icon: 'notifications',      color: BLUE   },
     reminder:    { icon: 'alarm',              color: ORANGE },
@@ -156,21 +155,18 @@ export default function NotificationsScreen() {
       'View Calories':    () => navigation.navigate('Main', { screen: 'Calorie' }),
       'View History':     () => navigation.navigate('Main', { screen: 'Activity' }),
       'View Plan':        () => navigation.navigate('Main', { screen: 'Meals' }),
-      'Open Coach':       () => navigation.navigate('Coach'),
-      'View Post':        () => navigation.navigate('Main', { screen: 'Social' }),
+      'Open Coach':       () => navigation.navigate('AICoach'),
       'Reply':            () => navigation.navigate('Chat'),
-      'View Group':       () => navigation.navigate('Community'),
-      'View Earnings':    () => navigation.navigate('Credits'),
       'View Plans':       () => navigation.navigate('Subscription'),
       'Complete Profile': () => navigation.navigate('Settings'),
     };
     map[notif.action_label]?.();
   };
 
-  const TABS: FilterTab[] = ['All', 'Unread', 'Activity', 'Achievements', 'Social', 'System'];
+  const TABS: FilterTab[] = ['All', 'Unread', 'Activity', 'Achievements', 'System'];
   const TAB_COLORS: Record<FilterTab, string> = {
     All: theme.accent, Unread: PINK, Activity: BLUE,
-    Achievements: GOLD, Social: ORANGE, System: PURPLE,
+    Achievements: GOLD, System: PURPLE,
   };
 
   const filtered = notifications.filter(n => {
@@ -178,7 +174,6 @@ export default function NotificationsScreen() {
     if (activeTab === 'Unread')       return !n.read;
     if (activeTab === 'Activity')     return ['streak','workout','nutrition','goal','reminder'].includes(n.type);
     if (activeTab === 'Achievements') return ['achievement','goal'].includes(n.type);
-    if (activeTab === 'Social')       return ['social','community','referral'].includes(n.type);
     if (activeTab === 'System')       return ['system','upgrade'].includes(n.type);
     return true;
   });

@@ -1,14 +1,7 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  TextInput,
-  ActivityIndicator,
-  Dimensions,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  Modal, TextInput, ActivityIndicator, Dimensions,
+  Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
@@ -20,13 +13,11 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import * as Speech from 'expo-speech';
-import { claudeJSON, hasClaudeKey } from '../../services/ClaudeService';
 import { checkAndSavePRs } from '../../services/personalRecordsService';
 import ExerciseDemoModal from '../../components/ExerciseDemoModal';
 
 const { width: SW } = Dimensions.get('window');
 
-// ── TYPES ─────────────────────────────────────────────────────
 interface Exercise {
   id: string; name: string; category: string; muscle_group: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
@@ -47,11 +38,9 @@ interface PRResult {
   isNewPR: boolean;
   newRecords: { type: string; label: string; value: string; improvement: string }[];
 }
-interface MealSuggestion { name: string; why: string; calories: number; }
 
 const speak = (text: string) => { Speech.stop(); Speech.speak(text, { language: 'en-US', pitch: 1.05, rate: 0.92 }); };
 
-// ── CATEGORY COLOURS ──────────────────────────────────────────
 const CAT_COLORS: Record<string, string> = {
   Cardio: '#FF6B35', Chest: '#F0427C', Back: '#4A90E2',
   Core: '#2BBCB0', Legs: '#9B6FE8', Shoulders: '#FFB830',
@@ -59,8 +48,18 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 const EQUIPMENT_OPTIONS = ['All', 'none', 'dumbbells', 'barbell', 'resistance band', 'machine'];
+const WORKOUT_CATEGORIES = [
+  { key: 'Chest',      icon: 'body-outline',          color: '#F0427C', label: 'Chest',      exercises: 24 },
+  { key: 'Back',       icon: 'arrow-back-outline',    color: '#4A90E2', label: 'Back',       exercises: 18 },
+  { key: 'Legs',       icon: 'footsteps-outline',     color: '#9B6FE8', label: 'Legs',       exercises: 22 },
+  { key: 'Shoulders',  icon: 'fitness-outline',       color: '#FFB830', label: 'Shoulders',  exercises: 16 },
+  { key: 'Arms',       icon: 'barbell-outline',       color: '#34D98A', label: 'Arms',       exercises: 20 },
+  { key: 'Core',       icon: 'radio-button-on-outline', color: '#2BBCB0', label: 'Core',     exercises: 14 },
+  { key: 'Cardio',     icon: 'pulse-outline',         color: '#FF6B35', label: 'Cardio',     exercises: 12 },
+  { key: 'Full Body',  icon: 'fitness-outline',       color: '#FF6B9D', label: 'Full Body',  exercises: 30 },
+];
+const CATEGORIES_FILTER = ['All', 'Cardio', 'Chest', 'Back', 'Core', 'Legs', 'Shoulders', 'Arms', 'Flexibility'];
 
-// ── DECORATIVE SVGs (used in empty states / tabs) ─────────────
 function FlameSvg({ color }: { color: string }) {
   return (
     <Svg width={60} height={80} viewBox="0 0 60 80">
@@ -74,15 +73,11 @@ function FootprintSvg({ color }: { color: string }) {
   return (
     <Svg width={80} height={80} viewBox="0 0 80 80">
       <Ellipse cx="25" cy="55" rx="10" ry="16" fill={color} opacity={0.70} />
-      <Circle cx="18" cy="36" r="4" fill={color} opacity={0.60} />
-      <Circle cx="25" cy="33" r="4.5" fill={color} opacity={0.60} />
-      <Circle cx="32" cy="35" r="3.5" fill={color} opacity={0.60} />
-      <Circle cx="37" cy="40" r="3" fill={color} opacity={0.55} />
+      <Circle cx="18" cy="36" r="4" fill={color} opacity={0.60} /><Circle cx="25" cy="33" r="4.5" fill={color} opacity={0.60} />
+      <Circle cx="32" cy="35" r="3.5" fill={color} opacity={0.60} /><Circle cx="37" cy="40" r="3" fill={color} opacity={0.55} />
       <Ellipse cx="55" cy="28" rx="10" ry="16" fill={color} opacity={0.40} />
-      <Circle cx="48" cy="10" r="3.5" fill={color} opacity={0.35} />
-      <Circle cx="55" cy="7" r="4" fill={color} opacity={0.35} />
-      <Circle cx="62" cy="9" r="3" fill={color} opacity={0.35} />
-      <Circle cx="67" cy="14" r="2.5" fill={color} opacity={0.30} />
+      <Circle cx="48" cy="10" r="3.5" fill={color} opacity={0.35} /><Circle cx="55" cy="7" r="4" fill={color} opacity={0.35} />
+      <Circle cx="62" cy="9" r="3" fill={color} opacity={0.35} /><Circle cx="67" cy="14" r="2.5" fill={color} opacity={0.30} />
     </Svg>
   );
 }
@@ -96,17 +91,6 @@ function HistorySvg({ color }: { color: string }) {
     </Svg>
   );
 }
-function BarbellSvg({ color }: { color: string }) {
-  return (
-    <Svg width={120} height={80} viewBox="0 0 120 80">
-      <Rect x="20" y="37" width="80" height="6" rx="3" fill={color} opacity={0.9} />
-      <Rect x="8" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
-      <Rect x="4" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
-      <Rect x="96" y="24" width="16" height="32" rx="5" fill={color} opacity={0.7} />
-      <Rect x="108" y="29" width="8" height="22" rx="3" fill={color} opacity={0.5} />
-    </Svg>
-  );
-}
 
 function catIconName(cat: string): any {
   const m: Record<string, string> = {
@@ -117,58 +101,38 @@ function catIconName(cat: string): any {
   return m[cat] ?? 'barbell-outline';
 }
 
-// ── EXERCISE CARD ─────────────────────────────────────────────
-// Demo button now shows animated figure icon — no YouTube
+// ── EXERCISE CARD (compact) ───────────────────────────────────
 function ExerciseCard({ exercise, theme, isSelected, onToggle, onDemo }: {
   exercise: Exercise; theme: typeof colors.light; isSelected: boolean;
   onToggle: () => void; onDemo: () => void;
 }) {
   const catColor = CAT_COLORS[exercise.category] ?? theme.accent;
   const diffColors: Record<string, string> = { beginner: '#2DDC8C', intermediate: '#FFB830', advanced: '#FF5959' };
-  const diffLabels: Record<string, string> = { beginner: 'Beginner', intermediate: 'Inter.', advanced: 'Advanced' };
+  const diffLabels: Record<string, string> = { beginner: 'Bgnr', intermediate: 'Int', advanced: 'Adv' };
   const diffColor = diffColors[exercise.difficulty] ?? '#2DDC8C';
 
   return (
-    <TouchableOpacity
-      onPress={onToggle}
-      activeOpacity={0.75}
-      style={[ec.card, {
-        backgroundColor: isSelected ? catColor + '15' : theme.card,
-        borderColor: isSelected ? catColor : theme.border,
-        borderWidth: isSelected ? 1.5 : 1,
-      }]}
-    >
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.75}
+      style={[ec.card, { backgroundColor: isSelected ? catColor + '15' : theme.card, borderColor: isSelected ? catColor : theme.border, borderWidth: isSelected ? 1.5 : 1 }]}>
       <View style={[ec.accentBar, { backgroundColor: catColor }]} />
       <View style={ec.body}>
         <View style={ec.topRow}>
           <Text style={[ec.name, { color: theme.textPrimary }]} numberOfLines={1}>{exercise.name}</Text>
           <View style={[ec.checkbox, { backgroundColor: isSelected ? catColor : 'transparent', borderColor: isSelected ? catColor : theme.border }]}>
-            {isSelected && <Ionicons name="checkmark" size={13} color="#fff" />}
+            {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
           </View>
         </View>
-        <Text style={[ec.muscle, { color: theme.textMuted }]} numberOfLines={1}>{exercise.muscle_group}</Text>
         <View style={ec.bottomRow}>
           <View style={[ec.diffPill, { backgroundColor: diffColor + '18', borderColor: diffColor + '44' }]}>
             <Text style={[ec.diffText, { color: diffColor }]}>{diffLabels[exercise.difficulty]}</Text>
           </View>
-          <View style={ec.kcalRow}>
-            <Ionicons name="flame-outline" size={11} color="#FF6B35" />
-            <Text style={[ec.kcalText, { color: theme.textMuted }]}>{exercise.calories_per_minute} kcal/min</Text>
-          </View>
+          <Ionicons name="flame-outline" size={10} color="#FF6B35" />
+          <Text style={[ec.kcalText, { color: theme.textMuted }]}>{exercise.calories_per_minute} kcal</Text>
           {exercise.equipment !== 'none' && (
-            <View style={[ec.equipPill, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-              <Ionicons name="barbell-outline" size={10} color={theme.textMuted} />
-              <Text style={[ec.equipText, { color: theme.textMuted }]}>{exercise.equipment}</Text>
-            </View>
+            <Text style={[ec.equipText, { color: theme.textMuted }]}>{exercise.equipment}</Text>
           )}
-          {/* Demo button — triggers animated figure modal */}
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); onDemo(); }}
-            style={[ec.playBtn, { backgroundColor: catColor + '18', borderColor: catColor + '44' }]}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="play-circle" size={15} color={catColor} />
-            <Text style={[ec.playText, { color: catColor }]}>Demo</Text>
+          <TouchableOpacity onPress={(e) => { e.stopPropagation(); onDemo(); }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <Ionicons name="play-circle" size={14} color={catColor} />
           </TouchableOpacity>
         </View>
       </View>
@@ -177,26 +141,20 @@ function ExerciseCard({ exercise, theme, isSelected, onToggle, onDemo }: {
 }
 
 const ec = StyleSheet.create({
-  card:      { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 14, overflow: 'hidden' },
-  accentBar: { width: 4, flexShrink: 0 },
-  body:      { flex: 1, padding: spacing.md, gap: 5 },
-  topRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  name:      { flex: 1, fontSize: fontSize.base, fontWeight: '700' },
-  checkbox:  { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  muscle:    { fontSize: fontSize.xs },
-  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
-  diffPill:  { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
-  diffText:  { fontSize: 10, fontWeight: '700' },
-  kcalRow:   { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  kcalText:  { fontSize: 10 },
-  equipPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
-  equipText: { fontSize: 10 },
-  playBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginLeft: 'auto' },
-  playText:  { fontSize: 10, fontWeight: '700' },
+  card: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: 6, borderRadius: 8, overflow: 'hidden' },
+  accentBar: { width: 3, flexShrink: 0 },
+  body: { flex: 1, paddingHorizontal: spacing.sm, paddingVertical: 8, gap: 3 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  name: { flex: 1, fontSize: fontSize.sm, fontWeight: '700' },
+  checkbox: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  diffPill: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1 },
+  diffText: { fontSize: 9, fontWeight: '700' },
+  kcalText: { fontSize: 9 },
+  equipText: { fontSize: 9 },
 });
 
-// ── ACTIVE EXERCISE ROW ───────────────────────────────────────
-// Demo button triggers animated figure modal during workout
+// ── ACTIVE EXERCISE ROW ─────────────────────────────────────
 function ActiveExerciseRow({ exercise, theme, isActive, onStart, onComplete, onDemo }: {
   exercise: ActiveExercise; theme: typeof colors.light; isActive: boolean;
   onStart: () => void; onComplete: () => void; onDemo: () => void;
@@ -209,53 +167,30 @@ function ActiveExerciseRow({ exercise, theme, isActive, onStart, onComplete, onD
     <View style={[aer.row, {
       backgroundColor: exercise.done ? theme.accent + '10' : isActive ? catColor + '15' : theme.card,
       borderColor: exercise.done ? theme.accent : isActive ? catColor : theme.border,
-      borderWidth: isActive ? 2 : 1,
-      borderLeftWidth: 4,
-      borderLeftColor: exercise.done ? theme.accent : catColor,
+      borderWidth: isActive ? 2 : 1, borderLeftWidth: 4, borderLeftColor: exercise.done ? theme.accent : catColor,
     }]}>
       <View style={{ flex: 1 }}>
         <View style={aer.nameRow}>
-          <Text style={[aer.name, {
-            color: exercise.done ? theme.accent : theme.textPrimary,
-            textDecorationLine: exercise.done ? 'line-through' : 'none',
-          }]}>{exercise.name}</Text>
-          {exercise.done && <Ionicons name="checkmark-circle" size={16} color={theme.accent} />}
+          <Text style={[aer.name, { color: exercise.done ? theme.accent : theme.textPrimary, textDecorationLine: exercise.done ? 'line-through' : 'none' }]}>{exercise.name}</Text>
+          {exercise.done && <Ionicons name="checkmark-circle" size={14} color={theme.accent} />}
         </View>
-        <Text style={[aer.meta, { color: theme.textMuted }]}>
-          {exercise.muscle_group} · {exercise.calories_per_minute} kcal/min
-        </Text>
         {exercise.seconds > 0 && (
-          <View style={aer.progressRow}>
-            <Ionicons name="timer-outline" size={12} color={catColor} />
-            <Text style={[aer.timer, { color: catColor }]}>
-              {mins}:{secs.toString().padStart(2, '0')} · {exercise.calories_burned} kcal
-            </Text>
-          </View>
+          <Text style={[aer.timer, { color: catColor }]}>{mins}:{secs.toString().padStart(2, '0')} · {exercise.calories_burned} kcal</Text>
         )}
       </View>
       <View style={aer.actions}>
-        {/* How-to demo — animated figure */}
-        <TouchableOpacity
-          onPress={onDemo}
-          style={[aer.howToBtn, { backgroundColor: catColor + '15', borderColor: catColor + '30' }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="play-circle" size={13} color={catColor} />
+        <TouchableOpacity onPress={onDemo} style={[aer.howToBtn, { backgroundColor: catColor + '15', borderColor: catColor + '30' }]} hitSlop={6}>
+          <Ionicons name="play-circle" size={12} color={catColor} />
         </TouchableOpacity>
         {exercise.done ? (
-          <View style={[aer.doneChip, { backgroundColor: theme.accent }]}>
-            <Ionicons name="checkmark" size={14} color="#fff" />
-          </View>
+          <View style={[aer.doneChip, { backgroundColor: theme.accent }]}><Ionicons name="checkmark" size={12} color="#fff" /></View>
         ) : isActive ? (
           <TouchableOpacity onPress={onComplete} activeOpacity={0.85}>
-            <LinearGradient colors={[catColor, catColor + 'BB'] as [string, string]} style={aer.doneBtn}>
-              <Text style={aer.doneBtnText}>Done</Text>
-            </LinearGradient>
+            <LinearGradient colors={[catColor, catColor + 'BB'] as [string, string]} style={aer.doneBtn}><Text style={aer.doneBtnText}>Done</Text></LinearGradient>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={onStart} style={[aer.startBtn, { borderColor: catColor }]}>
-            <Ionicons name="play" size={11} color={catColor} />
-            <Text style={[aer.startBtnText, { color: catColor }]}>Start</Text>
+            <Ionicons name="play" size={10} color={catColor} /><Text style={[aer.startBtnText, { color: catColor }]}>Start</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -264,19 +199,17 @@ function ActiveExerciseRow({ exercise, theme, isActive, onStart, onComplete, onD
 }
 
 const aer = StyleSheet.create({
-  row:         { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: 14, gap: spacing.md, overflow: 'hidden' },
-  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  name:        { fontSize: fontSize.base, fontWeight: '700', flex: 1 },
-  meta:        { fontSize: fontSize.xs, marginTop: 2 },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  timer:       { fontSize: fontSize.xs, fontWeight: '700' },
-  actions:     { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 0 },
-  howToBtn:    { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  doneChip:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  doneBtn:     { paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: 8 },
-  doneBtnText: { fontSize: fontSize.sm, fontWeight: '800', color: '#fff' },
-  startBtn:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5 },
-  startBtnText:{ fontSize: fontSize.sm, fontWeight: '700' },
+  row: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: 6, padding: spacing.sm, borderRadius: 10, gap: spacing.sm, overflow: 'hidden' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  name: { fontSize: fontSize.sm, fontWeight: '700', flex: 1 },
+  timer: { fontSize: fontSize.xs, fontWeight: '700', marginTop: 2 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 0 },
+  howToBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  doneChip: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  doneBtn: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: 6 },
+  doneBtnText: { fontSize: fontSize.xs, fontWeight: '800', color: '#fff' },
+  startBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 6, borderWidth: 1.5 },
+  startBtnText: { fontSize: fontSize.xs, fontWeight: '700' },
 });
 
 // ── WORKOUT TIMER ─────────────────────────────────────────────
@@ -284,30 +217,19 @@ function WorkoutTimer({ theme, seconds, calories }: { theme: typeof colors.light
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  const timeStr = hrs > 0
-    ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    : `${mins.toString().padStart(2, '00')}:${secs.toString().padStart(2, '0')}`;
+  const timeStr = hrs > 0 ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}` : `${mins.toString().padStart(2, '00')}:${secs.toString().padStart(2, '0')}`;
   return (
     <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.timerCard}>
-      <View style={styles.timerSide}>
-        <Text style={styles.timerLabel}>ELAPSED TIME</Text>
-        <Text style={styles.timerValue}>{timeStr}</Text>
-      </View>
+      <View style={styles.timerSide}><Text style={styles.timerLabel}>TIME</Text><Text style={styles.timerValue}>{timeStr}</Text></View>
       <View style={styles.timerDivider} />
-      <View style={styles.timerSide}>
-        <Text style={styles.timerLabel}>CALORIES BURNED</Text>
-        <Text style={[styles.timerValue, { color: '#FF6B35' }]}>{calories}</Text>
-        <Text style={styles.timerUnit}>kcal</Text>
-      </View>
+      <View style={styles.timerSide}><Text style={styles.timerLabel}>BURNED</Text><Text style={[styles.timerValue, { color: '#FF6B35' }]}>{calories}</Text></View>
     </LinearGradient>
   );
 }
 
 // ── POST-WORKOUT MODAL ────────────────────────────────────────
-function PostWorkoutModal({ visible, onClose, prResult, meal, loadingMeal, theme }: {
-  visible: boolean; onClose: () => void;
-  prResult: PRResult | null; meal: MealSuggestion | null;
-  loadingMeal: boolean; theme: typeof colors.light;
+function PostWorkoutModal({ visible, onClose, prResult, theme }: {
+  visible: boolean; onClose: () => void; prResult: PRResult | null; theme: typeof colors.light;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -333,20 +255,6 @@ function PostWorkoutModal({ visible, onClose, prResult, meal, loadingMeal, theme
                 ))}
               </View>
             )}
-            <View style={[styles.mealSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Text style={[styles.postSectionTitle, { color: theme.textPrimary }]}>🍽️ Recovery Meal Suggestion</Text>
-              {loadingMeal ? (
-                <ActivityIndicator color={theme.accent} style={{ marginVertical: spacing.md }} />
-              ) : meal ? (
-                <View style={{ gap: spacing.xs }}>
-                  <Text style={[styles.mealName, { color: theme.textPrimary }]}>{meal.name}</Text>
-                  <Text style={[styles.mealWhy, { color: theme.textSecondary }]}>{meal.why}</Text>
-                  <Text style={[styles.mealCal, { color: theme.accent }]}>~{meal.calories} kcal</Text>
-                </View>
-              ) : (
-                <Text style={[styles.mealWhy, { color: theme.textMuted }]}>No suggestion available</Text>
-              )}
-            </View>
             <View style={{ height: spacing.lg }} />
           </ScrollView>
           <View style={styles.postWorkoutClose}>
@@ -362,132 +270,98 @@ function PostWorkoutModal({ visible, onClose, prResult, meal, loadingMeal, theme
   );
 }
 
-// ── MY ROUTINES TAB ───────────────────────────────────────────
-function MyRoutinesTab({ theme, routines, onCreateManual, onCreateWithCoach, onStartRoutine, onDeleteRoutine }: {
+// ── MY ROUTINES TAB ──────────────────────────────────────────
+function MyRoutinesTab({ theme, routines, onCreateManual, onStartRoutine, onDeleteRoutine, onSelectCategory, workoutCount }: {
   theme: typeof colors.light; routines: SavedRoutine[];
-  onCreateManual: () => void; onCreateWithCoach: () => void;
-  onStartRoutine: (r: SavedRoutine) => void; onDeleteRoutine: (id: string) => void;
+  onCreateManual: () => void; onStartRoutine: (r: SavedRoutine) => void;
+  onDeleteRoutine: (id: string) => void; onSelectCategory?: (cat: string) => void;
+  workoutCount?: number;
 }) {
-  if (routines.length === 0) {
-    return (
-      <ScrollView contentContainerStyle={[styles.tabContent, styles.emptyContainer]}>
-        <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.emptyHeroCard}>
-          <BarbellSvg color={theme.accent} />
-          <Text style={styles.emptyHeroTitle}>No routines yet</Text>
-          <Text style={styles.emptyHeroSub}>Create a workout set to quickly access your saved workouts anytime</Text>
-        </LinearGradient>
-        <TouchableOpacity onPress={onCreateManual} activeOpacity={0.85} style={styles.createBtnWrap}>
-          <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.createBtn}>
-            <Ionicons name="add-circle-outline" size={20} color="#fff" />
-            <Text style={styles.createBtnText}>Create Workout Set</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onCreateWithCoach} activeOpacity={0.85}
-          style={[styles.coachBtnOutline, { borderColor: theme.accent, backgroundColor: theme.accentDim as string }]}>
-          <Ionicons name="sparkles-outline" size={18} color={theme.accent} />
-          <Text style={[styles.coachBtnOutlineText, { color: theme.accent }]}>Let CalFit Coach Create It</Text>
-        </TouchableOpacity>
-        <Text style={[styles.inspirationLabel, { color: theme.textSecondary }]}>Popular workout types</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inspirationRow}>
-          {[
-            { name: 'Leg Day', emoji: '🦵', color: CAT_COLORS.Legs, desc: 'Squats, lunges & more' },
-            { name: 'Cardio Blast', emoji: '🏃', color: CAT_COLORS.Cardio, desc: 'High energy burn' },
-            { name: 'Upper Body', emoji: '💪', color: CAT_COLORS.Chest, desc: 'Chest, back & arms' },
-            { name: 'Core Day', emoji: '🔥', color: CAT_COLORS.Core, desc: 'Abs & stability' },
-          ].map((w) => (
-            <TouchableOpacity key={w.name} onPress={onCreateManual} activeOpacity={0.8}
-              style={[styles.inspirationCard, { backgroundColor: w.color + '18', borderColor: w.color + '44' }]}>
-              <Text style={styles.inspirationEmoji}>{w.emoji}</Text>
-              <Text style={[styles.inspirationName, { color: w.color }]}>{w.name}</Text>
-              <Text style={[styles.inspirationDesc, { color: theme.textMuted }]}>{w.desc}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </ScrollView>
-    );
-  }
-
+  const streakDay = (workoutCount ?? 0) + 1;
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
-      <View style={styles.routinesTopRow}>
-        <Text style={[styles.routinesCount, { color: theme.textSecondary }]}>{routines.length} routine{routines.length !== 1 ? 's' : ''}</Text>
-        <TouchableOpacity onPress={onCreateManual} style={[styles.addRoutineBtn, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-          <Ionicons name="add" size={16} color={theme.accent} />
-          <Text style={[styles.addRoutineBtnText, { color: theme.accent }]}>New Routine</Text>
-        </TouchableOpacity>
-      </View>
-      {routines.map((routine) => {
-        const firstCat = routine.exercises[0]?.category ?? 'All';
-        const cardColor = CAT_COLORS[firstCat] ?? theme.accent;
-        const gradColors: [string, string] = [cardColor + 'DD', cardColor + '88'];
-        return (
-          <View key={routine.id} style={[styles.routineCard, { borderColor: cardColor + '44' }]}>
-            <LinearGradient colors={gradColors} style={styles.routineCardTop}>
-              <View style={styles.routineCardHeaderRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.routineCardName}>{routine.name}</Text>
-                  {routine.description ? <Text style={styles.routineCardDesc}>{routine.description}</Text> : null}
-                </View>
-                <TouchableOpacity onPress={() => Alert.alert('Delete?', `Remove "${routine.name}"?`, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => onDeleteRoutine(routine.id) },
-                ])} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="trash-outline" size={18} color="rgba(255,255,255,0.60)" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.routineStatsBadgeRow}>
-                {routine.duration_est ? <View style={styles.routineStatBadge}><Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.80)" /><Text style={styles.routineStatBadgeText}>~{routine.duration_est} min</Text></View> : null}
-                {routine.calories_est ? <View style={styles.routineStatBadge}><Ionicons name="flame-outline" size={12} color="rgba(255,255,255,0.80)" /><Text style={styles.routineStatBadgeText}>~{routine.calories_est} kcal</Text></View> : null}
-                <View style={styles.routineStatBadge}><Ionicons name="barbell-outline" size={12} color="rgba(255,255,255,0.80)" /><Text style={styles.routineStatBadgeText}>{routine.exercises.length} exercises</Text></View>
-              </View>
-            </LinearGradient>
-            <View style={[styles.routineCardBody, { backgroundColor: theme.card }]}>
-              {routine.exercises.slice(0, 3).map((ex, i) => (
-                <View key={i} style={styles.routineExRow}>
-                  <View style={[styles.routineExDot, { backgroundColor: CAT_COLORS[ex.category] ?? cardColor }]} />
-                  <Text style={[styles.routineExName, { color: theme.textSecondary }]}>{ex.name}</Text>
-                  <Text style={[styles.routineExCal, { color: theme.textMuted }]}>{ex.calories_per_minute} kcal/min</Text>
-                </View>
-              ))}
-              {routine.exercises.length > 3 && <Text style={[styles.routineMoreText, { color: theme.textMuted }]}>+{routine.exercises.length - 3} more exercises</Text>}
-              <TouchableOpacity onPress={() => onStartRoutine(routine)} activeOpacity={0.85} style={styles.startRoutineWrap}>
-                <LinearGradient colors={[cardColor, cardColor + 'BB'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.startRoutineBtn}>
-                  <Ionicons name="play-circle" size={18} color="#fff" />
-                  <Text style={styles.startRoutineBtnText}>Start Routine</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+    <ScrollView contentContainerStyle={styles.mrScroll} showsVerticalScrollIndicator={false}>
+      <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.mrHero}>
+        <View style={styles.mrHeroTop}>
+          <View><Text style={styles.mrHeroTitle}>Today's Workout</Text><Text style={styles.mrHeroSub}>Ready to crush your goals?</Text></View>
+          <View style={[styles.mrHeroBadge, { backgroundColor: theme.accent + '30' }]}>
+            <Ionicons name="flame" size={14} color={theme.accent} />
+            <Text style={styles.mrHeroBadgeText}>Day {streakDay}</Text>
           </View>
-        );
-      })}
-      <TouchableOpacity onPress={onCreateWithCoach} activeOpacity={0.8}
-        style={[styles.coachCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <LinearGradient colors={[theme.accent + '22', theme.gradStart + '22'] as [string, string]} style={styles.coachCardIconWrap}>
-          <Ionicons name="sparkles" size={22} color={theme.accent} />
-        </LinearGradient>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.coachCardTitle, { color: theme.textPrimary }]}>Let CalFit Coach Create It</Text>
-          <Text style={[styles.coachCardSub, { color: theme.textSecondary }]}>Answer a few questions and get a custom routine</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
-      </TouchableOpacity>
+        <TouchableOpacity onPress={onCreateManual} activeOpacity={0.85} style={[styles.mrStartBtn, { backgroundColor: theme.accent }]}>
+          <Ionicons name="play-circle" size={20} color="#fff" />
+          <Text style={styles.mrStartBtnText}>Quick Start Workout</Text>
+        </TouchableOpacity>
+      </LinearGradient>
+
+      <Text style={[styles.mrSectionTitle, { color: theme.textPrimary }]}>Workout Categories</Text>
+      <View style={styles.mrCategoryGrid}>
+        {WORKOUT_CATEGORIES.map((cat) => (
+          <TouchableOpacity key={cat.key} onPress={() => onSelectCategory?.(cat.key)} activeOpacity={0.85}
+            style={[styles.mrCatCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.mrCatIconWrap, { backgroundColor: cat.color + '18' }]}>
+              <Ionicons name={cat.icon as any} size={20} color={cat.color} />
+            </View>
+            <Text style={[styles.mrCatName, { color: theme.textPrimary }]}>{cat.label}</Text>
+            <Text style={[styles.mrCatCount, { color: theme.textMuted }]}>{cat.exercises} exercises</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {routines.length > 0 && (
+        <>
+          <View style={styles.mrSectionTopRow}>
+            <Text style={[styles.mrSectionTitle, { color: theme.textPrimary }]}>My Routines</Text>
+            <TouchableOpacity onPress={onCreateManual}><Text style={[styles.mrSeeAll, { color: theme.accent }]}>+ New</Text></TouchableOpacity>
+          </View>
+          {routines.map((routine) => {
+            const firstCat = routine.exercises[0]?.category ?? 'All';
+            const cardColor = CAT_COLORS[firstCat] ?? theme.accent;
+            return (
+              <TouchableOpacity key={routine.id} onPress={() => onStartRoutine(routine)} activeOpacity={0.85}
+                style={[styles.mrRoutineCard, { backgroundColor: theme.card, borderColor: theme.border, borderLeftColor: cardColor }]}>
+                <View style={styles.mrRoutineTop}>
+                  <Text style={[styles.mrRoutineName, { color: theme.textPrimary }]}>{routine.name}</Text>
+                  <TouchableOpacity onPress={() => Alert.alert('Delete?', `Remove "${routine.name}"?`, [
+                    { text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => onDeleteRoutine(routine.id) },
+                  ])} hitSlop={8}>
+                    <Ionicons name="ellipsis-horizontal" size={16} color={theme.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.mrRoutineMeta}>
+                  <View style={[styles.mrRoutineChip, { backgroundColor: cardColor + '15' }]}>
+                    <Ionicons name="barbell-outline" size={10} color={cardColor} />
+                    <Text style={[styles.mrRoutineChipText, { color: cardColor }]}>{routine.exercises.length} exercises</Text>
+                  </View>
+                  {routine.duration_est && (
+                    <View style={[styles.mrRoutineChip, { backgroundColor: theme.accent + '15' }]}>
+                      <Ionicons name="time-outline" size={10} color={theme.accent} />
+                      <Text style={[styles.mrRoutineChipText, { color: theme.accent }]}>~{routine.duration_est} min</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </>
+      )}
+      <View style={{ height: 80 }} />
     </ScrollView>
   );
 }
 
-// ── MODALS ────────────────────────────────────────────────────
+// ── CREATE ROUTINE MODAL ─────────────────────────────────────
 function CreateRoutineModal({ visible, theme, onClose, onConfirm }: {
   visible: boolean; theme: typeof colors.light; onClose: () => void; onConfirm: (name: string) => void;
 }) {
   const [name, setName] = useState('');
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalSheet, { backgroundColor: theme.card }]}>
           <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Name your routine</Text>
           <Text style={[styles.modalSub, { color: theme.textSecondary }]}>e.g. Leg Day, Cardio Blast, Full Body</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="Routine name"
-            placeholderTextColor={theme.textMuted} autoFocus
+          <TextInput value={name} onChangeText={setName} placeholder="Routine name" placeholderTextColor={theme.textMuted} autoFocus
             style={[styles.modalInput, { color: theme.textPrimary, borderColor: name ? theme.accent : theme.border, backgroundColor: theme.bg }]} />
           <View style={styles.modalBtnRow}>
             <TouchableOpacity onPress={onClose} style={[styles.modalCancelBtn, { borderColor: theme.border }]}>
@@ -501,118 +375,75 @@ function CreateRoutineModal({ visible, theme, onClose, onConfirm }: {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-function CoachRoutineModal({ visible, theme, onClose, onSave }: {
-  visible: boolean; theme: typeof colors.light; onClose: () => void; onSave: (r: Partial<SavedRoutine>) => void;
+// ── CATEGORY OPTIONS MODAL ───────────────────────────────────
+function CategoryOptionsModal({ visible, category, theme, onClose, onCreateRoutine, onGymWorkouts, onHomeWorkouts }: {
+  visible: boolean; category: string; theme: typeof colors.light;
+  onClose: () => void; onCreateRoutine: () => void; onGymWorkouts: () => void; onHomeWorkouts: () => void;
 }) {
-  const questions = [
-    { key: 'goal',      label: 'Fitness goal?',       options: ['Lose weight', 'Build muscle', 'Get fit', 'Endurance'] },
-    { key: 'style',     label: 'Activity style?',     options: ['Strength', 'Cardio', 'HIIT', 'Flexibility'] },
-    { key: 'location',  label: 'Home or gym?',         options: ['Home', 'Gym', 'Both'] },
-    { key: 'level',     label: 'Experience level?',    options: ['Beginner', 'Intermediate', 'Advanced'] },
-    { key: 'area',      label: 'Target area?',         options: ['Full body', 'Upper body', 'Lower body', 'Core'] },
-    { key: 'duration',  label: 'Duration?',            options: ['15 min', '30 min', '45 min', '60 min'] },
-    { key: 'equipment', label: 'Equipment?',           options: ['None', 'Dumbbells', 'Full gym', 'Bands'] },
-    { key: 'count',     label: 'Exercise count?',      options: ['4–5', '6–8', '8–10', '10+'] },
-  ];
-  const [qIndex, setQIndex]       = useState(0);
-  const [answers, setAnswers]     = useState<Record<string, string>>({});
-  const [loading, setLoading]     = useState(false);
-  const [generated, setGenerated] = useState<any>(null);
-  const reset = () => { setQIndex(0); setAnswers({}); setGenerated(null); setLoading(false); };
-
-  const handleAnswer = async (answer: string) => {
-    const newAnswers = { ...answers, [questions[qIndex].key]: answer };
-    setAnswers(newAnswers);
-    if (qIndex < questions.length - 1) { setQIndex(qIndex + 1); return; }
-    setLoading(true);
-    try {
-      if (!hasClaudeKey()) { Alert.alert('AI not connected', 'Add your Anthropic API key to generate routines.'); reset(); return; }
-      const result = await claudeJSON<any>(
-        'You are a fitness coach. Generate workout routines as JSON only. No markdown, no explanation.',
-        `Generate a workout routine. Goal:${newAnswers.goal} Style:${newAnswers.style} Location:${newAnswers.location} Level:${newAnswers.level} Area:${newAnswers.area} Duration:${newAnswers.duration} Equipment:${newAnswers.equipment} Count:${newAnswers.count}
-JSON only: {"name":"Routine Name","description":"One sentence","exercises":[{"name":"Exercise","calories_per_minute":8,"category":"Cardio"}],"duration_est":30,"calories_est":250}`,
-        600
-      );
-      if (!result) throw new Error('No result');
-      setGenerated(result);
-    } catch { Alert.alert('Error', 'Could not generate routine. Try again.'); reset(); }
-    finally { setLoading(false); }
-  };
-
+  const catColor = CAT_COLORS[category] ?? theme.accent;
+  const catData = WORKOUT_CATEGORIES.find((c) => c.key === category);
+  if (!category) return null;
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.modalSheet, { backgroundColor: theme.card }]}>
-          {loading ? (
-            <View style={styles.modalLoading}>
-              <ActivityIndicator color={theme.accent} size="large" />
-              <Text style={[styles.modalLoadingText, { color: theme.textPrimary }]}>Building your routine...</Text>
+          <View style={styles.catOptHeader}>
+            <View style={[styles.catOptIconWrap, { backgroundColor: catColor + '18' }]}>
+              <Ionicons name={(catData?.icon ?? 'barbell-outline') as any} size={26} color={catColor} />
             </View>
-          ) : generated ? (
-            <ScrollView>
-              <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.generatedHero}>
-                <Text style={styles.generatedBadge}>🎉 Your Routine is Ready</Text>
-                <Text style={styles.generatedName}>{generated.name}</Text>
-                <Text style={styles.generatedDesc}>{generated.description}</Text>
-              </LinearGradient>
-              {generated.exercises?.map((ex: any, i: number) => (
-                <View key={i} style={styles.routineExRow}>
-                  <View style={[styles.routineExDot, { backgroundColor: CAT_COLORS[ex.category] ?? theme.accent }]} />
-                  <Text style={[styles.routineExName, { color: theme.textSecondary }]}>{ex.name}</Text>
-                </View>
-              ))}
-              <View style={[styles.modalBtnRow, { marginTop: spacing.lg }]}>
-                <TouchableOpacity onPress={reset} style={[styles.modalCancelBtn, { borderColor: theme.border }]}>
-                  <Text style={[styles.modalCancelText, { color: theme.textMuted }]}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { onSave(generated); reset(); }} activeOpacity={0.85} style={styles.modalConfirmWrap}>
-                  <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} style={styles.modalConfirmBtn}>
-                    <Text style={styles.modalConfirmText}>Perfect ✓</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          ) : (
-            <>
-              <View style={styles.coachQProgress}>
-                {questions.map((_, i) => <View key={i} style={[styles.coachQDot, { backgroundColor: i <= qIndex ? theme.accent : theme.border, width: i === qIndex ? 20 : 6 }]} />)}
-              </View>
-              <Text style={[styles.coachQLabel, { color: theme.textMuted }]}>{qIndex + 1} of {questions.length}</Text>
-              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{questions[qIndex].label}</Text>
-              <View style={styles.coachQOptions}>
-                {questions[qIndex].options.map((opt) => (
-                  <TouchableOpacity key={opt} onPress={() => handleAnswer(opt)} activeOpacity={0.8}
-                    style={[styles.coachQOption, { backgroundColor: answers[questions[qIndex].key] === opt ? theme.accent : theme.bg, borderColor: answers[questions[qIndex].key] === opt ? theme.accent : theme.border }]}>
-                    <Text style={[styles.coachQOptionText, { color: answers[questions[qIndex].key] === opt ? '#fff' : theme.textPrimary }]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TouchableOpacity onPress={() => { reset(); onClose(); }} style={styles.modalCancelLink}>
-                <Text style={[styles.modalCancelText, { color: theme.textMuted }]}>Cancel</Text>
-              </TouchableOpacity>
-            </>
-          )}
+            <Text style={[styles.catOptTitle, { color: theme.textPrimary }]}>{category}</Text>
+            <Text style={[styles.catOptSub, { color: theme.textSecondary }]}>{catData?.exercises ?? 0} exercises</Text>
+          </View>
+          <TouchableOpacity onPress={() => { onClose(); onCreateRoutine(); }} activeOpacity={0.85}
+            style={[styles.catOptBtn, { backgroundColor: catColor + '12', borderColor: catColor + '44' }]}>
+            <Ionicons name="create-outline" size={20} color={catColor} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.catOptBtnTitle, { color: theme.textPrimary }]}>Create Own Routine</Text>
+              <Text style={[styles.catOptBtnSub, { color: theme.textMuted }]}>Pick exercises and build your custom workout</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { onClose(); onGymWorkouts(); }} activeOpacity={0.85}
+            style={[styles.catOptBtn, { backgroundColor: catColor + '12', borderColor: catColor + '44' }]}>
+            <Ionicons name="barbell-outline" size={20} color={catColor} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.catOptBtnTitle, { color: theme.textPrimary }]}>Gym Workouts</Text>
+              <Text style={[styles.catOptBtnSub, { color: theme.textMuted }]}>Equipment-based exercises for the gym</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { onClose(); onHomeWorkouts(); }} activeOpacity={0.85}
+            style={[styles.catOptBtn, { backgroundColor: catColor + '12', borderColor: catColor + '44' }]}>
+            <Ionicons name="home-outline" size={20} color={catColor} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.catOptBtnTitle, { color: theme.textPrimary }]}>Home Workouts</Text>
+              <Text style={[styles.catOptBtnSub, { color: theme.textMuted }]}>Bodyweight exercises, no equipment needed</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={[styles.modalCancelBtn, { borderColor: theme.border, marginTop: spacing.sm }]}>
+            <Text style={[styles.modalCancelText, { color: theme.textMuted }]}>Cancel</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-// ── ACTIVE WORKOUT TAB ────────────────────────────────────────
+// ── ACTIVE WORKOUT TAB ───────────────────────────────────────
 function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, workoutStarted, onStart, onComplete, onCompleteWorkout, onOpenCatalogue, onShowDemo }: {
   theme: typeof colors.light; exercises: ActiveExercise[]; activeIndex: number;
   workoutSeconds: number; workoutStarted: boolean;
   onStart: (i: number) => void; onComplete: (i: number) => void;
-  onCompleteWorkout: () => void; onOpenCatalogue: () => void;
-  onShowDemo: (ex: ActiveExercise) => void;
+  onCompleteWorkout: () => void; onOpenCatalogue: () => void; onShowDemo: (ex: ActiveExercise) => void;
 }) {
   const doneCount = exercises.filter(e => e.done).length;
-  const progress  = exercises.length > 0 ? doneCount / exercises.length : 0;
+  const progress = exercises.length > 0 ? doneCount / exercises.length : 0;
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       {workoutStarted && <WorkoutTimer theme={theme} seconds={workoutSeconds} calories={exercises.reduce((s, e) => s + e.calories_burned, 0)} />}
@@ -633,17 +464,12 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
         <TouchableOpacity onPress={onOpenCatalogue}><Text style={[styles.addMoreText, { color: theme.accent }]}>+ Add</Text></TouchableOpacity>
       </View>
       {exercises.map((ex, i) => (
-        <ActiveExerciseRow
-          key={ex.id} exercise={ex} theme={theme}
-          isActive={i === activeIndex && workoutStarted}
-          onStart={() => onStart(i)}
-          onComplete={() => onComplete(i)}
-          onDemo={() => onShowDemo(ex)}
-        />
+        <ActiveExerciseRow key={ex.id} exercise={ex} theme={theme} isActive={i === activeIndex && workoutStarted}
+          onStart={() => onStart(i)} onComplete={() => onComplete(i)} onDemo={() => onShowDemo(ex)} />
       ))}
       <TouchableOpacity onPress={onCompleteWorkout} activeOpacity={0.85} style={styles.completeWorkoutWrap}>
         <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.completeWorkoutBtn}>
-          <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          <Ionicons name="checkmark-circle" size={18} color="#fff" />
           <Text style={styles.completeWorkoutBtnText}>Complete Workout</Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -651,46 +477,44 @@ function ActiveWorkoutTab({ theme, exercises, activeIndex, workoutSeconds, worko
   );
 }
 
-// ── CATALOGUE TAB ─────────────────────────────────────────────
+// ── CATALOGUE TAB ────────────────────────────────────────────
 function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout, routineName, equipmentFilter, onEquipmentChange, onShowDemo }: {
   theme: typeof colors.light; exercises: Exercise[]; selectedIds: Set<string>;
   onToggle: (ex: Exercise) => void; onAddToWorkout: () => void; routineName?: string;
-  equipmentFilter: string; onEquipmentChange: (eq: string) => void;
-  onShowDemo: (ex: Exercise) => void;
+  equipmentFilter: string; onEquipmentChange: (eq: string) => void; onShowDemo: (ex: Exercise) => void;
 }) {
-  const categories = ['All', 'Cardio', 'Chest', 'Back', 'Core', 'Legs', 'Shoulders', 'Arms', 'Flexibility'];
   const [activeCategory, setActiveCategory] = useState('All');
   const [customName, setCustomName] = useState('');
 
   const filtered = exercises.filter((e) => {
     const catMatch = activeCategory === 'All' || e.category === activeCategory;
-    const eqMatch  = equipmentFilter === 'All' || e.equipment === equipmentFilter;
+    const eqMatch = equipmentFilter === 'All' || e.equipment === equipmentFilter;
     return catMatch && eqMatch;
   });
   const catColor = CAT_COLORS[activeCategory] ?? theme.accent;
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-        {categories.map((cat) => {
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catFilterRow}>
+        {CATEGORIES_FILTER.map((cat) => {
           const cc = CAT_COLORS[cat] ?? theme.accent;
           const isActive = activeCategory === cat;
           return (
             <TouchableOpacity key={cat} onPress={() => setActiveCategory(cat)}
-              style={[styles.categoryPill, { backgroundColor: isActive ? cc : theme.card, borderColor: isActive ? cc : theme.border }]}>
-              <Text style={[styles.categoryPillText, { color: isActive ? '#fff' : theme.textSecondary, fontWeight: isActive ? '700' : '400' }]}>{cat}</Text>
+              style={[styles.catFilterPill, { backgroundColor: isActive ? cc : theme.card, borderColor: isActive ? cc : theme.border }]}>
+              <Text style={[styles.catFilterPillText, { color: isActive ? '#fff' : theme.textSecondary, fontWeight: isActive ? '700' : '400' }]}>{cat}</Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.categoryRow, { paddingTop: 0 }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.eqFilterRow}>
         {EQUIPMENT_OPTIONS.map((eq) => {
           const isActive = equipmentFilter === eq;
           return (
             <TouchableOpacity key={eq} onPress={() => onEquipmentChange(eq)}
-              style={[styles.eqPill, { backgroundColor: isActive ? theme.accentSecond : theme.card, borderColor: isActive ? theme.accentSecond : theme.border }]}>
-              <Text style={[styles.eqPillText, { color: isActive ? '#fff' : theme.textMuted }]}>
-                {eq === 'none' ? 'Bodyweight' : eq.charAt(0).toUpperCase() + eq.slice(1)}
+              style={[styles.eqFilterPill, { backgroundColor: isActive ? theme.accent : 'transparent', borderColor: isActive ? theme.accent : theme.textMuted + '44' }]}>
+              <Text style={[styles.eqFilterPillText, { color: isActive ? '#fff' : theme.textMuted }]}>
+                {eq === 'none' ? 'Bodyweight' : eq === 'resistance band' ? 'Bands' : eq.charAt(0).toUpperCase() + eq.slice(1)}
               </Text>
             </TouchableOpacity>
           );
@@ -698,32 +522,27 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
       </ScrollView>
       {activeCategory !== 'All' && (
         <View style={[styles.catHeroBar, { backgroundColor: catColor + '15', borderColor: catColor + '44' }]}>
-          <Ionicons name={catIconName(activeCategory)} size={16} color={catColor} />
+          <Ionicons name={catIconName(activeCategory)} size={14} color={catColor} />
           <Text style={[styles.catHeroText, { color: catColor }]}>{activeCategory} — {filtered.length} exercises</Text>
         </View>
       )}
       {selectedIds.size > 0 && (
         <TouchableOpacity onPress={onAddToWorkout} activeOpacity={0.85} style={styles.addSelectedWrap}>
           <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addSelectedBar}>
-            <Ionicons name="add-circle" size={18} color="#fff" />
-            <Text style={styles.addSelectedText}>
-              Add {selectedIds.size} exercise{selectedIds.size > 1 ? 's' : ''} to workout{routineName ? ` — "${routineName}"` : ''} ✓
-            </Text>
+            <Ionicons name="add-circle" size={16} color="#fff" />
+            <Text style={styles.addSelectedText}>Add {selectedIds.size} exercise{selectedIds.size > 1 ? 's' : ''} {routineName ? `to "${routineName}"` : 'to workout'} ✓</Text>
           </LinearGradient>
         </TouchableOpacity>
       )}
-      <ScrollView contentContainerStyle={styles.tabContent}>
+      <ScrollView contentContainerStyle={styles.catContent}>
         {filtered.map((ex) => (
-          <ExerciseCard key={ex.id} exercise={ex} theme={theme}
-            isSelected={selectedIds.has(ex.id)}
-            onToggle={() => onToggle(ex)}
-            onDemo={() => onShowDemo(ex)} />
+          <ExerciseCard key={ex.id} exercise={ex} theme={theme} isSelected={selectedIds.has(ex.id)}
+            onToggle={() => onToggle(ex)} onDemo={() => onShowDemo(ex)} />
         ))}
         <View style={[styles.addManuallyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.addManuallyLabel, { color: theme.textSecondary }]}>Can't find it? Add manually:</Text>
           <View style={styles.addManuallyRow}>
-            <TextInput value={customName} onChangeText={setCustomName} placeholder="Exercise name"
-              placeholderTextColor={theme.textMuted}
+            <TextInput value={customName} onChangeText={setCustomName} placeholder="Exercise name" placeholderTextColor={theme.textMuted}
               style={[styles.addManuallyInput, { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.bg }]} />
             <TouchableOpacity onPress={() => {
               if (customName.trim()) {
@@ -732,7 +551,7 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
               }
             }} activeOpacity={0.85} style={styles.addManuallyBtnWrap}>
               <LinearGradient colors={[theme.accent, '#0A9A5E'] as [string, string]} style={styles.addManuallyBtn}>
-                <Ionicons name="add" size={20} color="#fff" />
+                <Ionicons name="add" size={18} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -742,7 +561,7 @@ function CatalogueTab({ theme, exercises, selectedIds, onToggle, onAddToWorkout,
   );
 }
 
-// ── CALORIES TAB ──────────────────────────────────────────────
+// ── CALORIES TAB ────────────────────────────────────────────
 function CaloriesTab({ theme, totalCalories, weeklyData }: { theme: typeof colors.light; totalCalories: number; weeklyData: number[] }) {
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const max = Math.max(...weeklyData, 1);
@@ -754,10 +573,7 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: { theme: typeof color
         <FlameSvg color="#FF6B35" />
         <Text style={styles.calorieHeroValue}>{totalCalories}</Text>
         <Text style={styles.calorieHeroLabel}>kcal burned today</Text>
-        <View style={styles.calorieBarBg}>
-          <LinearGradient colors={['#FF6B35', '#FFB830'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[styles.calorieBarFill, { width: `${pct}%` as any }]} />
-        </View>
+        <View style={styles.calorieBarBg}><LinearGradient colors={['#FF6B35', '#FFB830'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.calorieBarFill, { width: `${pct}%` as any }]} /></View>
         <Text style={styles.calorieBarSub}>{Math.round(pct)}% of 500 kcal daily burn goal</Text>
       </LinearGradient>
       <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>This Week</Text>
@@ -766,26 +582,24 @@ function CaloriesTab({ theme, totalCalories, weeklyData }: { theme: typeof color
           {weeklyData.map((val, i) => (
             <View key={i} style={styles.barWrap}>
               <View style={styles.barInner}>
-                {i === todayIndex ? (
-                  <LinearGradient colors={['#FF6B35', '#FFB830'] as [string, string]} style={[styles.bar, { height: `${(val / max) * 100}%` as any }]} />
-                ) : (
-                  <View style={[styles.bar, { height: `${(val / max) * 100}%` as any, backgroundColor: theme.border, opacity: 0.5 }]} />
-                )}
+                {i === todayIndex
+                  ? <LinearGradient colors={['#FF6B35', '#FFB830'] as [string, string]} style={[styles.bar, { height: `${(val / max) * 100}%` as any }]} />
+                  : <View style={[styles.bar, { height: `${(val / max) * 100}%` as any, backgroundColor: theme.border, opacity: 0.5 }]} />}
               </View>
               <Text style={[styles.barLabel, { color: i === todayIndex ? '#FF6B35' : theme.textMuted, fontWeight: i === todayIndex ? '700' : '400' }]}>{days[i]}</Text>
             </View>
           ))}
         </View>
-        <Text style={[styles.weeklyTotal, { color: theme.textMuted }]}>Weekly: {weeklyData.reduce((a, b) => a + b, 0)} kcal burned</Text>
+        <Text style={[styles.weeklyTotal, { color: theme.textMuted }]}>Weekly: {weeklyData.reduce((a, b) => a + b, 0)} kcal</Text>
       </View>
     </ScrollView>
   );
 }
 
-// ── STEPS TAB ─────────────────────────────────────────────────
+// ── STEPS TAB ───────────────────────────────────────────────
 function StepsTab({ theme, goalSteps }: { theme: typeof colors.light; goalSteps: number }) {
   const { liveSteps: steps } = useAuthStore();
-  const calories   = Math.round(steps * 0.04);
+  const calories = Math.round(steps * 0.04);
   const percentage = Math.round(Math.min(steps / goalSteps, 1) * 100);
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
@@ -793,35 +607,31 @@ function StepsTab({ theme, goalSteps }: { theme: typeof colors.light; goalSteps:
         <FootprintSvg color="#2BBCB0" />
         <Text style={styles.stepsHeroValue}>{steps >= 1000 ? `${(steps / 1000).toFixed(1)}K` : steps.toString()}</Text>
         <Text style={styles.stepsHeroLabel}>steps today</Text>
-        <View style={styles.stepsBarBg}>
-          <LinearGradient colors={['#2BBCB0', '#4A90E2'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[styles.stepsBarFill, { width: `${Math.min(percentage, 100)}%` as any }]} />
-        </View>
+        <View style={styles.stepsBarBg}><LinearGradient colors={['#2BBCB0', '#4A90E2'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.stepsBarFill, { width: `${Math.min(percentage, 100)}%` as any }]} /></View>
         <Text style={styles.stepsBarSub}>{steps.toLocaleString()} of {goalSteps.toLocaleString()} · {percentage}%</Text>
       </LinearGradient>
-      <LinearGradient colors={['#FF6B35' + '18', '#FFB830' + '18'] as [string, string]}
-        style={[styles.stepsCalPill, { borderColor: '#FF6B35' + '44' }]}>
-        <Ionicons name="flame-outline" size={16} color="#FF6B35" />
+      <LinearGradient colors={['#FF6B35' + '18', '#FFB830' + '18'] as [string, string]} style={[styles.stepsCalPill, { borderColor: '#FF6B35' + '44' }]}>
+        <Ionicons name="flame-outline" size={14} color="#FF6B35" />
         <Text style={[styles.stepsCalText, { color: '#FF6B35' }]}>{calories} kcal burned from steps</Text>
       </LinearGradient>
       <View style={[styles.stepsSensorCard, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-        <Ionicons name="checkmark-circle-outline" size={20} color={theme.accent} />
+        <Ionicons name="checkmark-circle-outline" size={18} color={theme.accent} />
         <Text style={[styles.stepsSensorText, { color: theme.textPrimary }]}>Steps tracked automatically in the background.</Text>
       </View>
     </ScrollView>
   );
 }
 
-// ── HISTORY TAB ───────────────────────────────────────────────
+// ── HISTORY TAB ─────────────────────────────────────────────
 function HistoryTab({ theme, sessions }: { theme: typeof colors.light; sessions: WorkoutSession[] }) {
   if (sessions.length === 0) {
     return (
       <ScrollView contentContainerStyle={[styles.tabContent, styles.emptyContainer]}>
-        <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.emptyHeroCard}>
+        <View style={[styles.historyEmptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <HistorySvg color={theme.accent} />
-          <Text style={styles.emptyHeroTitle}>No workout history yet</Text>
-          <Text style={styles.emptyHeroSub}>Complete your first workout and it will appear here</Text>
-        </LinearGradient>
+          <Text style={[styles.historyEmptyTitle, { color: theme.textPrimary }]}>No workout history yet</Text>
+          <Text style={[styles.historyEmptySub, { color: theme.textMuted }]}>Complete your first workout and it will appear here</Text>
+        </View>
       </ScrollView>
     );
   }
@@ -829,7 +639,7 @@ function HistoryTab({ theme, sessions }: { theme: typeof colors.light; sessions:
     <ScrollView contentContainerStyle={styles.tabContent}>
       {sessions.map((session) => {
         const date = new Date(session.completed_at);
-        const hrs  = Math.floor(session.duration_seconds / 3600);
+        const hrs = Math.floor(session.duration_seconds / 3600);
         const mins = Math.floor((session.duration_seconds % 3600) / 60);
         const secs = session.duration_seconds % 60;
         const timeDisplay = hrs > 0 ? `${hrs}h ${mins}m` : mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
@@ -840,21 +650,12 @@ function HistoryTab({ theme, sessions }: { theme: typeof colors.light; sessions:
                 <Text style={styles.historyName}>{session.name}</Text>
                 <Text style={styles.historyDate}>{date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
               </View>
-              <View style={styles.historyCalBadge}>
-                <Text style={[styles.historyCalNum, { color: '#FF6B35' }]}>{session.calories_burned}</Text>
-                <Text style={[styles.historyCalUnit, { color: '#FF6B35' }]}>kcal</Text>
-              </View>
+              <View style={styles.historyCalBadge}><Text style={[styles.historyCalNum, { color: '#FF6B35' }]}>{session.calories_burned}</Text><Text style={[styles.historyCalUnit, { color: '#FF6B35' }]}>kcal</Text></View>
             </LinearGradient>
             <View style={[styles.historyCardBottom, { backgroundColor: theme.card }]}>
               <View style={styles.historyStats}>
-                <View style={styles.historyStat}>
-                  <Ionicons name="time-outline" size={13} color={theme.textMuted} />
-                  <Text style={[styles.historyStatText, { color: theme.textMuted }]}>{timeDisplay}</Text>
-                </View>
-                <View style={styles.historyStat}>
-                  <Ionicons name="barbell-outline" size={13} color={theme.textMuted} />
-                  <Text style={[styles.historyStatText, { color: theme.textMuted }]}>{session.exercises.length} exercises</Text>
-                </View>
+                <View style={styles.historyStat}><Ionicons name="time-outline" size={12} color={theme.textMuted} /><Text style={[styles.historyStatText, { color: theme.textMuted }]}>{timeDisplay}</Text></View>
+                <View style={styles.historyStat}><Ionicons name="barbell-outline" size={12} color={theme.textMuted} /><Text style={[styles.historyStatText, { color: theme.textMuted }]}>{session.exercises.length} exercises</Text></View>
               </View>
             </View>
           </View>
@@ -864,20 +665,24 @@ function HistoryTab({ theme, sessions }: { theme: typeof colors.light; sessions:
   );
 }
 
-// ── INNER TAB BAR ─────────────────────────────────────────────
+// ── INNER TAB BAR ────────────────────────────────────────────
+const TAB_ICONS_MAP: Record<string, string> = {
+  'My Routines': 'barbell-outline', 'Catalogue': 'search-outline',
+  'Calories': 'flame-outline', 'Steps': 'footsteps-outline', 'History': 'time-outline',
+};
+
 function InnerTabs({ tabs, active, onPress, theme }: {
   tabs: string[]; active: string; onPress: (t: string) => void; theme: typeof colors.light;
 }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-      style={[styles.innerTabBar, { borderBottomColor: theme.border, backgroundColor: theme.bg }]}
-      contentContainerStyle={styles.innerTabBarContent}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.innerTabBarContent}>
       {tabs.map((tab) => {
         const isActive = active === tab;
         return (
           <TouchableOpacity key={tab} onPress={() => onPress(tab)}
-            style={[styles.innerTab, isActive && { borderBottomColor: theme.accent }]}>
-            <Text style={[styles.innerTabText, { color: isActive ? theme.textPrimary : theme.textMuted }, isActive && { fontWeight: '700' }]}>{tab}</Text>
+            style={[styles.innerTab, { backgroundColor: isActive ? theme.accent : theme.card, borderColor: isActive ? theme.accent : theme.border }]}>
+            <Ionicons name={TAB_ICONS_MAP[tab] as any} size={12} color={isActive ? '#fff' : theme.textMuted} />
+            <Text style={[styles.innerTabText, { color: isActive ? '#fff' : theme.textMuted, fontWeight: isActive ? '700' : '500' }]}>{tab}</Text>
           </TouchableOpacity>
         );
       })}
@@ -885,37 +690,37 @@ function InnerTabs({ tabs, active, onPress, theme }: {
   );
 }
 
-// ── MAIN SCREEN ───────────────────────────────────────────────
+// ── MAIN SCREEN ──────────────────────────────────────────────
 export default function WorkoutScreen() {
+  const navigation = useNavigation<any>();
   const { colorScheme } = useThemeStore();
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
   const goalSteps = (profile as any)?.step_goal ?? 10000;
 
   const tabs = ['My Routines', 'Catalogue', 'Calories', 'Steps', 'History'];
-  const [activeTab, setActiveTab]                       = useState('My Routines');
-  const [catalogue, setCatalogue]                       = useState<Exercise[]>([]);
-  const [selectedIds, setSelectedIds]                   = useState<Set<string>>(new Set());
-  const [workoutExercises, setWorkoutExercises]         = useState<ActiveExercise[]>([]);
-  const [activeExerciseIndex, setActiveExerciseIndex]   = useState(-1);
-  const [workoutStarted, setWorkoutStarted]             = useState(false);
-  const [workoutSeconds, setWorkoutSeconds]             = useState(0);
-  const [sessions, setSessions]                         = useState<WorkoutSession[]>([]);
-  const [weeklyCalories, setWeeklyCalories]             = useState([0, 0, 0, 0, 0, 0, 0]);
-  const [totalCaloriesBurned, setTotalCaloriesBurned]   = useState(0);
-  const [savedRoutines, setSavedRoutines]               = useState<SavedRoutine[]>([]);
-  const [pendingRoutineName, setPendingRoutineName]     = useState('');
-  const [showCreateModal, setShowCreateModal]           = useState(false);
-  const [showCoachModal, setShowCoachModal]             = useState(false);
-  const [isInActiveWorkout, setIsInActiveWorkout]       = useState(false);
-  const [equipmentFilter, setEquipmentFilter]           = useState('All');
+  const [activeTab, setActiveTab] = useState('My Routines');
+  const [catalogue, setCatalogue] = useState<Exercise[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [workoutExercises, setWorkoutExercises] = useState<ActiveExercise[]>([]);
+  const [activeExerciseIndex, setActiveExerciseIndex] = useState(-1);
+  const [workoutStarted, setWorkoutStarted] = useState(false);
+  const [workoutSeconds, setWorkoutSeconds] = useState(0);
+  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const [weeklyCalories, setWeeklyCalories] = useState([0, 0, 0, 0, 0, 0, 0]);
+  const [totalCaloriesBurned, setTotalCaloriesBurned] = useState(0);
+  const [savedRoutines, setSavedRoutines] = useState<SavedRoutine[]>([]);
+  const [pendingRoutineName, setPendingRoutineName] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isInActiveWorkout, setIsInActiveWorkout] = useState(false);
+  const [equipmentFilter, setEquipmentFilter] = useState('All');
   const [showPostWorkoutModal, setShowPostWorkoutModal] = useState(false);
-  const [prResult, setPrResult]                         = useState<PRResult | null>(null);
-  const [postWorkoutMeal, setPostWorkoutMeal]           = useState<MealSuggestion | null>(null);
-  const [loadingMealSuggestion, setLoadingMealSuggestion] = useState(false);
-  const [demoExercise, setDemoExercise]                   = useState<Exercise | null>(null);
+  const [prResult, setPrResult] = useState<PRResult | null>(null);
+  const [demoExercise, setDemoExercise] = useState<Exercise | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
-  const workoutTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const workoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useFocusEffect(useCallback(() => { if (user?.id) { loadHistory(); loadRoutines(); } }, [user?.id]));
@@ -931,11 +736,7 @@ export default function WorkoutScreen() {
   }, []);
 
   const loadCatalogue = async () => {
-    try {
-      const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('exercises').select('*').order('category');
-      if (data) setCatalogue(data);
-    } catch {}
+    try { const { supabase } = await import('../../services/supabase'); const { data } = await supabase.from('exercises').select('*').order('category'); if (data) setCatalogue(data); } catch {}
   };
 
   const loadHistory = async () => {
@@ -957,42 +758,26 @@ export default function WorkoutScreen() {
 
   const loadRoutines = async () => {
     if (!user?.id) return;
-    try {
-      const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('workout_routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      if (data) setSavedRoutines(data.map((r: any) => ({ ...r, exercises: r.exercises ?? [] })));
-    } catch {}
+    try { const { supabase } = await import('../../services/supabase'); const { data } = await supabase.from('workout_routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false }); if (data) setSavedRoutines(data.map((r: any) => ({ ...r, exercises: r.exercises ?? [] }))); } catch {}
   };
 
   const saveRoutine = async (routine: Partial<SavedRoutine>) => {
     if (!user?.id) return;
     try {
       const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('workout_routines').insert({
-        user_id: user.id, name: routine.name ?? 'My Routine', description: routine.description ?? '',
-        exercises: routine.exercises ?? [], duration_est: routine.duration_est ?? null, calories_est: routine.calories_est ?? null,
-      }).select().single();
+      const { data } = await supabase.from('workout_routines').insert({ user_id: user.id, name: routine.name ?? 'My Routine', description: routine.description ?? '', exercises: routine.exercises ?? [], duration_est: routine.duration_est ?? null, calories_est: routine.calories_est ?? null }).select().single();
       if (data) setSavedRoutines((prev) => [data, ...prev]);
-      setShowCoachModal(false); setShowCreateModal(false);
+      setShowCreateModal(false);
       Alert.alert('Routine saved! 💪', `"${routine.name}" added to My Routines.`);
     } catch {}
   };
 
   const deleteRoutine = async (id: string) => {
-    try {
-      const { supabase } = await import('../../services/supabase');
-      await supabase.from('workout_routines').delete().eq('id', id);
-      setSavedRoutines((prev) => prev.filter((r) => r.id !== id));
-    } catch {}
+    try { const { supabase } = await import('../../services/supabase'); await supabase.from('workout_routines').delete().eq('id', id); setSavedRoutines((prev) => prev.filter((r) => r.id !== id)); } catch {}
   };
 
   const handleStartRoutine = (routine: SavedRoutine) => {
-    const exercises = routine.exercises.map((ex: any) => ({
-      ...ex, id: ex.id ?? `${ex.name}_${Date.now()}`,
-      muscle_group: ex.muscle_group ?? '', difficulty: ex.difficulty ?? 'beginner',
-      equipment: ex.equipment ?? 'none', description: ex.description ?? '',
-      seconds: 0, calories_burned: 0, done: false,
-    }));
+    const exercises = routine.exercises.map((ex: any) => ({ ...ex, id: ex.id ?? `${ex.name}_${Date.now()}`, muscle_group: ex.muscle_group ?? '', difficulty: ex.difficulty ?? 'beginner', equipment: ex.equipment ?? 'none', description: ex.description ?? '', seconds: 0, calories_burned: 0, done: false }));
     setWorkoutExercises(exercises); setIsInActiveWorkout(true);
     speak(`Starting ${routine.name}! Let's go!`);
   };
@@ -1061,64 +846,45 @@ export default function WorkoutScreen() {
     } catch (e) { console.error('handleCompleteWorkout error:', e); }
     setIsInActiveWorkout(false); setWorkoutExercises([]); setWorkoutStarted(false); setWorkoutSeconds(0); setActiveExerciseIndex(-1);
     setShowPostWorkoutModal(true);
-    loadPostWorkoutMeal(workoutExercises, totalCal);
     loadHistory();
-  };
-
-  const loadPostWorkoutMeal = async (exercises: ActiveExercise[], totalCal: number) => {
-    setLoadingMealSuggestion(true); setPostWorkoutMeal(null);
-    try {
-      const fallbacks: MealSuggestion[] = [
-        { name: 'Grilled Chicken + Rice', why: 'High protein to repair muscles, carbs to replenish glycogen.', calories: 520 },
-        { name: 'Egg & Avocado Toast', why: 'Healthy fats + protein for recovery. Quick and easy.', calories: 380 },
-        { name: 'Greek Yoghurt + Banana', why: 'Fast carbs + protein — ideal within 30 min of training.', calories: 290 },
-        { name: 'Jollof Rice + Grilled Fish', why: 'Great carb and protein balance for Nigerian recovery.', calories: 580 },
-      ];
-      if (!hasClaudeKey()) { setPostWorkoutMeal(fallbacks[Math.floor(Math.random() * fallbacks.length)]); return; }
-      const categories = [...new Set(exercises.map(e => e.category))].join(', ');
-      const result = await claudeJSON<MealSuggestion>(
-        'You are a sports nutritionist. Suggest a post-workout recovery meal. Return JSON only: { "name": string, "why": string (max 15 words), "calories": number }',
-        `Workout: ${categories || 'mixed'} training, ${totalCal} kcal burned. Suggest one recovery meal suitable for Nigeria or globally.`
-      );
-      setPostWorkoutMeal(result ?? fallbacks[0]);
-    } catch { setPostWorkoutMeal({ name: 'Grilled Chicken + Rice', why: 'High protein to repair muscles, carbs to replenish glycogen.', calories: 520 }); }
-    finally { setLoadingMealSuggestion(false); }
   };
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
       <View style={[styles.header, { backgroundColor: theme.bg }]}>
-        <View>
-          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Activity</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>Workouts</Text>
           <Text style={[styles.pageSubtitle, { color: theme.textSecondary }]}>
-            {isInActiveWorkout ? 'Workout in progress 🔥' : `${savedRoutines.length} routine${savedRoutines.length !== 1 ? 's' : ''} saved`}
+            {isInActiveWorkout ? '🔥 Workout in progress' : `${savedRoutines.length} routine${savedRoutines.length !== 1 ? 's' : ''}`}
           </Text>
         </View>
         {isInActiveWorkout && (
           <TouchableOpacity onPress={() => { setIsInActiveWorkout(false); setWorkoutExercises([]); setWorkoutStarted(false); setWorkoutSeconds(0); }}
-            style={[styles.cancelWorkoutBtn, { borderColor: theme.red }]}>
-            <Text style={[styles.cancelWorkoutText, { color: theme.red }]}>Cancel</Text>
+            style={[styles.cancelWorkoutBtn, { backgroundColor: theme.red + '18', borderColor: theme.red }]}>
+            <Ionicons name="close-outline" size={14} color={theme.red} />
+            <Text style={[styles.cancelWorkoutText, { color: theme.red }]}>End</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      <InnerTabs tabs={tabs} active={activeTab}
-        onPress={(tab) => { setActiveTab(tab); if (tab !== 'My Routines') setIsInActiveWorkout(false); }}
-        theme={theme} />
+      <InnerTabs tabs={tabs} active={activeTab} onPress={(tab) => { setActiveTab(tab); if (tab !== 'My Routines') setIsInActiveWorkout(false); }} theme={theme} />
 
       {activeTab === 'My Routines' && !isInActiveWorkout && (
         <MyRoutinesTab theme={theme} routines={savedRoutines}
-          onCreateManual={() => setShowCreateModal(true)} onCreateWithCoach={() => setShowCoachModal(true)}
-          onStartRoutine={handleStartRoutine} onDeleteRoutine={deleteRoutine} />
+          onCreateManual={() => setShowCreateModal(true)}
+          onStartRoutine={handleStartRoutine} onDeleteRoutine={deleteRoutine}
+          workoutCount={sessions.length}
+          onSelectCategory={(cat) => { setSelectedCategory(cat); setShowCategoryModal(true); }} />
       )}
       {activeTab === 'My Routines' && isInActiveWorkout && (
-        <ActiveWorkoutTab
-          theme={theme} exercises={workoutExercises} activeIndex={activeExerciseIndex}
+        <ActiveWorkoutTab theme={theme} exercises={workoutExercises} activeIndex={activeExerciseIndex}
           workoutSeconds={workoutSeconds} workoutStarted={workoutStarted}
           onStart={handleStartExercise} onComplete={handleCompleteExercise}
           onCompleteWorkout={handleCompleteWorkout} onOpenCatalogue={() => setActiveTab('Catalogue')}
-          onShowDemo={(ex) => setDemoExercise(ex)}
-        />
+          onShowDemo={(ex) => setDemoExercise(ex)} />
       )}
       {activeTab === 'Catalogue' && (
         <CatalogueTab theme={theme} exercises={catalogue} selectedIds={selectedIds}
@@ -1130,159 +896,150 @@ export default function WorkoutScreen() {
       {activeTab === 'Steps' && <StepsTab theme={theme} goalSteps={goalSteps} />}
       {activeTab === 'History' && <HistoryTab theme={theme} sessions={sessions} />}
 
+      <CategoryOptionsModal visible={showCategoryModal} category={selectedCategory} theme={theme}
+        onClose={() => setShowCategoryModal(false)}
+        onCreateRoutine={() => { setShowCreateModal(true); }}
+        onGymWorkouts={() => { setEquipmentFilter('All'); setActiveTab('Catalogue'); }}
+        onHomeWorkouts={() => { setEquipmentFilter('none'); setActiveTab('Catalogue'); }} />
       <CreateRoutineModal visible={showCreateModal} theme={theme} onClose={() => setShowCreateModal(false)}
         onConfirm={(name) => { setPendingRoutineName(name); setShowCreateModal(false); setActiveTab('Catalogue'); }} />
-      <CoachRoutineModal visible={showCoachModal} theme={theme} onClose={() => setShowCoachModal(false)} onSave={saveRoutine} />
-
-      <PostWorkoutModal
-        visible={showPostWorkoutModal}
-        onClose={() => { setShowPostWorkoutModal(false); setPrResult(null); setPostWorkoutMeal(null); }}
-        prResult={prResult} meal={postWorkoutMeal} loadingMeal={loadingMealSuggestion} theme={theme}
-      />
-
-      {/* ── EXERCISE DEMO MODAL — animated human figure ── */}
-      <ExerciseDemoModal
-        visible={!!demoExercise}
-        exercise={demoExercise}
-        theme={theme}
+      <PostWorkoutModal visible={showPostWorkoutModal} onClose={() => { setShowPostWorkoutModal(false); setPrResult(null); }}
+        prResult={prResult} theme={theme} />
+      <ExerciseDemoModal visible={!!demoExercise} exercise={demoExercise} theme={theme}
         onClose={() => setDemoExercise(null)}
         onAddToWorkout={(ex) => {
           const toAdd = { ...ex, seconds: 0, calories_burned: 0, done: false };
           setWorkoutExercises((prev) => prev.some((e) => e.id === ex.id) ? prev : [...prev, toAdd as ActiveExercise]);
-          setDemoExercise(null);
-          setIsInActiveWorkout(true);
-          setActiveTab('My Routines');
-        }}
-      />
+          setDemoExercise(null); setIsInActiveWorkout(true); setActiveTab('My Routines');
+        }} />
     </AndroidSafeView>
   );
 }
 
-// ── STYLES ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xs },
-  pageTitle: { fontSize: fontSize.xxl, fontWeight: '800' },
-  pageSubtitle: { fontSize: fontSize.xs, marginTop: 1 },
-  cancelWorkoutBtn: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xs, gap: spacing.sm },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  pageTitle: { fontSize: fontSize.xxl, fontWeight: '800', letterSpacing: -0.5 },
+  pageSubtitle: { fontSize: fontSize.xs, marginTop: 1, letterSpacing: 0.2 },
+  cancelWorkoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
   cancelWorkoutText: { fontSize: fontSize.sm, fontWeight: '700' },
-  innerTabBar: { borderBottomWidth: 1, maxHeight: 42 },
-  innerTabBarContent: { paddingHorizontal: spacing.sm },
-  innerTab: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -1 },
-  innerTabText: { fontSize: fontSize.sm },
-  tabContent: { paddingBottom: 100, paddingTop: spacing.md },
+  innerTabBarContent: { paddingHorizontal: spacing.lg, gap: 5, paddingVertical: spacing.sm },
+  innerTab: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 5, paddingHorizontal: spacing.sm, borderRadius: 7, borderWidth: 1, height: 28 },
+  innerTabText: { fontSize: 10, letterSpacing: 0.3 },
+  tabContent: { paddingBottom: 120, paddingTop: spacing.sm },
   emptyContainer: { flexGrow: 1 },
-  sectionLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm },
-  emptyHeroCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: 28, borderRadius: 20, alignItems: 'center', gap: spacing.sm },
-  emptyHeroTitle: { fontSize: fontSize.xl, fontWeight: '700', color: '#fff', textAlign: 'center' },
-  emptyHeroSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 20 },
-  inspirationLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
-  inspirationRow: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.sm },
-  inspirationCard: { width: 130, padding: spacing.md, borderRadius: 16, borderWidth: 1, gap: 4 },
-  inspirationEmoji: { fontSize: 28 },
-  inspirationName: { fontSize: fontSize.sm, fontWeight: '800' },
-  inspirationDesc: { fontSize: 11, lineHeight: 15 },
-  createBtnWrap: { marginHorizontal: spacing.lg, borderRadius: 16, overflow: 'hidden', marginBottom: spacing.sm },
-  createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-  createBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
-  coachBtnOutline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.md, borderRadius: 16, borderWidth: 1.5 },
-  coachBtnOutlineText: { fontSize: fontSize.base, fontWeight: '700' },
-  routinesTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
-  routinesCount: { fontSize: fontSize.sm, fontWeight: '600' },
-  addRoutineBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
-  addRoutineBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
-  routineCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
-  routineCardTop: { padding: spacing.lg },
-  routineCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.sm },
-  routineCardName: { fontSize: fontSize.lg, fontWeight: '800', color: '#fff' },
-  routineCardDesc: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.70)', marginTop: 2 },
-  routineStatsBadgeRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  routineStatBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  routineStatBadgeText: { fontSize: 11, color: 'rgba(255,255,255,0.90)', fontWeight: '600' },
-  routineCardBody: { padding: spacing.md, gap: spacing.sm },
-  routineExRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  routineExDot: { width: 7, height: 7, borderRadius: 3.5, flexShrink: 0 },
-  routineExName: { flex: 1, fontSize: fontSize.sm },
-  routineExCal: { fontSize: 11 },
-  routineMoreText: { fontSize: fontSize.xs, marginTop: 2 },
-  startRoutineWrap: { borderRadius: 12, overflow: 'hidden', marginTop: spacing.xs },
-  startRoutineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
-  startRoutineBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  coachCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: 16, borderWidth: 1 },
-  coachCardIconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  coachCardTitle: { fontSize: fontSize.base, fontWeight: '700' },
-  coachCardSub: { fontSize: fontSize.sm, marginTop: 2 },
-  workoutProgressWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, borderRadius: 12, borderWidth: 1, gap: 8 },
+  sectionLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm },
+
+  // My Routines
+  mrScroll: { paddingBottom: 120 },
+  mrHero: { marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.md, padding: spacing.lg, borderRadius: 24, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16 }, android: { elevation: 12 } }) },
+  mrHeroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md },
+  mrHeroTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  mrHeroSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 2, letterSpacing: 0.2 },
+  mrHeroBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: 99 },
+  mrHeroBadgeText: { fontSize: fontSize.sm, fontWeight: '700', color: '#fff' },
+  mrStartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md, borderRadius: 14 },
+  mrStartBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '700', letterSpacing: 0.3 },
+  mrSectionTitle: { fontSize: fontSize.base, fontWeight: '700', marginHorizontal: spacing.lg, marginBottom: spacing.sm, letterSpacing: -0.2 },
+  mrCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.md },
+  mrCatCard: { width: '47%', padding: spacing.sm, borderRadius: 16, borderWidth: 1, gap: spacing.xs, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 }, android: { elevation: 3 } }) },
+  mrCatIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  mrCatName: { fontSize: fontSize.sm, fontWeight: '700', letterSpacing: -0.2 },
+  mrCatCount: { fontSize: fontSize.xs },
+  mrSectionTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+  mrSeeAll: { fontSize: fontSize.sm, fontWeight: '600' },
+  mrRoutineCard: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.sm, borderRadius: 16, borderWidth: 1, borderLeftWidth: 4, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 8 }, android: { elevation: 4 } }) },
+  mrRoutineTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
+  mrRoutineName: { fontSize: fontSize.sm, fontWeight: '700', flex: 1, letterSpacing: -0.2 },
+  mrRoutineMeta: { flexDirection: 'row', gap: spacing.sm },
+  mrRoutineChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 6 },
+  mrRoutineChipText: { fontSize: 9, fontWeight: '700' },
+  workoutProgressWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.sm, borderRadius: 14, borderWidth: 1, gap: 6 },
   workoutProgressRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  workoutProgressLabel: { fontSize: fontSize.sm },
+  workoutProgressLabel: { fontSize: fontSize.sm, letterSpacing: 0.2 },
   workoutProgressPct: { fontSize: fontSize.sm, fontWeight: '700' },
   workoutProgressBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
   workoutProgressFill: { height: '100%', borderRadius: 3 },
   todayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
-  todayTitle: { fontSize: fontSize.lg, fontWeight: '700' },
+  todayTitle: { fontSize: fontSize.lg, fontWeight: '700', letterSpacing: -0.3 },
   addMoreText: { fontSize: fontSize.sm, fontWeight: '600' },
-  completeWorkoutWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 16, overflow: 'hidden' },
-  completeWorkoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-  completeWorkoutBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
-  timerCard: { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.sm, padding: spacing.lg, borderRadius: 20 },
+  completeWorkoutWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 16, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10 }, android: { elevation: 6 } }) },
+  completeWorkoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
+  completeWorkoutBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  timerCard: { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.sm, padding: spacing.md, borderRadius: 24, ...Platform.select({ ios: { shadowColor: '#2A1F6B', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12 }, android: { elevation: 8 } }) },
   timerSide: { flex: 1, alignItems: 'center' },
   timerDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: spacing.md },
-  timerLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.5, marginBottom: 4 },
-  timerValue: { fontSize: 24, fontWeight: '900', color: '#fff' },
-  timerUnit: { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
-  categoryRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
-  categoryPill: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 99, borderWidth: 1, height: 32, justifyContent: 'center' },
-  categoryPillText: { fontSize: fontSize.sm },
-  eqPill: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: 99, borderWidth: 1, height: 28, justifyContent: 'center' },
-  eqPillText: { fontSize: 11, fontWeight: '600' },
-  catHeroBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: 10, borderRadius: 10, borderWidth: 1 },
-  catHeroText: { fontSize: fontSize.sm, fontWeight: '600' },
-  addSelectedWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 12, overflow: 'hidden' },
-  addSelectedBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
-  addSelectedText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  addManuallyCard: { marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', gap: spacing.sm },
-  addManuallyLabel: { fontSize: fontSize.sm },
+  timerLabel: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 1.5, marginBottom: 4 },
+  timerValue: { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
+
+  // Catalogue
+  catFilterRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
+  catFilterPill: { paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: 99, borderWidth: 1, height: 28, justifyContent: 'center' },
+  catFilterPillText: { fontSize: fontSize.xs, fontWeight: '600' },
+  eqFilterRow: { paddingHorizontal: spacing.lg, gap: 4, paddingBottom: spacing.sm, flexDirection: 'row', alignItems: 'center' },
+  eqFilterPill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 99, borderWidth: 1, height: 22, justifyContent: 'center' },
+  eqFilterPillText: { fontSize: 9, fontWeight: '600' },
+  catHeroBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: 6, padding: 6, borderRadius: 8, borderWidth: 1 },
+  catHeroText: { fontSize: fontSize.xs, fontWeight: '600' },
+  catContent: { paddingBottom: 120, paddingTop: spacing.xs },
+  addSelectedWrap: { marginHorizontal: spacing.lg, marginBottom: 6, borderRadius: 12, overflow: 'hidden' },
+  addSelectedBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.sm },
+  addSelectedText: { fontSize: fontSize.sm, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
+  addManuallyCard: { marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.sm, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', gap: spacing.sm },
+  addManuallyLabel: { fontSize: fontSize.xs },
   addManuallyRow: { flexDirection: 'row', gap: spacing.sm },
-  addManuallyInput: { flex: 1, borderWidth: 1, borderRadius: 8, padding: spacing.sm, fontSize: fontSize.base },
+  addManuallyInput: { flex: 1, borderWidth: 1, borderRadius: 8, padding: spacing.sm, fontSize: fontSize.sm },
   addManuallyBtnWrap: { borderRadius: 8, overflow: 'hidden' },
-  addManuallyBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  calorieHero: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.xl, borderRadius: 20, alignItems: 'center', gap: 6 },
-  calorieHeroValue: { fontSize: 56, fontWeight: '900', color: '#fff', lineHeight: 60 },
-  calorieHeroLabel: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.65)', marginBottom: 12 },
-  calorieBarBg: { width: '100%', height: 7, backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
-  calorieBarFill: { height: '100%', borderRadius: 4 },
-  calorieBarSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.55)' },
-  barChartCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.lg, borderRadius: 16, borderWidth: 1 },
-  barChart: { flexDirection: 'row', alignItems: 'flex-end', height: 90, gap: spacing.xs },
+  addManuallyBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  // Calories
+  calorieHero: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.xl, borderRadius: 24, alignItems: 'center', gap: 6, ...Platform.select({ ios: { shadowColor: '#FF6B35', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16 }, android: { elevation: 10 } }) },
+  calorieHeroValue: { fontSize: 48, fontWeight: '900', color: '#fff', lineHeight: 52, letterSpacing: -1 },
+  calorieHeroLabel: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.65)', marginBottom: 10, letterSpacing: 0.5 },
+  calorieBarBg: { width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.20)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
+  calorieBarFill: { height: '100%', borderRadius: 3 },
+  calorieBarSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.2 },
+  barChartCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: 16, borderWidth: 1, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10 }, android: { elevation: 5 } }) },
+  barChart: { flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: spacing.xs },
   barWrap: { flex: 1, alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' },
   barInner: { flex: 1, width: '100%', justifyContent: 'flex-end' },
   bar: { width: '100%', borderRadius: 4 },
-  barLabel: { fontSize: 9 },
-  weeklyTotal: { fontSize: fontSize.xs, textAlign: 'right', marginTop: spacing.sm },
-  stepsHero: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.xl, borderRadius: 20, alignItems: 'center', gap: 6 },
-  stepsHeroValue: { fontSize: 52, fontWeight: '900', color: '#2BBCB0', lineHeight: 56 },
-  stepsHeroLabel: { fontSize: fontSize.sm, color: '#2BBCB0', fontWeight: '600', marginBottom: 8 },
-  stepsBarBg: { width: '100%', height: 7, backgroundColor: 'rgba(43,188,176,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 4 },
-  stepsBarFill: { height: '100%', borderRadius: 4 },
-  stepsBarSub: { fontSize: fontSize.xs, color: '#2BBCB0', opacity: 0.70 },
-  stepsCalPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: 12, borderWidth: 1 },
+  barLabel: { fontSize: 8, fontWeight: '600' },
+  weeklyTotal: { fontSize: fontSize.xs, textAlign: 'right', marginTop: spacing.sm, letterSpacing: 0.2 },
+
+  // Steps
+  stepsHero: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.xl, borderRadius: 24, alignItems: 'center', gap: 6, ...Platform.select({ ios: { shadowColor: '#2BBCB0', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16 }, android: { elevation: 10 } }) },
+  stepsHeroValue: { fontSize: 44, fontWeight: '900', color: '#2BBCB0', lineHeight: 48, letterSpacing: -1 },
+  stepsHeroLabel: { fontSize: fontSize.sm, color: '#2BBCB0', fontWeight: '700', marginBottom: 6, letterSpacing: 0.5 },
+  stepsBarBg: { width: '100%', height: 6, backgroundColor: 'rgba(43,188,176,0.25)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
+  stepsBarFill: { height: '100%', borderRadius: 3 },
+  stepsBarSub: { fontSize: fontSize.xs, color: '#2BBCB0', opacity: 0.70, letterSpacing: 0.2 },
+  stepsCalPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.sm, borderRadius: 12, borderWidth: 1 },
   stepsCalText: { fontSize: fontSize.sm, fontWeight: '600' },
-  stepsSensorCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: 12, borderWidth: 1 },
+  stepsSensorCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.sm, borderRadius: 12, borderWidth: 1 },
   stepsSensorText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
-  historyCard: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 16, overflow: 'hidden', borderWidth: 1 },
-  historyCardTop: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg },
-  historyName: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  historyDate: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.60)', marginTop: 2 },
+
+  // History
+  historyEmptyCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg, padding: spacing.xl, borderRadius: 24, alignItems: 'center', gap: spacing.sm, borderWidth: 1 },
+  historyEmptyTitle: { fontSize: fontSize.lg, fontWeight: '800', textAlign: 'center', letterSpacing: -0.3 },
+  historyEmptySub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18, letterSpacing: 0.2 },
+  historyCard: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 16, overflow: 'hidden', borderWidth: 1, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 8 }, android: { elevation: 4 } }) },
+  historyCardTop: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
+  historyName: { fontSize: fontSize.base, fontWeight: '700', color: '#fff', letterSpacing: -0.2 },
+  historyDate: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.60)', marginTop: 2, letterSpacing: 0.2 },
   historyCalBadge: { alignItems: 'center', paddingHorizontal: 8 },
-  historyCalNum: { fontSize: 22, fontWeight: '900' },
-  historyCalUnit: { fontSize: 10, fontWeight: '600' },
-  historyCardBottom: { flexDirection: 'row', padding: spacing.md },
-  historyStats: { flexDirection: 'row', gap: spacing.lg },
+  historyCalNum: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  historyCalUnit: { fontSize: 9, fontWeight: '600' },
+  historyCardBottom: { flexDirection: 'row', padding: spacing.sm },
+  historyStats: { flexDirection: 'row', gap: spacing.md },
   historyStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   historyStatText: { fontSize: fontSize.xs },
+
+  // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, paddingBottom: 40, gap: spacing.md },
-  modalTitle: { fontSize: fontSize.xl, fontWeight: '800' },
+  modalTitle: { fontSize: fontSize.xl, fontWeight: '800', letterSpacing: -0.3 },
   modalSub: { fontSize: fontSize.base, lineHeight: 20 },
   modalInput: { borderWidth: 1.5, borderRadius: 12, padding: spacing.md, fontSize: fontSize.lg },
   modalBtnRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
@@ -1290,37 +1047,29 @@ const styles = StyleSheet.create({
   modalCancelText: { fontSize: fontSize.base, fontWeight: '600' },
   modalConfirmWrap: { flex: 2, borderRadius: 12, overflow: 'hidden' },
   modalConfirmBtn: { padding: spacing.md, alignItems: 'center' },
-  modalConfirmText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  modalLoading: { alignItems: 'center', gap: spacing.md, paddingVertical: 40 },
-  modalLoadingText: { fontSize: fontSize.lg, fontWeight: '600' },
-  modalCancelLink: { alignItems: 'center', paddingTop: spacing.sm },
-  generatedHero: { padding: spacing.lg, borderRadius: 16, marginBottom: spacing.md },
-  generatedBadge: { fontSize: fontSize.sm, fontWeight: '700', color: 'rgba(255,255,255,0.80)', marginBottom: 6 },
-  generatedName: { fontSize: fontSize.xxl, fontWeight: '900', color: '#fff' },
-  generatedDesc: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.65)', marginTop: 4 },
-  coachQProgress: { flexDirection: 'row', gap: 4, marginBottom: spacing.sm },
-  coachQDot: { height: 6, borderRadius: 3 },
-  coachQLabel: { fontSize: fontSize.xs, fontWeight: '600' },
-  coachQOptions: { gap: spacing.sm },
-  coachQOption: { padding: spacing.md, borderRadius: 12, borderWidth: 1.5, alignItems: 'center' },
-  coachQOptionText: { fontSize: fontSize.base, fontWeight: '600' },
+  modalConfirmText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  catOptHeader: { alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg, paddingTop: spacing.sm },
+  catOptIconWrap: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  catOptTitle: { fontSize: fontSize.xl, fontWeight: '800', letterSpacing: -0.3 },
+  catOptSub: { fontSize: fontSize.sm },
+  catOptBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: 16, borderWidth: 1, marginBottom: spacing.sm },
+  catOptBtnTitle: { fontSize: fontSize.base, fontWeight: '700', letterSpacing: -0.2 },
+  catOptBtnSub: { fontSize: fontSize.xs, marginTop: 2, lineHeight: 16 },
+
+  // Post-workout
   postWorkoutSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', maxHeight: '85%' },
   postWorkoutHeader: { padding: spacing.xl, alignItems: 'center', gap: spacing.xs },
-  postWorkoutEmoji: { fontSize: 40 },
-  postWorkoutTitle: { fontSize: fontSize.xxl, fontWeight: '900', color: '#fff' },
+  postWorkoutEmoji: { fontSize: 36 },
+  postWorkoutTitle: { fontSize: fontSize.xl, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
   postWorkoutSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.70)' },
   postWorkoutClose: { padding: spacing.lg, paddingTop: 0 },
   postWorkoutCloseWrap: { borderRadius: radius.lg, overflow: 'hidden' },
   postWorkoutCloseBtn: { padding: spacing.md, alignItems: 'center' },
-  postWorkoutCloseBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
+  postWorkoutCloseBtnText: { fontSize: fontSize.base, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
   prSection: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
-  mealSection: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
-  postSectionTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.xs },
+  postSectionTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: spacing.xs, letterSpacing: -0.2 },
   prRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   prLabel: { fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
-  prValue: { fontSize: fontSize.base, fontWeight: '800', textAlign: 'right' },
+  prValue: { fontSize: fontSize.base, fontWeight: '800', textAlign: 'right', letterSpacing: -0.3 },
   prImprovement: { fontSize: fontSize.xs, textAlign: 'right', marginTop: 2 },
-  mealName: { fontSize: fontSize.lg, fontWeight: '800', marginBottom: 4 },
-  mealWhy: { fontSize: fontSize.sm, lineHeight: 20, marginBottom: spacing.sm },
-  mealCal: { fontSize: fontSize.base, fontWeight: '700' },
 });

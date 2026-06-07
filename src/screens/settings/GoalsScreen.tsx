@@ -44,7 +44,7 @@ export default function GoalsScreen() {
       value: calories,
       onChange: setCalories,
       icon: 'flame-outline',
-      color: theme.orange,
+      color: '#FFB347',
       suffix: 'kcal',
       placeholder: '2000',
       keyboardType: 'number-pad',

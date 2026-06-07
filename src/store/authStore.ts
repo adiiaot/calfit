@@ -11,7 +11,7 @@ interface AuthState {
   setLiveSteps: (steps: number) => void;
   setSession: (session: Session | null) => void;
   setOnboarding: (v: boolean) => void;
-  loadProfile: (userId: string) => Promise<void>;
+  loadProfile: (userId: string) => Promise<Profile | null>;
   updateProfile: (updates: Partial<Profile>) => void;
   setCoachPersonality: (personality: CoachPersonality) => void;
   signIn: (email: string, password: string) => Promise<void>;
@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // loadProfile might flip isOnboarding based on profile state which would
     // unmount OnboardingScreen mid-flow.
     if (!get().isOnboarding) {
-      get().loadProfile(session.user.id);
+      get().loadProfile(session.user.id).catch(console.error);
     }
   },
 
@@ -52,11 +52,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (profile) {
         set({ profile });
 
-        // Only change isOnboarding if OnboardingScreen hasn't locked it.
-        // If isOnboarding is already true (mid-flow), leave it alone.
         if (!get().isOnboarding) {
-          // No goal = brand new OAuth user from LoginScreen who needs onboarding
-          // Has goal = returning user → stay on home screen (isOnboarding stays false)
           if (!profile.goal) {
             set({ isOnboarding: true });
           }
@@ -66,8 +62,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ isOnboarding: true });
         }
       }
+
+      return profile;
     } catch (e) {
       console.error('[authStore] loadProfile error:', e);
+      return null;
     }
   },
 

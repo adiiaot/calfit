@@ -17,7 +17,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { UserAvatar } from '../../modules/shared/UserAvatar';
 import { supabase } from '../../services/supabase';
-import { MilestoneCelebration, checkStreakMilestone, Milestone } from '../../components/Milestonecelebration';
+import { MilestoneCelebration, checkStreakMilestone, Milestone } from '../../components/MilestoneCelebration';
 
 const ORANGE = '#FFB347';
 const GOLD   = '#FFD133';

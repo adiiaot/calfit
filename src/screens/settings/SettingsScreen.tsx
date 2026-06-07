@@ -1,11 +1,12 @@
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Switch, Alert,
+  TouchableOpacity, Switch, Alert, Linking,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as SecureStore from 'expo-secure-store';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
@@ -32,22 +33,18 @@ const PREFS_KEY = 'calfit_notification_prefs';
 
 interface NotifPrefs {
   pushEnabled:       boolean;
-  coachMessages:     boolean;
-  mealReminders:     boolean;
-  waterReminders:    boolean;
+  mealReminders:    boolean;
+  waterReminders:   boolean;
   workoutReminders:  boolean;
   sleepReminders:    boolean;
-  micronutrients:    boolean;
 }
 
 const DEFAULT_PREFS: NotifPrefs = {
   pushEnabled:      true,
-  coachMessages:    true,
   mealReminders:    false,
   waterReminders:   false,
   workoutReminders: false,
   sleepReminders:   false,
-  micronutrients:   false,
 };
 
 async function loadPrefs(): Promise<NotifPrefs> {
@@ -67,7 +64,7 @@ const ORANGE = '#FFB347';
 const GOLD   = '#FFD133';
 const PURPLE = '#B280FF';
 const RED    = '#FF5959';
-const PINK   = '#FF6B9D';
+
 
 // ── SETTINGS GROUP ────────────────────────────────────────────
 function SettingsGroup({ theme, title, items }: {
@@ -129,7 +126,7 @@ function SettingsGroup({ theme, title, items }: {
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
   const { colorScheme, toggleTheme } = useThemeStore();
-  const { user, profile, userTier, signOut, updateProfile } = useAuthStore();
+  const { user, profile, signOut, updateProfile } = useAuthStore();
   const theme = colors[colorScheme];
 
   const [darkMode, setDarkMode]       = useState(colorScheme === 'dark');
@@ -139,12 +136,6 @@ export default function SettingsScreen() {
   const username = (profile as any)?.calfit_id
     || profile?.full_name?.toLowerCase().replace(/\s+/g, '')
     || user?.email?.split('@')[0] || 'user';
-  const tierColor =
-    userTier === 'premium' ? theme.accent :
-    userTier === 'pro'     ? GOLD : theme.textMuted;
-  const tierLabel =
-    userTier === 'premium' ? 'Premium' :
-    userTier === 'pro'     ? 'Pro' : 'Free';
 
   // ── LOAD PREFS ON EVERY FOCUS — fixes the toggle reset bug ──
   useFocusEffect(useCallback(() => {
@@ -222,9 +213,6 @@ export default function SettingsScreen() {
   const handleSleepReminder = async (val: boolean) =>
     updatePref('sleepReminders', val, () => scheduleSleepReminder(val));
 
-  const handleMicronutrients = async (val: boolean) =>
-    updatePref('micronutrients', val);
-
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -244,7 +232,7 @@ export default function SettingsScreen() {
             await supabase.functions.invoke('delete-account', { body: { userId: user?.id } });
             await signOut();
           } catch {
-            Alert.alert('Error', 'Could not delete account. Please contact support@calfit.tech.');
+            Alert.alert('Error', 'Could not delete account. Please contact aotnetworklabs@gmail.com.');
           }
         },
       },
@@ -266,24 +254,22 @@ export default function SettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* ── PROFILE CARD ── */}
-        <View style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Avatar size={52} borderWidth={2} />
+        <TouchableOpacity onPress={() => navigation.navigate('EditProfile' as never)} activeOpacity={0.85}
+          style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Avatar size={56} borderWidth={2} />
           <View style={styles.profileInfo}>
-            <View style={styles.nameRow}>
-              <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
-              <View style={[styles.tierBadge, { backgroundColor: tierColor + '20', borderColor: tierColor }]}>
-                <Text style={[styles.tierText, { color: tierColor }]}>{tierLabel}</Text>
-              </View>
+            <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
+            <Text style={[styles.profileHandle, { color: theme.textMuted }]}>@{username}</Text>
+             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <Ionicons name="settings-outline" size={12} color={theme.accent} />
+              <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '600' }}>Edit Profile</Text>
             </View>
-            <Text style={[styles.profileHandle, { color: theme.textSecondary }]}>@{username}</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('EditProfile' as never)}>
-              <Text style={[styles.editLink, { color: theme.accent }]}>Edit Profile →</Text>
-            </TouchableOpacity>
           </View>
-        </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+        </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => navigation.navigate('Progress' as never)}
+          onPress={() => navigation.navigate('Main', { screen: 'Progress' })}
           style={[styles.progressRow, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}
         >
           <Ionicons name="trending-up" size={18} color={theme.accent} />
@@ -308,7 +294,7 @@ export default function SettingsScreen() {
             label: 'Goals',
             value: `${(profile as any)?.daily_calorie_goal ?? 2000} kcal · ${((profile as any)?.water_goal_ml ?? 2500) / 1000}L water`,
             icon: 'flag-outline', iconColor: theme.accent,
-            onPress: () => navigation.navigate('Goals' as never),
+            onPress: () => navigation.navigate('Main', { screen: 'Goals' }),
           },
           {
             label: 'Units',
@@ -316,18 +302,6 @@ export default function SettingsScreen() {
             icon: 'speedometer-outline', iconColor: theme.accentSecond,
             onPress: () => navigation.navigate('EditProfile' as never),
           },
-          {
-            label: 'Micronutrients',
-            value: prefs.micronutrients ? 'Showing vitamins & minerals' : 'Hidden from food log',
-            icon: 'leaf-outline', iconColor: theme.accent,
-            toggle: true, toggleValue: prefs.micronutrients, onToggle: handleMicronutrients,
-          },
-          {
-  label: 'Equipment Preferences',
-  value: 'Filter workouts by your gear',
-  icon: 'barbell-outline', iconColor: ORANGE,
-  onPress: () => navigation.navigate('EquipmentPreferences' as never),
-},
         ]} />
 
         {/* ── NOTIFICATIONS ── */}
@@ -339,17 +313,10 @@ export default function SettingsScreen() {
             toggle: true, toggleValue: prefs.pushEnabled, onToggle: handlePushToggle,
           },
           {
-            label: 'Coach Messages',
-            value: prefs.coachMessages ? 'Show in notifications' : 'Hidden',
-            icon: 'chatbubble-outline', iconColor: theme.accentSecond,
-            toggle: true, toggleValue: prefs.coachMessages,
-            onToggle: (val) => updatePref('coachMessages', val),
-          },
-          {
             label: 'Streak Reminders',
             value: 'Daily check-in alert',
             icon: 'flame-outline', iconColor: ORANGE,
-            onPress: () => navigation.navigate('Streaks' as never),
+            onPress: () => navigation.navigate('Main', { screen: 'Streaks' }),
           },
           {
             label: 'Meal Reminders',
@@ -377,72 +344,19 @@ export default function SettingsScreen() {
           },
         ]} />
 
-        {/* ── CONNECTED ACCOUNTS ── */}
-        {/* Instagram removed — not in client feature docs */}
-        <SettingsGroup theme={theme} title="Connected Accounts" items={[
-          {
-            label: 'Google Sign-In',
-            value: 'Connect to sign in with Google',
-            icon: 'logo-google', iconColor: '#EA4335',
-            onPress: () => Alert.alert('Google Sign-In',
-              'Google sign-in will be active once the Play Console account is set up.', [{ text: 'OK' }]),
-          },
-          {
-            label: 'Apple Sign-In',
-            value: 'Connect to sign in with Apple',
-            icon: 'logo-apple', iconColor: theme.textPrimary,
-            onPress: () => Alert.alert('Apple Sign-In',
-              'Apple sign-in will be active once the Apple Developer account is set up.', [{ text: 'OK' }]),
-          },
-          {
-            label: 'Apple Health & Smartwatch',
-            value: 'Sync steps, sleep, heart rate',
-            icon: 'watch-outline', iconColor: theme.accentSecond,
-            onPress: () => Alert.alert(
-              'Health & Wearable Sync',
-              'CalFit can sync with Apple Health (iPhone) and Google Fit (Android) to automatically import steps, sleep, and heart rate.\n\nThis feature is active — make sure you have granted health permissions in your device Settings under Privacy → Health → CalFit.',
-              [
-                { text: 'Open Settings', onPress: async () => {
-                  const { Linking } = await import('react-native');
-                  Linking.openSettings();
-                }},
-                { text: 'OK' },
-              ]
-            ),
-          },
-        ]} />
-
-        {/* ── SUBSCRIPTION ── */}
-        <SettingsGroup theme={theme} title="Subscription" items={[
-          {
-            label: 'Current Plan',
-            value: userTier === 'premium' ? 'Premium — All features unlocked'
-              : userTier === 'pro' ? 'Pro — Upgrade for more'
-              : 'Free — Upgrade to unlock all features',
-            icon: 'star-outline', iconColor: GOLD,
-            onPress: () => navigation.navigate('Subscription' as never),
-          },
-          {
-            label: 'Credits & Earnings',
-            value: 'CalFit Points and referral earnings',
-            icon: 'wallet-outline', iconColor: theme.accent,
-            onPress: () => navigation.navigate('Credits' as never),
-          },
-        ]} />
-
         {/* ── ACCOUNT & PRIVACY ── */}
         <SettingsGroup theme={theme} title="Account & Privacy" items={[
           {
             label: 'Privacy & Data Policy',
             value: 'How we use your data',
             icon: 'shield-outline', iconColor: theme.accentSecond,
-            onPress: () => navigation.navigate('Privacy' as never),
+            onPress: () => navigation.navigate('Main', { screen: 'Privacy' }),
           },
           {
             label: 'Download My Data',
             value: 'Export all your activity as PDF or CSV',
             icon: 'download-outline', iconColor: theme.textSecondary,
-            onPress: () => navigation.navigate('DownloadData' as never),
+            onPress: () => navigation.navigate('Main', { screen: 'DownloadData' }),
           },
           {
             label: 'Sign Out',
@@ -455,6 +369,85 @@ export default function SettingsScreen() {
             danger: true, onPress: handleDeleteAccount,
           },
         ]} />
+
+        {/* ── SUPPORT THE DEV ── */}
+        <TouchableOpacity
+          onPress={() => { Linking.openURL('https://selar.com/showlove/aotayo'); }}
+          activeOpacity={0.85}
+          style={[styles.supportCard, { backgroundColor: theme.card, borderColor: theme.accent + '44' }]}
+        >
+          <LinearGradient
+            colors={[theme.card, theme.accent + '12'] as [string, string]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.supportGrad}
+          >
+            <View style={[styles.supportIconWrap, { backgroundColor: theme.gradStart + '22' }]}>
+              <Ionicons name="cafe-outline" size={24} color={theme.gradStart} />
+            </View>
+            <View style={styles.supportInfo}>
+              <Text style={[styles.supportTitle, { color: theme.textPrimary }]}>Support the Dev</Text>
+              <Text style={[styles.supportDesc, { color: theme.textMuted }]}>
+                Love the product? Buy me a tip to support ongoing development
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* ── APP FOR SALE ── */}
+        <TouchableOpacity
+          onPress={() => { Linking.openURL('mailto:aotnetworklabs@gmail.com?subject=CalFit%20App%20-%20Purchase%20Inquiry'); }}
+          activeOpacity={0.85}
+          style={[styles.commissionCard, { backgroundColor: theme.card, borderColor: theme.accent + '55' }]}
+        >
+          <View style={[styles.commissionIconWrap, { backgroundColor: theme.purple + '22' }]}>
+            <Ionicons name="cart-outline" size={22} color={theme.purple} />
+          </View>
+          <View style={styles.commissionInfo}>
+            <Text style={[styles.commissionTitle, { color: theme.textPrimary }]}>App for Sale — $1,499</Text>
+            <Text style={[styles.commissionDesc, { color: theme.textMuted }]}>
+              Own the complete CalFit source code. White-label it, rebrand it, launch it. Full AI features, Supabase backend, polished UI. Contact aotnetworklabs@gmail.com to purchase.
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* ── FOLLOW ME ── */}
+        <View style={[styles.socialCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[styles.socialTitle, { color: theme.textPrimary }]}>Follow the Developer</Text>
+          <View style={styles.socialRow}>
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://x.com/Aot_ayo')}
+              activeOpacity={0.8}
+              style={[styles.socialBtn, { backgroundColor: theme.bg, borderColor: theme.border }]}
+            >
+              <Ionicons name="logo-twitter" size={18} color={theme.textPrimary} />
+              <Text style={[styles.socialBtnLabel, { color: theme.textPrimary }]}>X</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://linkedin.com/in/aotayo')}
+              activeOpacity={0.8}
+              style={[styles.socialBtn, { backgroundColor: theme.bg, borderColor: theme.border }]}
+            >
+              <Ionicons name="logo-linkedin" size={18} color={theme.textPrimary} />
+              <Text style={[styles.socialBtnLabel, { color: theme.textPrimary }]}>LinkedIn</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://github.com/adiiaot')}
+              activeOpacity={0.8}
+              style={[styles.socialBtn, { backgroundColor: theme.bg, borderColor: theme.border }]}
+            >
+              <Ionicons name="logo-github" size={18} color={theme.textPrimary} />
+              <Text style={[styles.socialBtnLabel, { color: theme.textPrimary }]}>GitHub</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── APP INFO ── */}
+        <View style={styles.appInfo}>
+          <Text style={[styles.appInfoText, { color: theme.textMuted }]}>CalFit v1.0.0 — Demo</Text>
+          <Text style={[styles.appInfoText, { color: theme.textMuted }]}>Built by AOT · aotnetworklabs@gmail.com</Text>
+        </View>
 
         <View style={{ height: 60 }} />
       </ScrollView>
@@ -489,4 +482,25 @@ const styles = StyleSheet.create({
   settingsInfo:{ flex: 1 },
   settingsLabel:{ fontSize: fontSize.base },
   settingsValue:{ fontSize: fontSize.xs, marginTop: 1 },
+  appInfo: { alignItems: 'center', paddingVertical: spacing.xl, gap: 4 },
+  appInfoText: { fontSize: fontSize.xs },
+
+  supportCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
+  supportGrad: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+  supportIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  supportInfo: { flex: 1 },
+  supportTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  supportDesc: { fontSize: fontSize.xs, marginTop: 2, lineHeight: 16 },
+
+  commissionCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  commissionIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  commissionInfo: { flex: 1 },
+  commissionTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  commissionDesc: { fontSize: fontSize.xs, marginTop: 2, lineHeight: 16 },
+
+  socialCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  socialTitle: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: spacing.sm, textAlign: 'center' },
+  socialRow: { flexDirection: 'row', gap: spacing.sm },
+  socialBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1 },
+  socialBtnLabel: { fontSize: fontSize.sm, fontWeight: '700' },
 });

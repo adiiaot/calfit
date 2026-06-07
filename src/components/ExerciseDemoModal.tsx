@@ -1,6 +1,6 @@
 // src/components/ExerciseDemoModal.tsx
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, fontSize } from '../theme';
@@ -47,15 +47,12 @@ interface Props {
 }
 
 export default function ExerciseDemoModal({ visible, exercise, theme, onClose, onAddToWorkout }: Props) {
-  const [gifLoading, setGifLoading] = useState(true);
-  const [gifError,   setGifError]   = useState(false);
   if (!exercise) return null;
 
   const catColor = CAT_COLORS[exercise.category] ?? theme.accent;
   const muscles  = MUSCLE_MAP[exercise.category]  ?? MUSCLE_MAP.Custom;
   const tips     = FORM_TIPS[exercise.category]   ?? FORM_TIPS.Cardio;
   const setsReps = SETS_REPS[exercise.difficulty] ?? SETS_REPS.beginner;
-  const hasGif   = !!exercise.gif_url;
   const diffColors: Record<string, string> = { beginner: '#2DDC8C', intermediate: '#FFB830', advanced: '#FF5959' };
   const diffLabels: Record<string, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
   const diffColor = diffColors[exercise.difficulty] ?? '#2DDC8C';
@@ -92,39 +89,6 @@ export default function ExerciseDemoModal({ visible, exercise, theme, onClose, o
           </LinearGradient>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollBody} bounces={false}>
-            {/* GIF demo / placeholder */}
-            <View style={[s.gifCard, { backgroundColor: catColor + '0E', borderColor: catColor + '33' }]}>
-              {hasGif ? (
-                <>
-                  <View style={s.gifLabelRow}>
-                    <View style={[s.liveDot, { backgroundColor: catColor }]} />
-                    <Text style={[s.gifLabel, { color: catColor }]}>EXERCISE DEMO</Text>
-                  </View>
-                  {gifLoading && !gifError && <View style={s.gifBox}><ActivityIndicator color={catColor} size="large" /></View>}
-                  {gifError ? (
-                    <View style={s.gifBox}><Ionicons name="image-outline" size={40} color={catColor} opacity={0.4} /></View>
-                  ) : (
-                    <Image
-                      source={{ uri: exercise.gif_url! }}
-                      style={[s.gif, gifLoading && { height: 0 }]}
-                      resizeMode="contain"
-                      onLoad={() => setGifLoading(false)}
-                      onError={() => { setGifError(true); setGifLoading(false); }}
-                    />
-                  )}
-                  <Text style={s.gifHint}>Follow the movement · Match the form</Text>
-                </>
-              ) : (
-                <View style={s.gifBox}>
-                  <View style={[s.placeholderIcon, { backgroundColor: catColor + '22' }]}>
-                    <Ionicons name="videocam-outline" size={28} color={catColor} />
-                  </View>
-                  <Text style={[s.placeholderTitle, { color: catColor }]}>Demo Coming Soon</Text>
-                  <Text style={s.placeholderSub}>Video demos will be available in the next update</Text>
-                </View>
-              )}
-            </View>
-
             {/* Sets / Reps */}
             <View style={s.section}>
               <Text style={s.sectionTitle}>Recommended</Text>
@@ -222,16 +186,6 @@ const s = StyleSheet.create({
   pill:             { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
   pillText:         { fontSize: fontSize.xs, fontWeight: '700' },
   scrollBody:       { paddingHorizontal: spacing.lg, paddingBottom: 20 },
-  gifCard:          { borderRadius: 20, borderWidth: 1, marginBottom: spacing.lg, overflow: 'hidden' },
-  gifLabelRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, padding: spacing.md, paddingBottom: spacing.sm },
-  liveDot:          { width: 7, height: 7, borderRadius: 4 },
-  gifLabel:         { fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
-  gif:              { width: '100%', height: 240 },
-  gifBox:           { height: 180, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  gifHint:          { fontSize: 10, textAlign: 'center', color: 'rgba(255,255,255,0.25)', paddingVertical: spacing.sm, letterSpacing: 0.5 },
-  placeholderIcon:  { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  placeholderTitle: { fontSize: fontSize.base, fontWeight: '700', color: 'rgba(255,255,255,0.55)' },
-  placeholderSub:   { fontSize: fontSize.sm, textAlign: 'center', color: 'rgba(255,255,255,0.25)', lineHeight: 20 },
   section:          { marginBottom: spacing.lg },
   sectionTitle:     { fontSize: fontSize.xs, fontWeight: '800', color: 'rgba(255,255,255,0.35)', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: spacing.md },
   setsGrid:         { flexDirection: 'row', gap: spacing.sm },

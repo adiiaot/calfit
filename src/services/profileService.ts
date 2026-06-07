@@ -21,7 +21,6 @@ export interface Profile {
   units: string;
   dietary_preference: string[] | null;
   tracking_preferences: string[] | null;
-  referral_code: string | null;
   streak_count: number;
   last_active_date: string | null;
   created_at: string;

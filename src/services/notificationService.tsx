@@ -10,7 +10,6 @@ export interface AppNotification {
     | 'coach'
     | 'community'
     | 'goal'
-    | 'referral'
     | 'system'
     | 'welcome';
   title: string;
@@ -178,16 +177,6 @@ export const notifyProfileComplete = async (userId: string) => {
   );
 };
 
-export const notifyReferralSignup = async (userId: string) => {
-  await sendNotification(
-    userId,
-    'referral',
-    'Someone Joined via Your Link! 🎉',
-    'A friend just signed up using your referral link. You will earn commission when they upgrade.',
-    'View Earnings'
-  );
-};
-
 export const notifyUpgradePrompt = async (userId: string) => {
   await sendNotification(
     userId,
@@ -241,22 +230,3 @@ export const sendWelcomeNotification = async (userId: string, userName: string) 
   );
 };
 
-export const notifyKudosReceived = async (
-  postOwnerId: string,
-  reactorName: string,
-  kudosType: string,
-  postContent: string
-): Promise<void> => {
-  // Don't notify if reacting to your own post
-  const preview = postContent.length > 40
-    ? postContent.slice(0, 40) + '...'
-    : postContent;
-
-  await sendNotification(
-    postOwnerId,
-    'social',
-    `${reactorName} reacted to your post ${kudosType}`,
-    `"${preview}"`,
-    'View Post'
-  );
-};

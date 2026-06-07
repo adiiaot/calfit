@@ -34,6 +34,10 @@ yarn-error.*
 .env*.local
 .env
 
+# AOTSECURE AGENT FILES
+Aotsecure-V1/
+aotsecure-v1/
+
 # typescript
 *.tsbuildinfo
 

@@ -162,9 +162,9 @@ function MealSection({ theme, title, mealType, items, onAddFood }: {
 }
 
 // ── ADD FOOD MODAL ────────────────────────────────────────────
-function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedMeals, onSaveFavourite }: {
+function AddFoodModal({ visible, theme, mealType, onClose, onAdd, savedMeals, onSaveFavourite }: {
   visible: boolean; theme: typeof colors.light; mealType: MealType;
-  onClose: () => void; onScan: () => void;
+  onClose: () => void;
   onAdd: (entry: { food_name: string; calories: number; protein_g?: number; carbs_g?: number; fats_g?: number; meal_type: MealType }) => void;
   savedMeals: FoodResult[];
   onSaveFavourite: (food: FoodResult) => void;
@@ -228,16 +228,6 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
 
           {view === 'choice' && (
             <ScrollView contentContainerStyle={{ gap: spacing.md, padding: spacing.lg }}>
-              <TouchableOpacity onPress={() => { reset(); onClose(); onScan(); }} activeOpacity={0.85} style={styles.choiceWrap}>
-                <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.choiceCard}>
-                  <Ionicons name="camera" size={32} color="#fff" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.choiceTitle}>Scan Food</Text>
-                    <Text style={styles.choiceSub}>Point camera at food — AI identifies and calculates nutrition</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.70)" />
-                </LinearGradient>
-              </TouchableOpacity>
               <TouchableOpacity onPress={() => setView('search')} activeOpacity={0.85}
                 style={[styles.choiceCardOutline, { borderColor: theme.accent, backgroundColor: theme.accentDim as string }]}>
                 <Ionicons name="search" size={28} color={theme.accent} />
@@ -380,6 +370,88 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
   );
 }
 
+// ── MEAL PLAN TAB ──────────────────────────────────────────────
+function MealPlanTab({ theme }: { theme: typeof colors.light }) {
+  const navigation = useNavigation<any>();
+  const [plan, setPlan] = useState<{ meal: string; foods: string[]; cals: number }[] | null>(null);
+
+  const generatePlan = async () => {
+    setPlan([
+      { meal: 'Breakfast', foods: ['Oatmeal with berries', 'Scrambled eggs', 'Green smoothie'], cals: 420 },
+      { meal: 'Lunch', foods: ['Grilled chicken salad', 'Quinoa bowl', 'Mixed veggies'], cals: 550 },
+      { meal: 'Dinner', foods: ['Baked salmon', 'Sweet potato', 'Steamed broccoli'], cals: 620 },
+      { meal: 'Snacks', foods: ['Greek yogurt', 'Almonds', 'Apple slices'], cals: 280 },
+    ]);
+  };
+
+  return (
+    <ScrollView contentContainerStyle={mp.scroll} showsVerticalScrollIndicator={false}>
+      <LinearGradient colors={[theme.card, theme.bg] as [string, string]} style={[mp.hero, { borderColor: theme.border }]}>
+        <View style={mp.heroIconWrap}>
+          <Ionicons name="restaurant-outline" size={28} color={theme.accent} />
+        </View>
+        <Text style={[mp.heroTitle, { color: theme.textPrimary }]}>Meal Planner</Text>
+        <Text style={[mp.heroSub, { color: theme.textMuted }]}>
+          Plan your meals for the day and hit your nutrition goals
+        </Text>
+        {!plan ? (
+          <TouchableOpacity onPress={generatePlan} activeOpacity={0.85} style={[mp.generateBtn, { backgroundColor: theme.accent }]}>
+            <Ionicons name="sparkles-outline" size={18} color="#fff" />
+            <Text style={mp.generateBtnText}>Generate Meal Plan</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => setPlan(null)} activeOpacity={0.85} style={[mp.resetBtn, { borderColor: theme.border }]}>
+            <Text style={[mp.resetBtnText, { color: theme.textMuted }]}>Reset</Text>
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
+
+      {plan?.map((section) => (
+        <View key={section.meal} style={[mp.mealCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={mp.mealHeader}>
+            <Text style={[mp.mealName, { color: theme.textPrimary }]}>{section.meal}</Text>
+            <Text style={[mp.mealCal, { color: theme.accent }]}>{section.cals} kcal</Text>
+          </View>
+          {section.foods.map((food) => (
+            <View key={food} style={[mp.foodRow, { borderColor: theme.border }]}>
+              <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
+              <Text style={[mp.foodName, { color: theme.textSecondary }]}>{food}</Text>
+            </View>
+          ))}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Main', { screen: 'Calorie' })}
+            style={[mp.logBtn, { borderColor: theme.accent }]}
+          >
+            <Ionicons name="add-circle-outline" size={16} color={theme.accent} />
+            <Text style={[mp.logBtnText, { color: theme.accent }]}>Log these meals</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+      <View style={{ height: 40 }} />
+    </ScrollView>
+  );
+}
+
+const mp = StyleSheet.create({
+  scroll: { padding: spacing.lg, paddingBottom: 120 },
+  hero: { borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, alignItems: 'center', marginBottom: spacing.md },
+  heroIconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(45,220,140,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  heroTitle: { fontSize: fontSize.xl, fontWeight: '800', marginBottom: spacing.xs },
+  heroSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18, marginBottom: spacing.lg },
+  generateBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full },
+  generateBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '700' },
+  resetBtn: { paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
+  resetBtnText: { fontSize: fontSize.sm, fontWeight: '600' },
+  mealCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
+  mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  mealName: { fontSize: fontSize.base, fontWeight: '700' },
+  mealCal: { fontSize: fontSize.sm, fontWeight: '700' },
+  foodRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6, borderBottomWidth: 0.5 },
+  foodName: { fontSize: fontSize.sm, flex: 1 },
+  logBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1, marginTop: spacing.sm },
+  logBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
+});
+
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function CalorieScreen() {
   const navigation = useNavigation<any>();
@@ -387,6 +459,7 @@ export default function CalorieScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
+  const [activeView, setActiveView]             = useState<'tracker' | 'mealplan'>('tracker');
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [waterMl, setWaterMl]                   = useState(0);
   const [foodEntries, setFoodEntries]           = useState<FoodEntry[]>([]);
@@ -463,51 +536,94 @@ export default function CalorieScreen() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
         </View>
-        <TouchableOpacity onPress={() => { setActiveMeal('breakfast'); setShowAddFood(true); }}
-          activeOpacity={0.85} style={styles.addBtn}>
-          <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} style={styles.addBtnGrad}>
-            <Ionicons name="add" size={22} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {activeView === 'tracker' && (
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('FoodScanner')}
+                activeOpacity={0.85} style={[styles.cameraBtn, { borderColor: theme.border }]}>
+                <Ionicons name="camera-outline" size={20} color={theme.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setActiveMeal('breakfast'); setShowAddFood(true); }}
+                activeOpacity={0.85} style={styles.addBtn}>
+                <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} style={styles.addBtnGrad}>
+                  <Ionicons name="add" size={22} color="#fff" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
+      {/* View toggle */}
+      <View style={[styles.viewToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {(['tracker', 'mealplan'] as const).map((v) => {
+          const isActive = activeView === v;
+          return (
+            <TouchableOpacity
+              key={v}
+              onPress={() => setActiveView(v)}
+              style={[styles.viewToggleTab, isActive && { backgroundColor: theme.accent }]}
+            >
+              <Ionicons
+                name={v === 'tracker' ? 'nutrition-outline' : 'restaurant-outline'}
+                size={15}
+                color={isActive ? '#fff' : theme.textMuted}
+              />
+              <Text style={[styles.viewToggleText, {
+                color: isActive ? '#fff' : theme.textMuted,
+                fontWeight: isActive ? '700' : '500',
+              }]}>
+                {v === 'tracker' ? 'Tracker' : 'Meal Plan'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-        <CalorieHero theme={theme} consumed={caloriesConsumed} goal={calorieGoal} waterMl={waterMl} waterGoalMl={waterGoalMl} />
+      {activeView === 'tracker' ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
 
-        <TouchableOpacity onPress={() => navigation.getParent()?.navigate('FoodScanner')} activeOpacity={0.85} style={styles.scanWrap}>
-          <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.scanCard}>
-            <View style={styles.scanLeft}>
-              <View style={styles.scanIconCircle}><Ionicons name="camera" size={20} color={theme.gradStart} /></View>
-              <View><Text style={styles.scanTitle}>Scan Food</Text><Text style={styles.scanSub}>AI-powered — point and log</Text></View>
+          <CalorieHero theme={theme} consumed={caloriesConsumed} goal={calorieGoal} waterMl={waterMl} waterGoalMl={waterGoalMl} />
+
+          <WaterCard theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl} onLog={handleWaterLog} />
+
+          {/* Scan Food Card */}
+          <TouchableOpacity onPress={() => navigation.navigate('FoodScanner')} activeOpacity={0.85}
+            style={[styles.foodScanCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.foodScanLeft}>
+              <View style={[styles.foodScanIconWrap, { backgroundColor: '#4A90E2' + '18' }]}>
+                <Ionicons name="camera-outline" size={22} color="#4A90E2" />
+              </View>
+              <View>
+                <Text style={[styles.foodScanTitle, { color: theme.textPrimary }]}>Scan Food</Text>
+                <Text style={[styles.foodScanSub, { color: theme.textMuted }]}>Snap a photo to log nutrition instantly</Text>
+              </View>
             </View>
-            <View style={styles.scanArrow}><Ionicons name="chevron-forward" size={16} color={theme.gradStart} /></View>
-          </LinearGradient>
-        </TouchableOpacity>
+            <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+          </TouchableOpacity>
 
-        <WaterCard theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl} onLog={handleWaterLog} />
+          {meals.map((m) => (
+            <MealSection key={m.type} theme={theme} title={m.title} mealType={m.type}
+              items={foodEntries.filter((e) => e.meal_type === m.type)}
+              onAddFood={(meal) => { setActiveMeal(meal); setShowAddFood(true); }} />
+          ))}
 
-        {meals.map((m) => (
-          <MealSection key={m.type} theme={theme} title={m.title} mealType={m.type}
-            items={foodEntries.filter((e) => e.meal_type === m.type)}
-            onAddFood={(meal) => { setActiveMeal(meal); setShowAddFood(true); }} />
-        ))}
+          <CalorieTrendChart
+            userId={user?.id ?? ''}
+            calorieGoal={calorieGoal}
+            theme={theme}
+          />
 
-        {/* ── CALORIE TREND CHART ── */}
-        <CalorieTrendChart
-          userId={user?.id ?? ''}
-          calorieGoal={calorieGoal}
-          theme={theme}
-        />
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      ) : (
+        <MealPlanTab theme={theme} />
+      )}
 
       <AddFoodModal
         visible={showAddFood} theme={theme} mealType={activeMeal}
         onClose={() => setShowAddFood(false)}
-        onScan={() => { setShowAddFood(false); navigation.getParent()?.navigate('FoodScanner'); }}
         onAdd={handleAddFood}
         savedMeals={savedMeals}
         onSaveFavourite={handleSaveFavourite}
@@ -524,6 +640,7 @@ const styles = StyleSheet.create({
   pageDate: { fontSize: fontSize.xs, marginTop: 2 },
   addBtn: { borderRadius: 20, overflow: 'hidden' },
   addBtnGrad: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  cameraBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { paddingBottom: 120 },
   heroCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.lg, borderRadius: 20 },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md },
@@ -543,14 +660,12 @@ const styles = StyleSheet.create({
   waterBar: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
   waterBarFill: { height: '100%', borderRadius: 3 },
   waterLabel: { fontSize: fontSize.xs, color: '#2BBCB0', fontWeight: '600' },
-  scanWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: radius.lg, overflow: 'hidden' },
-  scanCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
-  scanLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
-  scanIconCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  scanTitle: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  scanSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  scanArrow: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   waterCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.lg },
+  foodScanCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  foodScanLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  foodScanIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  foodScanTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  foodScanSub: { fontSize: fontSize.xs, marginTop: 1 },
   waterCardLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   waterCardTitle: { fontSize: fontSize.base, fontWeight: '700' },
   waterCardSub: { fontSize: fontSize.xs },
@@ -568,15 +683,14 @@ const styles = StyleSheet.create({
   foodItemCal: { fontSize: fontSize.sm, fontWeight: '600' },
   addFoodBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing.sm, marginTop: spacing.xs, borderTopWidth: 0.5, borderStyle: 'dashed' },
   addFoodText: { fontSize: fontSize.sm, fontWeight: '600' },
+  viewToggle: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: 10, padding: 3, borderWidth: 1 },
+  viewToggleTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 7, borderRadius: 8 },
+  viewToggleText: { fontSize: fontSize.sm },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%', minHeight: '60%' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 0.5, borderColor: 'rgba(0,0,0,0.1)' },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700' },
   sectionLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  choiceWrap: { borderRadius: 16, overflow: 'hidden' },
-  choiceCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
-  choiceTitle: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  choiceSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.70)', marginTop: 2, lineHeight: 16 },
   choiceCardOutline: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: 16, borderWidth: 1.5 },
   choiceTitleDark: { fontSize: fontSize.base, fontWeight: '700' },
   choiceSubDark: { fontSize: fontSize.xs, marginTop: 2 },

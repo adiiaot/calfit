@@ -17,10 +17,10 @@ export default function WelcomeScreen() {
 
   const features = [
     { icon: 'nutrition-outline', text: 'Track calories, macros & water intake' },
-    { icon: 'chatbubble-ellipses-outline', text: 'AI Coach powered by Claude API' },
+    { icon: 'chatbubble-ellipses-outline', text: 'AI Coach — personalized workouts & meal plans' },
     { icon: 'barbell-outline', text: 'Workouts, sleep & step tracking' },
-    { icon: 'people-outline', text: 'Social feed & accountability partner' },
-    { icon: 'star-outline', text: 'Earn CalFit Points & referral rewards' },
+    { icon: 'people-outline', text: 'Accountability partner for shared goals' },
+    { icon: 'flash-outline', text: 'Smart progress tracking & insights' },
   ];
 
   return (

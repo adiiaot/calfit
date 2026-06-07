@@ -8,12 +8,14 @@ import type {
   ChatMessage,
 } from '../types/ai-coach.types';
 
+/** Cached workout entry used to avoid redundant regeneration within the TTL window. */
 interface CacheEntry {
   params: WorkoutParams;
   workout: GeneratedWorkout;
   timestamp: number;
 }
 
+/** AI Coach store state covering workout generation, saved workouts, chat messages, and user profile. */
 interface AiCoachState {
   currentWorkout: GeneratedWorkout | null;
   savedWorkouts: GeneratedWorkout[];
@@ -63,6 +65,13 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+/**
+ * Zustand store hook for AI-powered workout generation, persistence of saved
+ * workouts, and real-time chat with the AI coach.
+ *
+ * @returns AiCoachState — The full store including current/saved workouts,
+ * chat messages, profile, cache, and all action methods.
+ */
 export const useAiCoachStore = create<AiCoachState>((set, get) => ({
   currentWorkout: null,
   savedWorkouts: [],

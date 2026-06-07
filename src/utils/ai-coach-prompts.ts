@@ -19,11 +19,20 @@ function wrapUserInput(value: string | null | undefined): string {
   return `<user_data>${sanitizeForPrompt(value)}</user_data>`;
 }
 
+/**
+ * Builds the base system prompt for the AI coach.
+ * @returns The system prompt string.
+ */
 export const buildSystemPrompt = (): string =>
   `You are a certified fitness coach with 15 years of experience. ` +
   `You design safe, effective workouts that respect the client's level and goals. ` +
   `Every exercise must include form tips to prevent injury.`;
 
+/**
+ * Builds the coach chat system prompt, optionally injecting a user profile.
+ * @param userProfile - Optional object with user's name, goal, and fitness level.
+ * @returns The coach chat system prompt string.
+ */
 export function buildCoachChatSystemPrompt(userProfile?: {
   name?: string; goal?: string; fitnessLevel?: string;
 }): string {
@@ -52,6 +61,11 @@ Rules:
 ${profile}`;
 }
 
+/**
+ * Generates the workout prompt for the AI, embedding client profile and constraints.
+ * @param params - Workout parameters including goals, duration, equipment, fitness level, and optional previous workouts.
+ * @returns The workout generation prompt string.
+ */
 export const generateWorkoutPrompt = (
   params: WorkoutParams & { previousWorkouts?: string[] }
 ): string => {
@@ -109,6 +123,11 @@ Generate a detailed workout for a ${fitnessLevel} client.
 Remember: ONLY output the JSON. Nothing else.`;
 };
 
+/**
+ * Generates the meal plan prompt for the AI, embedding dietary preferences, budget, and health goals.
+ * @param params - Meal plan parameters including dietary preferences, budget mode, calorie target, cuisine style, etc.
+ * @returns The meal plan generation prompt string.
+ */
 export const generateMealPlanPrompt = (params: MealPlanParams): string => {
   const budgetStr = params.budget_mode === 'fixed'
     ? `- Fixed Budget: ${params.budget_amount} (${params.budget_period || 'week'})`

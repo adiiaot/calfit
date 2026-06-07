@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.bigcutstore.calfit",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSMotionUsageDescription": "CalFit uses motion data to count your steps automatically."
+        "NSMotionUsageDescription": "CalFit uses motion data to count your steps automatically.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

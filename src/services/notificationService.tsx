@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 
+/** Represents a notification from the app's notification system. */
 export interface AppNotification {
   id: string;
   type:
@@ -19,7 +20,7 @@ export interface AppNotification {
   created_at: string;
 }
 
-// Fetch all notifications for the user
+/** Fetches all notifications for a user. @param userId - The user's ID. @returns Array of AppNotification objects. */
 export const getNotifications = async (userId: string): Promise<AppNotification[]> => {
   const { data, error } = await supabase
     .from('notifications')
@@ -35,7 +36,7 @@ export const getNotifications = async (userId: string): Promise<AppNotification[
   return data ?? [];
 };
 
-// Get unread count
+/** Gets the count of unread notifications for a user. @param userId - The user's ID. @returns The number of unread notifications. */
 export const getUnreadCount = async (userId: string): Promise<number> => {
   const { count, error } = await supabase
     .from('notifications')
@@ -47,7 +48,7 @@ export const getUnreadCount = async (userId: string): Promise<number> => {
   return count ?? 0;
 };
 
-// Mark a single notification as read
+/** Marks a single notification as read. @param notificationId - The notification's ID. */
 export const markNotificationRead = async (notificationId: string): Promise<void> => {
   await supabase
     .from('notifications')
@@ -55,7 +56,7 @@ export const markNotificationRead = async (notificationId: string): Promise<void
     .eq('id', notificationId);
 };
 
-// Mark all notifications as read
+/** Marks all unread notifications as read for a user. @param userId - The user's ID. */
 export const markAllNotificationsRead = async (userId: string): Promise<void> => {
   await supabase
     .from('notifications')
@@ -64,7 +65,7 @@ export const markAllNotificationsRead = async (userId: string): Promise<void> =>
     .eq('read', false);
 };
 
-// Delete a single notification
+/** Deletes a single notification. @param notificationId - The notification's ID. */
 export const deleteNotification = async (notificationId: string): Promise<void> => {
   await supabase
     .from('notifications')
@@ -72,7 +73,7 @@ export const deleteNotification = async (notificationId: string): Promise<void> 
     .eq('id', notificationId);
 };
 
-// Send a notification (called from within the app after user actions)
+/** Sends a notification after a user action. @param userId - The user's ID. @param type - The notification type. @param title - The notification title. @param body - The notification body. @param actionLabel - Optional call-to-action label. */
 export const sendNotification = async (
   userId: string,
   type: AppNotification['type'],
@@ -93,6 +94,7 @@ export const sendNotification = async (
 // ── TRIGGER FUNCTIONS ──────────────────────────────────────────
 // Call these from within the app after specific user actions
 
+/** Notifies that a food item has been logged. @param userId - The user's ID. @param foodName - The logged food name. @param calories - The calorie count. */
 export const notifyFoodLogged = async (userId: string, foodName: string, calories: number) => {
   await sendNotification(
     userId,
@@ -102,6 +104,7 @@ export const notifyFoodLogged = async (userId: string, foodName: string, calorie
   );
 };
 
+/** Notifies that the user hit their daily water goal. @param userId - The user's ID. */
 export const notifyWaterGoalReached = async (userId: string) => {
   await sendNotification(
     userId,
@@ -112,6 +115,7 @@ export const notifyWaterGoalReached = async (userId: string) => {
   );
 };
 
+/** Notifies that the user hit their daily calorie goal. @param userId - The user's ID. */
 export const notifyCalorieGoalReached = async (userId: string) => {
   await sendNotification(
     userId,
@@ -122,6 +126,7 @@ export const notifyCalorieGoalReached = async (userId: string) => {
   );
 };
 
+/** Notifies that a workout has been completed. @param userId - The user's ID. @param workoutName - The workout name. @param calories - Calories burned. @param duration - Duration in seconds. */
 export const notifyWorkoutComplete = async (
   userId: string,
   workoutName: string,
@@ -138,6 +143,7 @@ export const notifyWorkoutComplete = async (
   );
 };
 
+/** Notifies about a streak check-in milestone. @param userId - The user's ID. @param streakCount - The current streak length. */
 export const notifyStreakCheckIn = async (userId: string, streakCount: number) => {
   await sendNotification(
     userId,
@@ -148,6 +154,7 @@ export const notifyStreakCheckIn = async (userId: string, streakCount: number) =
   );
 };
 
+/** Sends a reminder to maintain the user's streak. @param userId - The user's ID. */
 export const notifyStreakReminder = async (userId: string) => {
   await sendNotification(
     userId,
@@ -158,6 +165,7 @@ export const notifyStreakReminder = async (userId: string) => {
   );
 };
 
+/** Notifies that an AI meal plan has been generated. @param userId - The user's ID. @param planTitle - The meal plan title. */
 export const notifyMealPlanGenerated = async (userId: string, planTitle: string) => {
   await sendNotification(
     userId,
@@ -168,6 +176,7 @@ export const notifyMealPlanGenerated = async (userId: string, planTitle: string)
   );
 };
 
+/** Notifies that the user's profile is complete. @param userId - The user's ID. */
 export const notifyProfileComplete = async (userId: string) => {
   await sendNotification(
     userId,
@@ -177,6 +186,7 @@ export const notifyProfileComplete = async (userId: string) => {
   );
 };
 
+/** Notifies about a message from an accountability partner. @param userId - The user's ID. @param partnerName - The partner's name. @param messageType - The message type (text, image, video, audio). */
 export const notifyPartnerMessage = async (userId: string, partnerName: string, messageType: string) => {
   const labels: Record<string, string> = {
     text: 'sent you a message',
@@ -193,6 +203,7 @@ export const notifyPartnerMessage = async (userId: string, partnerName: string, 
   );
 };
 
+/** Notifies about a partner's streak achievement. @param userId - The user's ID. @param partnerName - The partner's name. @param streakCount - The partner's streak length. */
 export const notifyPartnerStreak = async (userId: string, partnerName: string, streakCount: number) => {
   await sendNotification(
     userId,
@@ -203,6 +214,7 @@ export const notifyPartnerStreak = async (userId: string, partnerName: string, s
   );
 };
 
+/** Notifies that the AI Coach has new insights. @param userId - The user's ID. */
 export const notifyCoachResponse = async (userId: string) => {
   await sendNotification(
     userId,
@@ -213,6 +225,7 @@ export const notifyCoachResponse = async (userId: string) => {
   );
 };
 
+/** Prompts the user to upgrade to a premium plan. @param userId - The user's ID. */
 export const notifyUpgradePrompt = async (userId: string) => {
   await sendNotification(
     userId,
@@ -223,7 +236,7 @@ export const notifyUpgradePrompt = async (userId: string) => {
   );
 };
 
-// Call this on app open to remind user to check in
+/** Checks if a streak reminder should be sent and sends it if needed. @param userId - The user's ID. @param lastActiveDate - The date of the user's last activity, or null. */
 export const checkAndSendStreakReminder = async (
   userId: string,
   lastActiveDate: string | null
@@ -256,6 +269,7 @@ export const checkAndSendStreakReminder = async (
   );
   
 };
+/** Sends a welcome notification to a new user. @param userId - The user's ID. @param userName - The user's name. */
 export const sendWelcomeNotification = async (userId: string, userName: string) => {
   await sendNotification(
     userId,

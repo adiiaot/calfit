@@ -12,6 +12,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 let recording: Audio.Recording | null = null;
 
+/** Requests microphone permission from the user. @returns Whether permission was granted. */
 export const requestMicPermission = async (): Promise<boolean> => {
   try {
     const { status: existing } = await Audio.getPermissionsAsync();
@@ -21,6 +22,7 @@ export const requestMicPermission = async (): Promise<boolean> => {
   } catch { return false; }
 };
 
+/** Starts an audio recording. @returns Whether recording started successfully. */
 export const startRecording = async (): Promise<boolean> => {
   try {
     const granted = await requestMicPermission();
@@ -34,6 +36,7 @@ export const startRecording = async (): Promise<boolean> => {
   } catch (e) { if (__DEV__) console.error('startRecording error:', e); return false; }
 };
 
+/** Stops the current audio recording and returns the file URI. @returns The recording file URI, or null if no recording was in progress. */
 export const stopRecording = async (): Promise<string | null> => {
   if (!recording) return null;
   try {
@@ -45,6 +48,7 @@ export const stopRecording = async (): Promise<string | null> => {
   } catch (e) { recording = null; return null; }
 };
 
+/** Cancels the current audio recording without saving. */
 export const cancelRecording = async (): Promise<void> => {
   if (!recording) return;
   try {
@@ -58,6 +62,7 @@ export const cancelRecording = async (): Promise<void> => {
 // Deepgram is synchronous — no polling needed.
 // POST audio → get transcript back immediately in one request.
 // Simpler and faster than AssemblyAI's async approach.
+/** Transcribes an audio file using Deepgram speech-to-text. @param uri - The file URI of the audio recording. @returns The transcribed text, or null on failure. */
 export const transcribeAudio = async (uri: string): Promise<string | null> => {
   const apiKey = process.env.EXPO_PUBLIC_DEEPGRAM_KEY;
   if (!apiKey) { if (__DEV__) console.warn('EXPO_PUBLIC_DEEPGRAM_KEY not set'); return null; }
@@ -103,6 +108,7 @@ export const transcribeAudio = async (uri: string): Promise<string | null> => {
   }
 };
 
+/** Formats a duration in milliseconds to mm:ss format. @param ms - Duration in milliseconds. @returns Formatted string in mm:ss. */
 export const formatDuration = (ms: number): string => {
   const secs = Math.floor(ms / 1000);
   const mins = Math.floor(secs / 60);

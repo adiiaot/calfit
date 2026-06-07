@@ -30,14 +30,16 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (but allow .env.example — it's a template)
 .env*.local*
-.env*
-.env.example*
+.env
+!.env.example
 
 # AOTSECURE AGENT FILES
 Aotsecure-V1/
 aotsecure-v1/
+.Aotsecure-V1/
+.aotsecure-v1/
 
 # typescript
 *.tsbuildinfo

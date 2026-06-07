@@ -8,6 +8,7 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** Meal plan store state covering generation, saved plans, and loading/error indicators. */
 interface MealPlanState {
   currentPlan: GeneratedMealPlan | null;
   savedPlans: GeneratedMealPlan[];
@@ -22,6 +23,13 @@ interface MealPlanState {
   clearError: () => void;
 }
 
+/**
+ * Zustand store hook for AI-generated meal plan creation, persistence, and
+ * management of saved meal plans.
+ *
+ * @returns MealPlanState — The full store including current/saved plans,
+ * loading and error state, and all action methods.
+ */
 export const useMealPlanStore = create<MealPlanState>((set, get) => ({
   currentPlan: null,
   savedPlans: [],

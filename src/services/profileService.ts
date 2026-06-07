@@ -32,12 +32,12 @@ export interface Profile {
 export const getProfile = async (userId: string): Promise<Profile | null> => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, calfit_id, full_name, goal, activity_level, age, height_cm, current_weight_kg, target_weight_kg, daily_calorie_goal, protein_goal_g, carb_goal_g, fat_goal_g, water_goal_ml, sleep_goal_hrs, step_goal, theme, units, dietary_preference, tracking_preferences, streak_count, last_active_date, created_at, updated_at, avatar_url')
     .eq('id', userId)
     .maybeSingle();
 
   if (error) {
-    console.error('Error fetching profile:', error.message);
+    if (__DEV__) console.error('Error fetching profile:', error.message);
     return null;
   }
   return data;
@@ -54,7 +54,7 @@ export const updateProfile = async (
     .eq('id', userId);
 
   if (error) {
-    console.error('Error updating profile:', error.message);
+    if (__DEV__) console.error('Error updating profile:', error.message);
     return false;
   }
   return true;
@@ -100,7 +100,7 @@ export const logWater = async (
     .insert({ user_id: userId, amount_ml });
 
   if (error) {
-    console.error('Error logging water:', error.message);
+    if (__DEV__) console.error('Error logging water:', error.message);
     return false;
   }
   return true;
@@ -124,7 +124,7 @@ export const logFood = async (
     .insert({ user_id: userId, date: today, ...entry });
 
   if (error) {
-    console.error('Error logging food:', error.message);
+    if (__DEV__) console.error('Error logging food:', error.message);
     return false;
   }
   return true;

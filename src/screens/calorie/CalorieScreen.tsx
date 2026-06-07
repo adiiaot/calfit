@@ -454,15 +454,15 @@ export default function CalorieScreen() {
       const [cal, water, entries, saved] = await Promise.all([
         getTodayCalories(user.id),
         getTodayWater(user.id),
-        supabase.from('food_logs').select('*').eq('user_id', user.id)
+        supabase.from('food_logs').select('id,user_id,meal_type,food_name,calories,protein_g,carbs_g,fats_g,date,created_at').eq('user_id', user.id)
           .eq('date', new Date().toISOString().split('T')[0]).order('created_at', { ascending: false }),
-        supabase.from('saved_meals').select('*').eq('user_id', user.id).limit(10),
+        supabase.from('saved_meals').select('id,user_id,name,calories,protein_g,carbs_g,fats_g,meal_type,created_at').eq('user_id', user.id).limit(10),
       ]);
       setCaloriesConsumed(cal);
       setWaterMl(water);
       if (entries.data) setFoodEntries(entries.data as FoodEntry[]);
       if (saved.data) setSavedMeals(saved.data);
-    } catch (e) { console.error('CalorieScreen loadData:', e); }
+    } catch (e) { if (__DEV__) console.error('CalorieScreen loadData:', e); }
     finally { setIsRefreshing(false); }
   };
 

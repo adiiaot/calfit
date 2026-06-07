@@ -259,7 +259,7 @@ export default function HealthScreen() {
           setSleepAvg(avg.toFixed(1) + 'h');
         }
         const { count } = await supabase.from('workout_sessions')
-          .select('*', { head: true, count: 'exact' }).eq('user_id', userId);
+          .select('id', { head: true, count: 'exact' }).eq('user_id', userId);
         setWorkoutTotal(count != null ? String(count) : '—');
       } catch {}
     };

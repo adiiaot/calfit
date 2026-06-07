@@ -474,7 +474,7 @@ export default function HomeScreen() {
       setWaterMl(water);
       setSleepHrs(sleepRes.data?.hours ?? 0);
       setUnreadCount(notifRes.count ?? 0);
-    } catch (e) { console.error('HomeScreen loadData error:', e); }
+    } catch (e) { if (__DEV__) console.error('HomeScreen loadData error:', e); }
     finally { setIsRefreshing(false); }
   };
 

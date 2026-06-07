@@ -23,13 +23,13 @@ export interface AppNotification {
 export const getNotifications = async (userId: string): Promise<AppNotification[]> => {
   const { data, error } = await supabase
     .from('notifications')
-    .select('*')
+    .select('id, type, title, body, action_label, read, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
 
   if (error) {
-    console.error('Failed to fetch notifications:', error.message);
+    if (__DEV__) console.error('Failed to fetch notifications:', error.message);
     return [];
   }
   return data ?? [];
@@ -39,7 +39,7 @@ export const getNotifications = async (userId: string): Promise<AppNotification[
 export const getUnreadCount = async (userId: string): Promise<number> => {
   const { count, error } = await supabase
     .from('notifications')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('read', false);
 

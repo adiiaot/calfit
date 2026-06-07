@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // loadProfile might flip isOnboarding based on profile state which would
     // unmount OnboardingScreen mid-flow.
     if (!get().isOnboarding) {
-      get().loadProfile(session.user.id).catch(console.error);
+      get().loadProfile(session.user.id).catch((e) => { if (__DEV__) console.error(e); });
     }
   },
 
@@ -65,7 +65,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       return profile;
     } catch (e) {
-      console.error('[authStore] loadProfile error:', e);
+      if (__DEV__) console.error('[authStore] loadProfile error:', e);
       return null;
     }
   },

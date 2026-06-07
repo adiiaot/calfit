@@ -80,7 +80,7 @@ export const useMealPlanStore = create<MealPlanState>((set, get) => ({
       const { supabase } = await import('../services/supabase');
       const { data, error } = await supabase
         .from('ai_generated_meal_plans')
-        .select('*')
+        .select('id,user_id,title,description,daily_calories,meals,nutrition_goals,is_saved,created_at')
         .eq('user_id', userId)
         .eq('is_saved', true)
         .order('created_at', { ascending: false });

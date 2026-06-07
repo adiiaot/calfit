@@ -187,7 +187,7 @@ export default function SleepScreen() {
   const loadLogs = async () => {
     if (!user?.id) return;
     setIsLoading(true);
-    const { data, error } = await supabase.from('sleep_logs').select('*').eq('user_id', user.id)
+    const { data, error } = await supabase.from('sleep_logs').select('id,user_id,hours,date,created_at,bedtime,wake_time').eq('user_id', user.id)
       .order('date', { ascending: false }).limit(30);
     if (data) setLogs(data as SleepLog[]);
     setIsLoading(false);

@@ -9,7 +9,6 @@ import { useAuthStore } from './src/store/authStore';
 import { useThemeStore } from './src/store/themeStore';
 import { colors } from './src/theme';
 import AppNavigator from './src/navigation/AppNavigator';
-import { initIAP, endIAP, setupPurchaseListeners } from './src/services/iapService';
 import { setupNotificationHandler } from './src/services/reminderService';
 
 setupNotificationHandler();
@@ -56,17 +55,6 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    let cleanup: (() => void) | undefined;
-    const setup = async () => {
-      const ready = await initIAP();
-      if (ready) cleanup = setupPurchaseListeners(user.id);
-    };
-    setup();
-    return () => { cleanup?.(); endIAP(); };
-  }, [user?.id]);
 
   if (!fontsLoaded) {
     return (

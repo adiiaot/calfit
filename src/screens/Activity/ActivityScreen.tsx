@@ -57,7 +57,7 @@ export default function WorkoutScreen() {
     if (!user?.id) return;
     try {
       const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('workout_routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      const { data } = await supabase.from('workout_routines').select('id,user_id,name,exercises,created_at,updated_at').eq('user_id', user.id).order('created_at', { ascending: false });
       if (data) setRoutines(data.map((r: any) => ({ ...r, exercises: r.exercises ?? [] })));
     } catch {}
   };
@@ -66,7 +66,7 @@ export default function WorkoutScreen() {
     if (!user?.id) return;
     try {
       const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('workout_sessions').select('*').eq('user_id', user.id).eq('status', 'completed').order('completed_at', { ascending: false }).limit(5);
+      const { data } = await supabase.from('workout_sessions').select('id,user_id,name,status,calories_burned,duration_seconds,exercises,completed_at').eq('user_id', user.id).eq('status', 'completed').order('completed_at', { ascending: false }).limit(5);
       if (data) setSessions(data);
     } catch {}
   };

@@ -179,7 +179,7 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
       const { supabase } = await import('../services/supabase');
       const { data, error } = await supabase
         .from('ai_generated_workouts')
-        .select('*')
+        .select('id,user_id,title,description,duration,difficulty,exercises,warmup,cooldown,is_saved,created_at')
         .eq('user_id', userId)
         .eq('is_saved', true)
         .order('created_at', { ascending: false });
@@ -311,7 +311,7 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
       const { supabase } = await import('../services/supabase');
       const { data, error } = await supabase
         .from('chat_messages')
-        .select('*')
+        .select('id,user_id,role,content,created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
 

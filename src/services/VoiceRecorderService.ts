@@ -31,7 +31,7 @@ export const startRecording = async (): Promise<boolean> => {
     );
     recording = rec;
     return true;
-  } catch (e) { console.error('startRecording error:', e); return false; }
+  } catch (e) { if (__DEV__) console.error('startRecording error:', e); return false; }
 };
 
 export const stopRecording = async (): Promise<string | null> => {
@@ -60,7 +60,7 @@ export const cancelRecording = async (): Promise<void> => {
 // Simpler and faster than AssemblyAI's async approach.
 export const transcribeAudio = async (uri: string): Promise<string | null> => {
   const apiKey = process.env.EXPO_PUBLIC_DEEPGRAM_KEY;
-  if (!apiKey) { console.warn('EXPO_PUBLIC_DEEPGRAM_KEY not set'); return null; }
+  if (!apiKey) { if (__DEV__) console.warn('EXPO_PUBLIC_DEEPGRAM_KEY not set'); return null; }
 
   try {
     // Read audio as base64 then convert to binary blob for upload
@@ -89,7 +89,7 @@ export const transcribeAudio = async (uri: string): Promise<string | null> => {
 
     if (!res.ok) {
       const err = await res.text();
-      console.error('Deepgram error:', res.status, err);
+      if (__DEV__) console.error('Deepgram error:', res.status, err);
       return null;
     }
 
@@ -98,7 +98,7 @@ export const transcribeAudio = async (uri: string): Promise<string | null> => {
     return transcript?.trim() || null;
 
   } catch (e) {
-    console.error('transcribeAudio error:', e);
+    if (__DEV__) console.error('transcribeAudio error:', e);
     return null;
   }
 };

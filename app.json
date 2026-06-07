@@ -27,7 +27,9 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080A0F"
       },
-      "permissions": ["ACTIVITY_RECOGNITION"],
+      "permissions": [
+        "ACTIVITY_RECOGNITION"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -48,6 +50,11 @@
     "assetBundlePatterns": [
       "**/*",
       "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*.ttf"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2da67313-11c7-433d-9cd4-b5e725dce13c"
+      }
+    }
   }
 }

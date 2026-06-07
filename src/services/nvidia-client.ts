@@ -89,7 +89,7 @@ export async function generateWorkout(
   params: WorkoutParams & { previousWorkouts?: GeneratedWorkout[] }
 ): Promise<GeneratedWorkout> {
   if (!API_KEY) {
-    console.warn('[nvidia-client] No API key configured, returning fallback workout');
+    if (__DEV__) console.warn('[nvidia-client] No API key configured, returning fallback workout');
     return fallbackWorkout(params);
   }
 
@@ -245,7 +245,7 @@ export async function generateMealPlan(
   params: MealPlanParams
 ): Promise<GeneratedMealPlan> {
   if (!API_KEY) {
-    console.warn('[nvidia-client] No API key configured, returning fallback meal plan');
+    if (__DEV__) console.warn('[nvidia-client] No API key configured, returning fallback meal plan');
     return fallbackMealPlan(params);
   }
 
@@ -517,9 +517,16 @@ export async function lookupFoodNutrition(
 } | null> {
   if (!API_KEY) return null;
 
+  const sanitizedFood = (foodName || '')
+    .replace(/[\0\\\x00-\x1f]/g, '')
+    .trim()
+    .slice(0, 200);
+
+  if (!sanitizedFood) return null;
+
   const prompt = `You are a nutrition database. Given a food name, estimate its nutritional values per standard serving.
 
-Food: "${foodName}"
+Food: <user_input>${sanitizedFood}</user_input>
 
 Respond ONLY with valid JSON (no markdown, no preamble):
 {

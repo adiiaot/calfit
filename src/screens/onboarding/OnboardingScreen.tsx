@@ -230,6 +230,7 @@ export default function OnboardingScreen() {
       });
       if (anonData.user) {
         await saveProfile(anonData.user.id);
+        await useAuthStore.getState().loadProfile(anonData.user.id);
         const { sendWelcomeNotification } = await import('../../services/notificationService');
         await sendWelcomeNotification(anonData.user.id, 'there');
       }

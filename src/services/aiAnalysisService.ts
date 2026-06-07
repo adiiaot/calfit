@@ -52,7 +52,7 @@ export async function fetchWorkoutAnalysis(
 
   const { data: sessions, error } = await supabase
     .from('workout_sessions')
-    .select('*')
+    .select('id, user_id, name, status, calories_burned, duration_seconds, completed_at')
     .eq('user_id', userId)
     .eq('status', 'completed')
     .gte('completed_at', pastDate.toISOString())

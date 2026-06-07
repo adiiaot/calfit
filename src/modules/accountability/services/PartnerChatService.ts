@@ -44,11 +44,11 @@ export const uploadMedia = async (
       .upload(fileName, blob, { contentType, upsert: false });
 
     if (uploadError) {
-      console.error('uploadMedia error:', uploadError.message);
+      if (__DEV__) console.error('uploadMedia error:', uploadError.message);
       if (uploadError.message?.includes('bucket') || uploadError.message?.includes('does not exist')) {
-        console.warn('The "partner-media" storage bucket does not exist. Create it in Supabase Dashboard → Storage → New bucket → name: partner-media → Public');
+        if (__DEV__) console.warn('The "partner-media" storage bucket does not exist. Create it in Supabase Dashboard → Storage → New bucket → name: partner-media → Public');
       } else if (uploadError.message?.includes('row-level security') || uploadError.message?.includes('policy')) {
-        console.warn('RLS policy blocking upload. Run supabase/migrations/storage_rls_policies.sql in Supabase Dashboard SQL Editor to fix.');
+        if (__DEV__) console.warn('RLS policy blocking upload. Run supabase/migrations/storage_rls_policies.sql in Supabase Dashboard SQL Editor to fix.');
       }
       return null;
     }
@@ -59,7 +59,7 @@ export const uploadMedia = async (
 
     return publicUrl;
   } catch (e) {
-    console.error('uploadMedia exception:', e);
+    if (__DEV__) console.error('uploadMedia exception:', e);
     return null;
   }
 };
@@ -83,7 +83,7 @@ export const sendMediaMessage = async (
   });
 
   if (error) {
-    console.error('sendMediaMessage error:', error.message);
+    if (__DEV__) console.error('sendMediaMessage error:', error.message);
     return { success: false, message: error.message };
   }
   return { success: true };
@@ -105,7 +105,7 @@ export const sendMessage = async (
   });
 
   if (error) {
-    console.error('sendMessage error:', error.message);
+    if (__DEV__) console.error('sendMessage error:', error.message);
     return { success: false, message: error.message };
   }
   return { success: true };
@@ -118,14 +118,14 @@ export const loadMessages = async (
 ): Promise<ChatMessage[]> => {
   const { data, error } = await supabase
     .from('partner_messages')
-    .select('*')
+    .select('id, sender_id, receiver_id, message, message_type, media_url, media_duration, created_at, read')
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
     .or(`sender_id.eq.${partnerId},receiver_id.eq.${partnerId}`)
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) {
-    console.error('loadMessages error:', error.message);
+    if (__DEV__) console.error('loadMessages error:', error.message);
     return [];
   }
 
@@ -161,7 +161,7 @@ export const subscribeToMessages = (
 export const getUnreadCount = async (userId: string): Promise<number> => {
   const { count, error } = await supabase
     .from('partner_messages')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('receiver_id', userId)
     .eq('read', false);
 

@@ -81,7 +81,7 @@ export default function IntermittentFastingScreen() {
     if (!user?.id) return;
     try {
       const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('fasting_logs').select('*').eq('user_id', user.id)
+      const { data } = await supabase.from('fasting_logs').select('id,user_id,started_at,ended_at,completed,duration_planned,duration_actual').eq('user_id', user.id)
         .order('started_at', { ascending: false }).limit(20);
       if (data) {
         const active = data.find((f: FastingLog) => !f.completed && !f.ended_at);
@@ -89,7 +89,7 @@ export default function IntermittentFastingScreen() {
         setHistory(data.filter((f: FastingLog) => f.completed || f.ended_at));
         if (active) setElapsed(Date.now() - new Date(active.started_at).getTime());
       }
-    } catch (e) { console.error('IF loadData:', e); }
+    } catch (e) { if (__DEV__) console.error('IF loadData:', e); }
     finally { setIsRefreshing(false); }
   };
 

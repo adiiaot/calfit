@@ -1,5 +1,24 @@
 import type { WorkoutParams, MealPlanParams } from '../types/ai-coach.types';
 
+const MAX_PROMPT_INPUT_LENGTH = 500;
+
+function sanitizeForPrompt(input: string | null | undefined, maxLength = MAX_PROMPT_INPUT_LENGTH): string {
+  if (!input) return '';
+  return input
+    .replace(/[\0\\\x00-\x1f]/g, '')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function sanitizeArray(items: string[] | undefined): string {
+  if (!items || items.length === 0) return 'None specified';
+  return items.map(i => sanitizeForPrompt(i)).filter(Boolean).join(', ');
+}
+
+function wrapUserInput(value: string | null | undefined): string {
+  return `<user_data>${sanitizeForPrompt(value)}</user_data>`;
+}
+
 export const buildSystemPrompt = (): string =>
   `You are a certified fitness coach with 15 years of experience. ` +
   `You design safe, effective workouts that respect the client's level and goals. ` +
@@ -9,7 +28,7 @@ export function buildCoachChatSystemPrompt(userProfile?: {
   name?: string; goal?: string; fitnessLevel?: string;
 }): string {
   const profile = userProfile
-    ? `\nUser profile:\n- Name: ${userProfile.name ?? 'Unknown'}\n- Goal: ${userProfile.goal ?? 'Not set'}\n- Fitness level: ${userProfile.fitnessLevel ?? 'Not set'}`
+    ? `\nUser profile:\n- Name: ${wrapUserInput(userProfile.name) || 'Unknown'}\n- Goal: ${wrapUserInput(userProfile.goal) || 'Not set'}\n- Fitness level: ${wrapUserInput(userProfile.fitnessLevel) || 'Not set'}`
     : '';
 
   return `You are CalFit Coach — a supportive, knowledgeable fitness and nutrition coach. Your tone is encouraging but honest.
@@ -38,17 +57,20 @@ export const generateWorkoutPrompt = (
 ): string => {
   const prevSummary =
     params.previousWorkouts?.length
-      ? params.previousWorkouts.join(', ')
+      ? params.previousWorkouts.map(w => sanitizeForPrompt(w)).filter(Boolean).join(', ')
       : 'None';
+  const fitnessLevel = sanitizeForPrompt(params.fitnessLevel) || 'beginner';
+  const goals = sanitizeArray(params.goals);
+  const equipment = sanitizeArray(params.equipment);
 
   return `
-Generate a detailed workout for a ${params.fitnessLevel} client.
+Generate a detailed workout for a ${fitnessLevel} client.
 
 **Client Profile:**
-- Fitness Level: ${params.fitnessLevel}
-- Goals: ${params.goals.join(', ')}
+- Fitness Level: ${fitnessLevel}
+- Goals: ${goals}
 - Duration: ${params.duration} minutes
-- Available Equipment: ${params.equipment.join(', ')}
+- Available Equipment: ${equipment}
 - Previous workouts this week: ${prevSummary}
 
 **Requirements:**
@@ -91,18 +113,22 @@ export const generateMealPlanPrompt = (params: MealPlanParams): string => {
   const budgetStr = params.budget_mode === 'fixed'
     ? `- Fixed Budget: ${params.budget_amount} (${params.budget_period || 'week'})`
     : `- Budget Level: ${params.budget_level} (auto-calculated based on food costs)`;
+  const dietaryPrefs = sanitizeArray(params.dietary_preferences);
+  const excludedFoods = sanitizeArray(params.excluded_foods);
+  const cuisineStyle = sanitizeForPrompt(params.cuisine_style) || 'Any';
+  const healthGoal = sanitizeForPrompt(params.health_goal) || 'General health';
 
   return `
 Generate a detailed daily meal plan with the following preferences:
 
 **Client Preferences:**
-- Dietary Preferences: ${params.dietary_preferences.join(', ') || 'None specified'}
+- Dietary Preferences: ${dietaryPrefs}
 ${budgetStr}
 - Daily Calorie Target: ${params.calories_target} kcal
 - Meals per Day: ${params.meals_per_day}
-- Excluded Foods: ${params.excluded_foods.join(', ') || 'None'}
-- Cuisine Style: ${params.cuisine_style || 'Any'}
-- Health Goal: ${params.health_goal || 'General health'}
+- Excluded Foods: ${excludedFoods}
+- Cuisine Style: ${cuisineStyle}
+- Health Goal: ${healthGoal}
 
 **Requirements:**
 1. Create ${params.meals_per_day} meals covering the full day

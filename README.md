@@ -146,6 +146,9 @@ npx expo run:ios
 | partners | Accountability partner relationships |
 | notes | User journal entries |
 
+```
+
+
 ````
 ````
   <h3>Support AOT Network</h3>

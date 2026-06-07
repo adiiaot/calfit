@@ -4,92 +4,54 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
-import {
-  initIAP,
-  endIAP,
-  getSubscriptionProducts,
-  purchaseSubscription,
-  restorePurchases,
-  PRODUCT_IDS,
-} from '../../services/iapService';
+const ALL_FEATURES = [
+  'Unlimited AI Coach prompts',
+  'Food scanner (AI vision)',
+  'Calorie & macro tracking',
+  'Water & step logging',
+  'Workout generation & library',
+  'AI Meal Planner',
+  'Accountability partners & chat',
+  'Community groups',
+  'Live streaming',
+  'Fasting & sleep tracking',
+  'Progress & streaks',
+  'Data export',
+];
 
 const TIERS = [
   {
     id: 'free',
-    name: 'Free',
+    name: 'Starter',
     price: '₦0',
     period: 'forever',
     color: '#6B7280',
-    features: [
-      'Basic calorie tracking',
-      'Water logging',
-      'Step tracking',
-      '1 community group',
-      'Workout library access',
-    ],
-    missing: [
-      'Food scanner',
-      'AI Meal Planner',
-      'CalFit Coach (unlimited)',
-      'Live streaming',
-      'Accountability partners',
-      'Referral earnings wallet',
-    ],
+    features: ALL_FEATURES,
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: '₦4,999',
-    period: 'per month',
+    price: '₦0',
+    period: 'forever',
     color: '#0DAE6C',
-    productId: PRODUCT_IDS.pro,
-    features: [
-      '20 AI Coach prompts per day',
-      'Food scanner (barcode + AI vision)',
-      'Up to 5 community groups',
-      'Accountability partners (up to 3)',
-      'Advanced macro tracking',
-      'No ads',
-      'Priority support',
-    ],
-    missing: [
-      'AI Meal Planner',
-      'Live streaming',
-      'Referral earnings wallet',
-    ],
+    features: ALL_FEATURES,
   },
   {
     id: 'premium',
     name: 'Premium',
-    price: '₦8,999',
-    period: 'per month',
+    price: '₦0',
+    period: 'forever',
     color: '#F59E0B',
-    productId: PRODUCT_IDS.premium,
     badge: 'BEST VALUE',
-    features: [
-      'Unlimited AI Coach prompts',
-      'AI Meal Planner (full access)',
-      'Food scanner (barcode + AI vision)',
-      'Live streaming access',
-      'Unlimited community groups',
-      'Accountability partners (up to 3)',
-      'Referral earnings wallet',
-      'No ads',
-      'Priority support',
-    ],
-    missing: [],
+    features: ALL_FEATURES,
   },
 ];
 
@@ -97,8 +59,7 @@ export default function SubscriptionScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { colorScheme } = useThemeStore();
-  const { user, userTier } = useAuthStore();
-  const { setOnboarding } = useAuthStore(); // add this to reset onboarding state if user came from onboarding flow and hit back from subscription screen
+  const { userTier, setOnboarding } = useAuthStore();
   const theme = colors[colorScheme];
 
   // fromOnboarding flag — passed from paywall handleTrial/handlePayNow
@@ -106,21 +67,8 @@ export default function SubscriptionScreen() {
   // which would fail because there's no screen behind it in the auth stack
   const fromOnboarding = route.params?.fromOnboarding ?? false;
   const preselectedPlan = route.params?.plan ?? null;
-  const isTrial = route.params?.trial ?? false;
 
-  const [isLoading, setIsLoading]     = useState(false);
-  const [loadingTier, setLoadingTier] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const [iapReady, setIapReady]       = useState(false);
-
-  useEffect(() => {
-    const init = async () => {
-      const ready = await initIAP();
-      setIapReady(ready);
-    };
-    init();
-    return () => { endIAP(); };
-  }, []);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
 
  const handleBack = () => {
   if (navigation.canGoBack()) {
@@ -129,41 +77,16 @@ export default function SubscriptionScreen() {
 };
 
   const handleSubscribe = async (tier: typeof TIERS[0]) => {
-    if (tier.id === 'free' || !tier.productId) return;
-
-    // IAP is stubbed — show clear explanation with next steps
-    // When store products are created and dev build is ready,
-    // replace this Alert with: await purchaseSubscription(tier.productId)
-    Alert.alert(
-      '🚀 Almost ready!',
-      `CalFit ${tier.name} payments are being set up in the App Store and Google Play.\n\nYou'll be able to subscribe directly through your ${Platform.OS === 'ios' ? 'Apple ID' : 'Google Play'} account — no new account needed.\n\nWe'll notify you the moment it's live!`,
-      [
-        { text: 'Remind me later', style: 'cancel' },
-        {
-          text: 'Continue on Free',
-        // When user taps "Continue on Free" in the alert:
-         onPress: () => {
-         setOnboarding(false); // NOW release to main app
-},
-        },
-      ]
-    );
-  };
-
-  const handleRestore = async () => {
-    if (!user?.id) return;
-    setIsRestoring(true);
-    const { restored, tier } = await restorePurchases(user.id);
-    if (restored) {
-      Alert.alert(
-        'Purchases Restored ✅',
-        `Your ${tier} subscription has been restored.`,
-        [{ text: 'OK', onPress: handleBack }]
-      );
-    } else {
-      Alert.alert('Nothing to restore', 'No active subscriptions found for this account.');
+    if (tier.id === 'free') {
+      setOnboarding(false);
+      return;
     }
-    setIsRestoring(false);
+    setSelectedTier(tier.id);
+    // Simulate a brief selection animation, then continue
+    setTimeout(() => {
+      setSelectedTier(null);
+      setOnboarding(false);
+    }, 600);
   };
 
   return (
@@ -188,40 +111,10 @@ export default function SubscriptionScreen() {
         <View style={styles.hero}>
           <Text style={[styles.heroTitle, { color: theme.textPrimary }]}>Choose your plan</Text>
           <Text style={[styles.heroSub, { color: theme.textSecondary }]}>
-            Unlock the full CalFit experience. Cancel anytime.
+            Everything is free during this demo. No limits, no payments.
           </Text>
         </View>
 
-        {/* IAP coming soon banner */}
-        <View style={[styles.comingSoonBanner, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-          <Ionicons name="time-outline" size={18} color={theme.accent} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.comingSoonTitle, { color: theme.accent }]}>
-              In-app payments coming very soon
-            </Text>
-            <Text style={[styles.comingSoonSub, { color: theme.textSecondary }]}>
-              You'll pay directly through your {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} account — fast, secure, no new card needed.
-            </Text>
-          </View>
-        </View>
-
-        {/* How IAP works explainer */}
-        <View style={[styles.explainerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.explainerTitle, { color: theme.textPrimary }]}>How it works</Text>
-          {[
-            { icon: 'phone-portrait-outline', text: `Tap "Get Pro" or "Get Premium" below` },
-            { icon: 'storefront-outline',     text: `Your ${Platform.OS === 'ios' ? 'App Store' : 'Google Play'} payment sheet opens` },
-            { icon: 'card-outline',           text: `Pay with your saved card — one tap` },
-            { icon: 'checkmark-circle-outline', text: `CalFit Pro/Premium unlocks instantly` },
-          ].map((s) => (
-            <View key={s.text} style={styles.explainerRow}>
-              <View style={[styles.explainerIconWrap, { backgroundColor: theme.accentDim as string }]}>
-                <Ionicons name={s.icon as any} size={16} color={theme.accent} />
-              </View>
-              <Text style={[styles.explainerText, { color: theme.textSecondary }]}>{s.text}</Text>
-            </View>
-          ))}
-        </View>
 
         {/* Current plan */}
         <View style={[styles.currentPlanBadge, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
@@ -235,7 +128,7 @@ export default function SubscriptionScreen() {
         {TIERS.map((tier) => {
           const isCurrent      = userTier === tier.id;
           const isPreselected  = preselectedPlan === tier.id;
-          const isLoadingThis  = loadingTier === tier.id && isLoading;
+          const isLoadingThis  = selectedTier === tier.id;
 
           return (
             <View
@@ -256,9 +149,9 @@ export default function SubscriptionScreen() {
                   <Text style={[styles.currentBadgeText, { color: tier.color }]}>Current Plan</Text>
                 </View>
               )}
-              {isPreselected && !isCurrent && isTrial && (
+              {isPreselected && !isCurrent && (
                 <View style={[styles.currentBadge, { backgroundColor: tier.color + '22' }]}>
-                  <Text style={[styles.currentBadgeText, { color: tier.color }]}>3-Day Free Trial</Text>
+                  <Text style={[styles.currentBadgeText, { color: tier.color }]}>Recommended</Text>
                 </View>
               )}
 
@@ -277,27 +170,19 @@ export default function SubscriptionScreen() {
                     <Text style={[styles.featureText, { color: theme.textPrimary }]}>{f}</Text>
                   </View>
                 ))}
-                {tier.missing?.map((f) => (
-                  <View key={f} style={styles.featureRow}>
-                    <Ionicons name="close-circle" size={16} color={theme.textMuted} />
-                    <Text style={[styles.featureText, { color: theme.textMuted }]}>{f}</Text>
-                  </View>
-                ))}
               </View>
 
               {/* CTA */}
               {tier.id !== 'free' && !isCurrent && (
                 <TouchableOpacity
                   onPress={() => handleSubscribe(tier)}
-                  disabled={isLoading}
+                  disabled={!!selectedTier}
                   style={[styles.ctaBtn, { backgroundColor: tier.color }]}
                 >
                   {isLoadingThis
-                    ? <ActivityIndicator color="#fff" />
+                    ? <Text style={styles.ctaBtnText}>Activating...</Text>
                     : <Text style={styles.ctaBtnText}>
-                        {isTrial && preselectedPlan === tier.id
-                          ? `Start 3-Day Free Trial`
-                          : `Get ${tier.name} — ${tier.price}/mo`}
+                        Get {tier.name} — Free
                       </Text>}
                 </TouchableOpacity>
               )}
@@ -306,7 +191,7 @@ export default function SubscriptionScreen() {
                 <View style={[styles.activeTag, { backgroundColor: tier.color + '18', borderColor: tier.color }]}>
                   <Ionicons name="checkmark-circle" size={16} color={tier.color} />
                   <Text style={[styles.activeTagText, { color: tier.color }]}>
-                    Active — managed in {Platform.OS === 'ios' ? 'App Store' : 'Google Play'}
+                    Current plan — everything is free
                   </Text>
                 </View>
               )}
@@ -321,23 +206,14 @@ export default function SubscriptionScreen() {
                style={styles.skipBtn}
      >
             <Text style={[styles.skipText, { color: theme.textMuted }]}>
-              Continue with Free plan — I'll upgrade later
+              Continue to CalFit
            </Text>
               </TouchableOpacity>
 )}
 
-{/* Restore */}
-<TouchableOpacity onPress={handleRestore} disabled={isRestoring} style={styles.restoreBtn}></TouchableOpacity>
-        {/* Restore */}
-        <TouchableOpacity onPress={handleRestore} disabled={isRestoring} style={styles.restoreBtn}>
-          {isRestoring
-            ? <ActivityIndicator size="small" color={theme.textMuted} />
-            : <Text style={[styles.restoreText, { color: theme.textMuted }]}>Restore previous purchases</Text>}
-        </TouchableOpacity>
-
         <Text style={[styles.legalNote, { color: theme.textMuted }]}>
-          Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period.
-          Manage or cancel in your {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} account settings.
+          Everything is free during this demo. No payment required.{'\n'}
+          Enjoy all features — no limits, no subscriptions.
         </Text>
       </ScrollView>
     </AndroidSafeView>
@@ -359,23 +235,6 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.xs },
   heroTitle: { fontSize: fontSize.xxl, fontWeight: '800', textAlign: 'center' },
   heroSub: { fontSize: fontSize.base, textAlign: 'center' },
-
-  comingSoonBanner: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
-    marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    padding: spacing.md, borderRadius: radius.lg, borderWidth: 1,
-  },
-  comingSoonTitle: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 4 },
-  comingSoonSub: { fontSize: fontSize.xs, lineHeight: 16 },
-
-  explainerCard: {
-    marginHorizontal: spacing.lg, marginBottom: spacing.md,
-    padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.sm,
-  },
-  explainerTitle: { fontSize: fontSize.base, fontWeight: '700', marginBottom: 4 },
-  explainerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  explainerIconWrap: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  explainerText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
 
   currentPlanBadge: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
@@ -411,9 +270,6 @@ const styles = StyleSheet.create({
     padding: spacing.sm, borderRadius: radius.md, borderWidth: 1,
   },
   activeTagText: { fontSize: fontSize.sm, fontWeight: '600' },
-
-  restoreBtn: { alignItems: 'center', padding: spacing.lg, marginTop: spacing.sm },
-  restoreText: { fontSize: fontSize.sm },
 
   skipBtn: { padding: spacing.lg, alignItems: 'center' },
 skipText: { fontSize: fontSize.sm, fontWeight: '600', textDecorationLine: 'underline' },

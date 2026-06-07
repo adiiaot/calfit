@@ -14,75 +14,72 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 const SECTIONS = [
   {
     title: 'Data We Collect',
-    content: `CalFit collects the following information to provide and improve our services:
+    content: `CalFit collects the following information to provide and improve your fitness experience:
 
-- Account information: name, email address, and CalFit ID
-- Body stats: age, height, weight, and target weight that you provide
-- Activity data: food logs, water intake, workout sessions, steps, and sleep you record
-- Usage data: how you interact with the app to improve our features
+- Account information: name, email address, and profile details you provide
+- Body stats: height, weight, and fitness goals that you enter
+- Activity data: food logs, water intake, workout sessions, steps, and notes you record
+- AI interactions: prompts you send to the CalFit Coach for personalised guidance
 
-We only collect what is necessary to deliver your personalised fitness experience.`,
+We only collect what is necessary to deliver your personalised fitness experience. No data is collected without your consent.`,
   },
   {
     title: 'How We Use Your Data',
     content: `Your data is used exclusively to:
 
-- Calculate your personalised calorie targets and macro splits
-- Power the CalFit Coach AI with your fitness context
-- Track your progress and generate your weekly and monthly recaps
-- Send you relevant notifications and reminders you have enabled
-- Improve app features through anonymised, aggregated analytics
+- Calculate your personalised calorie targets and nutrition goals
+- Power the CalFit Coach AI with your fitness context for tailored advice
+- Track your progress and generate workout recommendations
+- Send you notifications and reminders you have opted into
+- Improve app features through aggregated, anonymised analytics
 
-We do not build advertising profiles from your health data.`,
+We do not build advertising profiles or sell your personal information.`,
   },
   {
     title: 'Data Sharing',
     content: `CalFit does not sell your personal data. We share limited data with:
 
 - Supabase — our secure database and authentication provider
-- Anthropic — powers the CalFit Coach AI (your prompts only, no health data shared)
-- Stripe — payment processing only (no health data shared)
-- Cloudinary — media storage for profile photos and shared content
+- NVIDIA — powers the CalFit Coach AI (your prompts only, no health data shared)
 
-All third-party providers are contractually bound to protect your data.`,
+All third-party providers are contractually bound to protect your data and use it only for the services they provide.`,
   },
   {
     title: 'Your Rights',
     content: `You have full control over your data:
 
-- Access: view all data stored about you
-- Download: export your complete data at any time from Settings
-- Correct: update your information in Edit Profile
+- Access: view all data stored about you in the app
+- Download: export your complete data from Settings
+- Correct: update your information in Edit Profile at any time
 - Delete: permanently delete your account and all associated data
-- Opt out: disable personalised coaching or notifications at any time
+- Opt out: disable AI coaching or notifications whenever you choose
 
-To exercise any of these rights, use the controls in your Settings or contact us.`,
+To exercise any of these rights, use the controls in your Settings or contact us directly.`,
   },
   {
     title: 'Data Security',
     content: `We take security seriously:
 
 - All data is encrypted in transit via HTTPS with TLS 1.3
-- Authentication tokens are stored in your device's secure keychain
+- Authentication tokens are stored securely on your device
 - Row Level Security ensures your data is only accessible to you
 - No API keys or secrets are ever stored in the app codebase
-- Payment data is handled entirely by Stripe (PCI DSS Level 1)`,
+- You must be logged in to access any stored information`,
   },
   {
     title: 'Data Retention',
-    content: `We retain your data for as long as your account is active. When you delete your account:
+    content: `We retain your data for as long as your account is active:
 
-- All personal data is permanently deleted within 30 days
-- Anonymised, aggregated data may be retained for analytics
+- All personal data is permanently deleted when you delete your account
+- Anonymised, aggregated data may be retained for analytics purposes
 - You can request immediate deletion by contacting our support team
-
-Backups are purged on a 90-day rolling cycle.`,
+- Backups are purged on a rolling cycle`,
   },
   {
     title: 'Contact Us',
-    content: `For privacy questions or requests:
+    content: `For privacy questions, data requests, or support:
 
-Email: privacy@calfit.app`,
+Email: aotnetworklabs@gmail.com`,
   },
 ];
 

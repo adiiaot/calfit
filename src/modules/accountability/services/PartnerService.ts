@@ -61,7 +61,7 @@ export const loadPartners = async (userId: string): Promise<PartnerData[]> => {
     .eq('status', 'active');
 
   if (error) {
-    console.error('loadPartners error:', error.message);
+    if (__DEV__) console.error('loadPartners error:', error.message);
     return [];
   }
   return (data as any[]) ?? [];
@@ -81,7 +81,7 @@ export const addPartner = async (
     .maybeSingle();
 
   if (findError) {
-    console.error('addPartner find error:', findError.message);
+    if (__DEV__) console.error('addPartner find error:', findError.message);
     return { success: false, message: 'Something went wrong. Please try again.' };
   }
   if (!partnerProfile) {
@@ -115,7 +115,7 @@ export const addPartner = async (
     .insert({ user_id: userId, partner_id: partnerProfile.id, status: 'active' });
 
   if (err1 && err1.code !== '23505') {
-    console.error('addPartner insert row 1 error:', err1.message, err1.code);
+    if (__DEV__) console.error('addPartner insert row 1 error:', err1.message, err1.code);
     return { success: false, message: 'Could not add partner. Please try again.' };
   }
 
@@ -131,7 +131,7 @@ export const addPartner = async (
   if (err2) {
     // Log but don't fail — current user's row is saved and functional.
     // Partner will see the connection when they next open their app.
-    console.warn('addPartner reverse row warning:', err2.message);
+    if (__DEV__) console.warn('addPartner reverse row warning:', err2.message);
   }
 
   return {

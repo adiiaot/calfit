@@ -13,6 +13,7 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { getTodayCalories, getTodayWater, logFood, logWater } from '../../services/profileService';
 import { supabase } from '../../services/supabase';
 import { searchFoods } from '../../services/foodSearchService';
+import { lookupFoodNutrition } from '../../services/nvidia-client';
 import { CalorieTrendChart } from '../../components/TrendCharts';
 
 
@@ -162,9 +163,9 @@ function MealSection({ theme, title, mealType, items, onAddFood }: {
 }
 
 // ── ADD FOOD MODAL ────────────────────────────────────────────
-function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedMeals, onSaveFavourite }: {
+function AddFoodModal({ visible, theme, mealType, onClose, onAdd, savedMeals, onSaveFavourite }: {
   visible: boolean; theme: typeof colors.light; mealType: MealType;
-  onClose: () => void; onScan: () => void;
+  onClose: () => void;
   onAdd: (entry: { food_name: string; calories: number; protein_g?: number; carbs_g?: number; fats_g?: number; meal_type: MealType }) => void;
   savedMeals: FoodResult[];
   onSaveFavourite: (food: FoodResult) => void;
@@ -181,8 +182,9 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
   const [manualProtein, setManualProtein] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
   const [manualFat, setManualFat] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
-  const reset = () => { setView('choice'); setQuery(''); setResults([]); setSelected(null); setPortion('100'); setManualName(''); setManualCal(''); setManualProtein(''); setManualCarbs(''); setManualFat(''); };
+  const reset = () => { setView('choice'); setQuery(''); setResults([]); setSelected(null); setPortion('100'); setManualName(''); setManualCal(''); setManualProtein(''); setManualCarbs(''); setManualFat(''); setAiLoading(false); };
 
   const handleSearch = async (q: string) => {
     setQuery(q);
@@ -210,6 +212,20 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
     reset(); onClose();
   };
 
+  const handleAutoFill = async () => {
+    if (!manualName.trim()) { Alert.alert('Missing name', 'Enter a food name first.'); return; }
+    setAiLoading(true);
+    const { user } = useAuthStore.getState();
+    if (!user?.id) { setAiLoading(false); return; }
+    const result = await lookupFoodNutrition(user.id, manualName.trim());
+    setAiLoading(false);
+    if (!result) { Alert.alert('No results', 'Could not estimate nutrition for that food. Try being more specific.'); return; }
+    setManualCal(String(result.calories));
+    setManualProtein(String(result.protein_g));
+    setManualCarbs(String(result.carbs_g));
+    setManualFat(String(result.fats_g));
+  };
+
   const MEAL_LABELS: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
 
   return (
@@ -228,16 +244,6 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
 
           {view === 'choice' && (
             <ScrollView contentContainerStyle={{ gap: spacing.md, padding: spacing.lg }}>
-              <TouchableOpacity onPress={() => { reset(); onClose(); onScan(); }} activeOpacity={0.85} style={styles.choiceWrap}>
-                <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.choiceCard}>
-                  <Ionicons name="camera" size={32} color="#fff" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.choiceTitle}>Scan Food</Text>
-                    <Text style={styles.choiceSub}>Point camera at food — AI identifies and calculates nutrition</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.70)" />
-                </LinearGradient>
-              </TouchableOpacity>
               <TouchableOpacity onPress={() => setView('search')} activeOpacity={0.85}
                 style={[styles.choiceCardOutline, { borderColor: theme.accent, backgroundColor: theme.accentDim as string }]}>
                 <Ionicons name="search" size={28} color={theme.accent} />
@@ -361,6 +367,13 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
                   </View>
                 ))}
               </View>
+              <TouchableOpacity onPress={handleAutoFill} disabled={aiLoading} activeOpacity={0.85}
+                style={[styles.aiFillBtn, { borderColor: theme.accent, opacity: aiLoading ? 0.6 : 1 }]}>
+                <Ionicons name="sparkles-outline" size={16} color={theme.accent} />
+                <Text style={[styles.aiFillBtnText, { color: theme.accent }]}>
+                  {aiLoading ? 'Looking up...' : 'Auto-fill with AI'}
+                </Text>
+              </TouchableOpacity>
               <View style={styles.editPerfectRow}>
                 <TouchableOpacity onPress={() => setView('choice')} activeOpacity={0.8}
                   style={[styles.editBtn, { borderColor: theme.border }]}>
@@ -380,6 +393,40 @@ function AddFoodModal({ visible, theme, mealType, onClose, onScan, onAdd, savedM
   );
 }
 
+// ── MEAL PLAN TAB ──────────────────────────────────────────────
+function MealPlanTab({ theme }: { theme: typeof colors.light }) {
+  const navigation = useNavigation<any>();
+
+  return (
+    <ScrollView contentContainerStyle={mp.scroll} showsVerticalScrollIndicator={false}>
+      <LinearGradient colors={[theme.card, theme.bg] as [string, string]} style={[mp.hero, { borderColor: theme.border }]}>
+        <View style={mp.heroIconWrap}>
+          <Ionicons name="restaurant-outline" size={28} color={theme.accent} />
+        </View>
+        <Text style={[mp.heroTitle, { color: theme.textPrimary }]}>Meal Planner</Text>
+        <Text style={[mp.heroSub, { color: theme.textMuted }]}>
+          Create personalized meal plans with AI — tailored to your budget, preferences, and health goals
+        </Text>
+        <TouchableOpacity onPress={() => navigation.navigate('MealPlan')} activeOpacity={0.85} style={[mp.goBtn, { backgroundColor: theme.accent }]}>
+          <Ionicons name="sparkles-outline" size={18} color="#fff" />
+          <Text style={mp.goBtnText}>Go to Meal Planner</Text>
+        </TouchableOpacity>
+      </LinearGradient>
+      <View style={{ height: 40 }} />
+    </ScrollView>
+  );
+}
+
+const mp = StyleSheet.create({
+  scroll: { padding: spacing.lg, paddingBottom: 120 },
+  hero: { borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, alignItems: 'center', marginBottom: spacing.md },
+  heroIconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(45,220,140,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  heroTitle: { fontSize: fontSize.xl, fontWeight: '800', marginBottom: spacing.xs },
+  heroSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18, marginBottom: spacing.lg, paddingHorizontal: spacing.md },
+  goBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full },
+  goBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '700' },
+});
+
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function CalorieScreen() {
   const navigation = useNavigation<any>();
@@ -387,6 +434,7 @@ export default function CalorieScreen() {
   const { user, profile } = useAuthStore();
   const theme = colors[colorScheme];
 
+  const [activeView, setActiveView]             = useState<'tracker' | 'mealplan'>('tracker');
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [waterMl, setWaterMl]                   = useState(0);
   const [foodEntries, setFoodEntries]           = useState<FoodEntry[]>([]);
@@ -406,15 +454,15 @@ export default function CalorieScreen() {
       const [cal, water, entries, saved] = await Promise.all([
         getTodayCalories(user.id),
         getTodayWater(user.id),
-        supabase.from('food_logs').select('*').eq('user_id', user.id)
+        supabase.from('food_logs').select('id,user_id,meal_type,food_name,calories,protein_g,carbs_g,fats_g,date,created_at').eq('user_id', user.id)
           .eq('date', new Date().toISOString().split('T')[0]).order('created_at', { ascending: false }),
-        supabase.from('saved_meals').select('*').eq('user_id', user.id).limit(10),
+        supabase.from('saved_meals').select('id,user_id,name,calories,protein_g,carbs_g,fats_g,meal_type,created_at').eq('user_id', user.id).limit(10),
       ]);
       setCaloriesConsumed(cal);
       setWaterMl(water);
       if (entries.data) setFoodEntries(entries.data as FoodEntry[]);
       if (saved.data) setSavedMeals(saved.data);
-    } catch (e) { console.error('CalorieScreen loadData:', e); }
+    } catch (e) { if (__DEV__) console.error('CalorieScreen loadData:', e); }
     finally { setIsRefreshing(false); }
   };
 
@@ -463,51 +511,97 @@ export default function CalorieScreen() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
         </View>
-        <TouchableOpacity onPress={() => { setActiveMeal('breakfast'); setShowAddFood(true); }}
-          activeOpacity={0.85} style={styles.addBtn}>
-          <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} style={styles.addBtnGrad}>
-            <Ionicons name="add" size={22} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {activeView === 'tracker' && (
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('FoodScanner')}
+                activeOpacity={0.85} style={[styles.cameraBtn, { borderColor: theme.border }]}>
+                <Ionicons name="camera-outline" size={20} color={theme.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setActiveMeal('breakfast'); setShowAddFood(true); }}
+                activeOpacity={0.85} style={styles.addBtn}>
+                <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} style={styles.addBtnGrad}>
+                  <Ionicons name="add" size={22} color="#fff" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
+      {/* View toggle */}
+      <View style={[styles.viewToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {(['tracker', 'mealplan'] as const).map((v) => {
+          const isActive = activeView === v;
+          return (
+            <TouchableOpacity
+              key={v}
+              onPress={() => setActiveView(v)}
+              style={[styles.viewToggleTab, isActive && { backgroundColor: theme.accent }]}
+            >
+              <Ionicons
+                name={v === 'tracker' ? 'nutrition-outline' : 'restaurant-outline'}
+                size={15}
+                color={isActive ? '#fff' : theme.textMuted}
+              />
+              <Text style={[styles.viewToggleText, {
+                color: isActive ? '#fff' : theme.textMuted,
+                fontWeight: isActive ? '700' : '500',
+              }]}>
+                {v === 'tracker' ? 'Tracker' : 'Meal Plan'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-        <CalorieHero theme={theme} consumed={caloriesConsumed} goal={calorieGoal} waterMl={waterMl} waterGoalMl={waterGoalMl} />
+      {activeView === 'tracker' ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />}>
 
-        <TouchableOpacity onPress={() => navigation.getParent()?.navigate('FoodScanner')} activeOpacity={0.85} style={styles.scanWrap}>
-          <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.scanCard}>
-            <View style={styles.scanLeft}>
-              <View style={styles.scanIconCircle}><Ionicons name="camera" size={20} color={theme.gradStart} /></View>
-              <View><Text style={styles.scanTitle}>Scan Food</Text><Text style={styles.scanSub}>AI-powered — point and log</Text></View>
+          <CalorieHero theme={theme} consumed={caloriesConsumed} goal={calorieGoal} waterMl={waterMl} waterGoalMl={waterGoalMl} />
+
+          <WaterCard theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl} onLog={handleWaterLog} />
+
+          {/* Scan Food Card */}
+          <TouchableOpacity onPress={() => navigation.navigate('FoodScanner')} activeOpacity={0.85}
+            style={[styles.foodScanCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.foodScanLeft}>
+              <View style={[styles.foodScanIconWrap, { backgroundColor: '#4A90E2' + '18' }]}>
+                <Ionicons name="camera-outline" size={22} color="#4A90E2" />
+              </View>
+              <View>
+                <Text style={[styles.foodScanTitle, { color: theme.textPrimary }]}>Scan Food</Text>
+                <Text style={[styles.foodScanSub, { color: theme.textMuted }]}>Snap a photo to log nutrition instantly</Text>
+              </View>
             </View>
-            <View style={styles.scanArrow}><Ionicons name="chevron-forward" size={16} color={theme.gradStart} /></View>
-          </LinearGradient>
-        </TouchableOpacity>
+            <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+          </TouchableOpacity>
+          <Text style={[styles.scanDisclaimer, { color: theme.textMuted }]}>
+            Camera estimates are approximate — always verify with nutrition labels
+          </Text>
 
-        <WaterCard theme={theme} waterMl={waterMl} waterGoalMl={waterGoalMl} onLog={handleWaterLog} />
+          {meals.map((m) => (
+            <MealSection key={m.type} theme={theme} title={m.title} mealType={m.type}
+              items={foodEntries.filter((e) => e.meal_type === m.type)}
+              onAddFood={(meal) => { setActiveMeal(meal); setShowAddFood(true); }} />
+          ))}
 
-        {meals.map((m) => (
-          <MealSection key={m.type} theme={theme} title={m.title} mealType={m.type}
-            items={foodEntries.filter((e) => e.meal_type === m.type)}
-            onAddFood={(meal) => { setActiveMeal(meal); setShowAddFood(true); }} />
-        ))}
+          <CalorieTrendChart
+            userId={user?.id ?? ''}
+            calorieGoal={calorieGoal}
+            theme={theme}
+          />
 
-        {/* ── CALORIE TREND CHART ── */}
-        <CalorieTrendChart
-          userId={user?.id ?? ''}
-          calorieGoal={calorieGoal}
-          theme={theme}
-        />
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      ) : (
+        <MealPlanTab theme={theme} />
+      )}
 
       <AddFoodModal
         visible={showAddFood} theme={theme} mealType={activeMeal}
         onClose={() => setShowAddFood(false)}
-        onScan={() => { setShowAddFood(false); navigation.getParent()?.navigate('FoodScanner'); }}
         onAdd={handleAddFood}
         savedMeals={savedMeals}
         onSaveFavourite={handleSaveFavourite}
@@ -524,6 +618,7 @@ const styles = StyleSheet.create({
   pageDate: { fontSize: fontSize.xs, marginTop: 2 },
   addBtn: { borderRadius: 20, overflow: 'hidden' },
   addBtnGrad: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  cameraBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { paddingBottom: 120 },
   heroCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.lg, borderRadius: 20 },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.md },
@@ -543,14 +638,12 @@ const styles = StyleSheet.create({
   waterBar: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
   waterBarFill: { height: '100%', borderRadius: 3 },
   waterLabel: { fontSize: fontSize.xs, color: '#2BBCB0', fontWeight: '600' },
-  scanWrap: { marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: radius.lg, overflow: 'hidden' },
-  scanCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
-  scanLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
-  scanIconCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  scanTitle: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  scanSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  scanArrow: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   waterCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.lg },
+  foodScanCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  foodScanLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  foodScanIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  foodScanTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  foodScanSub: { fontSize: fontSize.xs, marginTop: 1 },
   waterCardLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   waterCardTitle: { fontSize: fontSize.base, fontWeight: '700' },
   waterCardSub: { fontSize: fontSize.xs },
@@ -568,15 +661,14 @@ const styles = StyleSheet.create({
   foodItemCal: { fontSize: fontSize.sm, fontWeight: '600' },
   addFoodBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing.sm, marginTop: spacing.xs, borderTopWidth: 0.5, borderStyle: 'dashed' },
   addFoodText: { fontSize: fontSize.sm, fontWeight: '600' },
+  viewToggle: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: 10, padding: 3, borderWidth: 1 },
+  viewToggleTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 7, borderRadius: 8 },
+  viewToggleText: { fontSize: fontSize.sm },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%', minHeight: '60%' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 0.5, borderColor: 'rgba(0,0,0,0.1)' },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700' },
   sectionLabel: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  choiceWrap: { borderRadius: 16, overflow: 'hidden' },
-  choiceCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
-  choiceTitle: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  choiceSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.70)', marginTop: 2, lineHeight: 16 },
   choiceCardOutline: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: 16, borderWidth: 1.5 },
   choiceTitleDark: { fontSize: fontSize.base, fontWeight: '700' },
   choiceSubDark: { fontSize: fontSize.xs, marginTop: 2 },
@@ -616,4 +708,14 @@ const styles = StyleSheet.create({
   macroInput: { flex: 1, padding: spacing.sm, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
   macroInputText: { fontSize: fontSize.lg, fontWeight: '800', width: '100%' },
   macroInputLabel: { fontSize: 9, marginTop: 2, textAlign: 'center' },
+  aiFillBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, paddingVertical: spacing.md,
+    borderRadius: radius.md, borderWidth: 1.5, borderStyle: 'dashed',
+  },
+  aiFillBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
+  scanDisclaimer: {
+    fontSize: fontSize.xs, textAlign: 'center', marginTop: -spacing.sm,
+    marginBottom: spacing.md, paddingHorizontal: spacing.xl, lineHeight: 16,
+  },
 });

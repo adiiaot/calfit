@@ -50,7 +50,7 @@ export const uploadAvatarToSupabase = async (
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError.message);
+      if (__DEV__) console.error('Upload error:', uploadError.message);
       return null;
     }
 
@@ -62,7 +62,7 @@ export const uploadAvatarToSupabase = async (
     // Add cache bust so updated image shows immediately
     return `${data.publicUrl}?t=${Date.now()}`;
   } catch (error) {
-    console.error('Avatar upload failed:', error);
+    if (__DEV__) console.error('Avatar upload failed:', error);
     return null;
   }
 };

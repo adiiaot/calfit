@@ -164,55 +164,36 @@ export const colors = {
   },
 
   dark: {
-    // ── Backgrounds ─────────────────────────────────────────
-    bg:      palette.indigo950,     // #0D0A2E — deep indigo-black
-    surface: palette.indigo900,     // #1A1445
-    card:    palette.indigo800,     // #231B5B
-
-    // ── Hero / calorie card ──────────────────────────────────
-    heroCard: palette.indigo900,    // same indigo — reads as card on darker bg
-
-    // ── Stat card backgrounds ────────────────────────────────
+    bg:      '#08061A',
+    surface: '#0D0A2E',
+    card:    '#120E3A',
+    heroCard: '#0D0A2E',
     waterCard: palette.waterCardBgDark,
     stepsCard: palette.stepsCardBgDark,
     sleepCard: palette.sleepCardBgDark,
-
-    // ── Borders ─────────────────────────────────────────────
-    border:  palette.indigo600,     // #3B308A
-
-    // ── Brand accent (CalFit green) ──────────────────────────
-    accent:      palette.green500,
-    accentDim:   'rgba(45,220,140,0.15)',
-    accentSecond: '#6699FF',
-
-    // ── Gradient accent (pink→orange→yellow) ─────────────────
-    gradStart:  palette.gradPink,
-    gradMid:    palette.gradOrange,
-    gradEnd:    palette.gradYellow,
-
-    // ── Text ────────────────────────────────────────────────
-    textPrimary:   palette.textD100,
-    textSecondary: palette.textD200,
-    textMuted:     palette.textD300,
-    textOnHero:    palette.white,
-    textOnGrad:    palette.white,
-
-    // ── Semantic ────────────────────────────────────────────
-    red:    palette.red400,
-    amber:  palette.amber400,
-    purple: palette.purple400,
-    gold:   palette.amber400,
-
-    // ── Tab bar ─────────────────────────────────────────────
-    tabBar:         palette.indigo900,
-    tabBarActive:   palette.green500,
-    tabBarInactive: palette.textD300,
-
-    // ── Overlays ────────────────────────────────────────────
-    overlay:      'rgba(0,0,0,0.65)',
-    glassStrong:  'rgba(255,255,255,0.10)',
-    glassMedium:  'rgba(255,255,255,0.06)',
-    glassSubtle:  'rgba(255,255,255,0.03)',
+    border:  '#1E1A4A',
+    accent:      '#34D98A',
+    accentDim:   'rgba(52,217,138,0.15)',
+    accentSecond: '#7BA7FF',
+    gradStart:  '#FF6EB0',
+    gradMid:    '#FF8C42',
+    gradEnd:    '#FFD133',
+    textPrimary:   '#F0EEF8',
+    textSecondary: '#B0ABD0',
+    textMuted:     '#6A6690',
+    textOnHero:    '#FFFFFF',
+    textOnGrad:    '#FFFFFF',
+    red:    '#FF6B6B',
+    amber:  '#FFD133',
+    purple: '#B280FF',
+    gold:   '#FFD133',
+    tabBar:         '#0D0A2ECC',
+    tabBarActive:   '#34D98A',
+    tabBarInactive: '#6A6690',
+    overlay:      'rgba(0,0,0,0.70)',
+    glassStrong:  'rgba(255,255,255,0.12)',
+    glassMedium:  'rgba(255,255,255,0.07)',
+    glassSubtle:  'rgba(255,255,255,0.04)',
   },
 
   // ── Subscription tier badges ──────────────────────────────

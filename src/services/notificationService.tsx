@@ -10,7 +10,6 @@ export interface AppNotification {
     | 'coach'
     | 'community'
     | 'goal'
-    | 'referral'
     | 'system'
     | 'welcome';
   title: string;
@@ -24,13 +23,13 @@ export interface AppNotification {
 export const getNotifications = async (userId: string): Promise<AppNotification[]> => {
   const { data, error } = await supabase
     .from('notifications')
-    .select('*')
+    .select('id, type, title, body, action_label, read, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
 
   if (error) {
-    console.error('Failed to fetch notifications:', error.message);
+    if (__DEV__) console.error('Failed to fetch notifications:', error.message);
     return [];
   }
   return data ?? [];
@@ -40,7 +39,7 @@ export const getNotifications = async (userId: string): Promise<AppNotification[
 export const getUnreadCount = async (userId: string): Promise<number> => {
   const { count, error } = await supabase
     .from('notifications')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('read', false);
 
@@ -178,13 +177,39 @@ export const notifyProfileComplete = async (userId: string) => {
   );
 };
 
-export const notifyReferralSignup = async (userId: string) => {
+export const notifyPartnerMessage = async (userId: string, partnerName: string, messageType: string) => {
+  const labels: Record<string, string> = {
+    text: 'sent you a message',
+    image: 'sent you a photo',
+    video: 'sent you a video',
+    audio: 'sent you a voice note',
+  };
   await sendNotification(
     userId,
-    'referral',
-    'Someone Joined via Your Link! 🎉',
-    'A friend just signed up using your referral link. You will earn commission when they upgrade.',
-    'View Earnings'
+    'social',
+    `💬 ${partnerName}`,
+    `${partnerName} ${labels[messageType] ?? 'sent you a message'}. Tap to view.`,
+    'View Chat'
+  );
+};
+
+export const notifyPartnerStreak = async (userId: string, partnerName: string, streakCount: number) => {
+  await sendNotification(
+    userId,
+    'streak',
+    `🔥 ${partnerName} is on fire!`,
+    `${partnerName} has reached a ${streakCount}-day streak! Cheer them on!`,
+    'View Streaks'
+  );
+};
+
+export const notifyCoachResponse = async (userId: string) => {
+  await sendNotification(
+    userId,
+    'coach',
+    'AI Coach Ready 🤖',
+    'Your AI Coach has new insights and tips for you. Tap to chat.',
+    'Open Coach'
   );
 };
 
@@ -231,22 +256,13 @@ export const checkAndSendStreakReminder = async (
   );
   
 };
-export const notifyKudosReceived = async (
-  postOwnerId: string,
-  reactorName: string,
-  kudosType: string,
-  postContent: string
-): Promise<void> => {
-  // Don't notify if reacting to your own post
-  const preview = postContent.length > 40
-    ? postContent.slice(0, 40) + '...'
-    : postContent;
-
+export const sendWelcomeNotification = async (userId: string, userName: string) => {
   await sendNotification(
-    postOwnerId,
-    'social',
-    `${reactorName} reacted to your post ${kudosType}`,
-    `"${preview}"`,
-    'View Post'
+    userId,
+    'welcome',
+    `Welcome to CalFit, ${userName}! 🎉`,
+    'Your personalised fitness plan is ready. Start tracking your calories, workouts, and more!',
+    'Get Started'
   );
 };
+

@@ -59,7 +59,7 @@ export async function checkAndSavePRs(
     // ── 1. Load existing PRs for this user ────────────────────
     const { data: existing } = await supabase
       .from('personal_records')
-      .select('*')
+      .select('id, user_id, record_type, exercise_name, value, achieved_at, session_name')
       .eq('user_id', userId);
 
     const prMap: Record<string, PersonalRecord> = {};
@@ -181,7 +181,7 @@ export async function checkAndSavePRs(
     return { isNewPR: newRecords.length > 0, newRecords };
 
   } catch (e) {
-    console.error('checkAndSavePRs error:', e);
+    if (__DEV__) console.error('checkAndSavePRs error:', e);
     return { isNewPR: false, newRecords: [] };
   }
 }
@@ -192,7 +192,7 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
   try {
     const { data } = await supabase
       .from('personal_records')
-      .select('*')
+      .select('id, user_id, record_type, exercise_name, value, achieved_at, session_name')
       .eq('user_id', userId)
       .order('achieved_at', { ascending: false });
     return data ?? [];

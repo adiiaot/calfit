@@ -13,9 +13,11 @@
 //   read `liveSteps` from Zustand (authStore) which useSteps() writes to.
 
 import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Platform, StatusBar } from 'react-native';
+import { Platform, StatusBar, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { RadialMenu } from '../components/RadialMenu';
 import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../theme';
@@ -33,8 +35,6 @@ import HomeScreen from '../screens/dashboard/HomeScreen';
 import CalorieScreen from '../screens/calorie/CalorieScreen';
 import MealsScreen from '../screens/meals/MealsScreen';
 import WorkoutScreen from '../screens/Activity/ActivityScreen';
-import CoachScreen from '../screens/coach/CoachScreen';
-import CreditsScreen from '../screens/earnings/CreditsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProgressScreen from '../screens/progress/ProgressScreen';
 import StreaksScreen from '../screens/streaks/StreaksScreen';
@@ -44,39 +44,31 @@ import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import DownloadDataScreen from '../screens/settings/DownloadDataScreen';
 import LanguageScreen from '../screens/settings/LanguageScreen';
 import PrivacyScreen from '../screens/settings/PrivacyScreen';
-import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 import GoalsScreen from '../screens/settings/GoalsScreen';
 import QuickStartScreen from '../screens/Activity/QuickStartScreen';
+import AnalysisScreen from '../screens/Activity/AnalysisScreen';
 import SubscriptionScreen from '../screens/earnings/SubscriptionScreen';
-import PurchaseCreditsScreen from '../screens/earnings/PurchaseCreditsScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
-import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import RecapScreen from '../screens/progress/RecapScreen';
 import IntermittentFastingScreen from '../screens/meals/IntermittentFastingScreen';
 import BodyMeasurementsScreen from '../screens/progress/BodyMeasurementScreen';
 
-// ── SOCIAL MODULE ─────────────────────────────────────────────
-import SocialScreen from '../screens/social/CalfitSocialScreen';
-import ProfileScreen from '../modules/social/screens/ProfileScreen';
+// ── AI COACH MODULE ─────────────────────────────────────────────
+import AICoachScreen from '../screens/AICoachScreen';
 
-// ── COMMUNITY MODULE ──────────────────────────────────────────
-import CommunityScreen from '../modules/community/screens/CommunityScreen';
+// ── NOTES MODULE ───────────────────────────────────────────────
+import NotesScreen from '../screens/nutrition/NotesScreen';
 
-// ── LEADERBOARD MODULE ────────────────────────────────────────
-import LeaderboardScreen from '../modules/leaderboard/screens/LeaderboardScreen';
+// ── MEAL PLAN MODULE ──────────────────────────────────────────
+import MealPlanScreen from '../screens/meals/MealPlanScreen';
 
-// ── CHAT MODULE ───────────────────────────────────────────────
-import MessagesScreen from '../modules/chat/screens/MessageScreen';
-import ChatScreen from '../modules/chat/screens/ChatScreen';
+// ── AI FOOD SCANNER ───────────────────────────────────────────
+import FoodScannerScreen from '../screens/calorie/FoodScannerScreen';
 
 // ── ACCOUNTABILITY MODULE ─────────────────────────────────────
 import AccountabilityScreen from '../modules/accountability/screens/AccountabilityScreen';
-
-// ── LIVE MODULE ───────────────────────────────────────────────
-import LiveScreen from '../modules/live/screens/LiveScreen';
-import GoLiveScreen from '../modules/live/screens/Golivescreen';
-import WatchLiveScreen from '../modules/live/screens/Watchlivescreen';
+import PartnerChatScreen from '../modules/accountability/screens/PartnerChatScreen';
 
 // ── SETTINGS MODULE ───────────────────────────────────────────
 import EquipmentPreferencesScreen from '../screens/settings/EquipmentPreferenceScreen';
@@ -84,28 +76,131 @@ import EquipmentPreferencesScreen from '../screens/settings/EquipmentPreferenceS
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
 
-// ── TAB ICON ──────────────────────────────────────────────────
-function TabIcon({ label, focused, activeColor, inactiveColor }: {
-  label: string; focused: boolean; activeColor: string; inactiveColor: string;
-}) {
-  const icons: Record<string, { active: any; inactive: any }> = {
-    Home:     { active: 'home',         inactive: 'home-outline' },
-    Calorie:  { active: 'nutrition',    inactive: 'nutrition-outline' },
-    Meals:    { active: 'restaurant',   inactive: 'restaurant-outline' },
-    Activity: { active: 'barbell',      inactive: 'barbell-outline' },
-    Social:   { active: 'people',       inactive: 'people-outline' },
-    Messages: { active: 'chatbubbles',  inactive: 'chatbubbles-outline' },
+// ── CUSTOM TAB BAR ─────────────────────────────────────────────
+const TAB_ICONS: Record<string, { active: any; inactive: any }> = {
+  Home:     { active: 'home',         inactive: 'home-outline' },
+  Calorie:  { active: 'nutrition',    inactive: 'nutrition-outline' },
+  AICoach:  { active: 'bulb',         inactive: 'bulb-outline' },
+  Notes:    { active: 'book',         inactive: 'book-outline' },
+};
+
+const TAB_LABELS: Record<string, string> = {
+  Home: 'Home', Calorie: 'Calorie', AICoach: 'AI Coach', Notes: 'Notes',
+};
+
+function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
+  const { colorScheme } = useThemeStore();
+  const theme = colors[colorScheme];
+  const [radialOpen, setRadialOpen] = useState(false);
+
+  // Hide tab bar on PartnerChat screen
+  const currentRoute = state.routeNames[state.index];
+  if (currentRoute === 'PartnerChat') return null;
+
+  const handleRadialSelect = (key: string) => {
+    setRadialOpen(false);
+    const routeMap: Record<string, string> = {
+      Activity: 'Activity',
+      Health: 'Meals',
+      MealPlans: 'MealPlan',
+      Progress: 'Progress',
+      FoodScanner: 'FoodScanner',
+    };
+    setTimeout(() => (nav as any).navigate(routeMap[key] ?? key), 200);
   };
-  const icon = icons[label];
-  if (!icon) return null;
+
+  // Only show these 4 tabs in the bar
+  const visibleRoutes = state.routes.filter(r => TAB_ICONS[r.name]);
+
   return (
-    <Ionicons
-      name={focused ? icon.active : icon.inactive}
-      size={22}
-      color={focused ? activeColor : inactiveColor}
-    />
+    <>
+      <RadialMenu
+        visible={radialOpen}
+        onClose={() => setRadialOpen(false)}
+        onSelect={handleRadialSelect}
+        theme={theme}
+      />
+
+      <View style={[tb.bar, { backgroundColor: theme.tabBar, borderTopColor: theme.border }]}>
+        {visibleRoutes.map((route, index) => {
+          const isFocused = state.index === index;
+          const icon = TAB_ICONS[route.name];
+          const label = TAB_LABELS[route.name] || route.name;
+
+          const onPress = () => {
+            const event = nav.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!isFocused && !event.defaultPrevented) nav.navigate(route.name);
+          };
+
+          return (
+            <TouchableOpacity key={route.key} onPress={onPress} activeOpacity={0.7} style={tb.tab}>
+              <Ionicons
+                name={isFocused ? icon.active : icon.inactive}
+                size={22}
+                color={isFocused ? theme.tabBarActive : theme.tabBarInactive}
+              />
+              <Text style={[tb.label, { color: isFocused ? theme.tabBarActive : theme.tabBarInactive }]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Floating + button */}
+        <TouchableOpacity
+          onPress={() => setRadialOpen(true)}
+          activeOpacity={0.85}
+          style={[tb.plusBtn, { backgroundColor: theme.accent }]}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </>
   );
 }
+
+const tb = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    height: 72,
+    borderTopWidth: 0.5,
+    paddingBottom: 8,
+    paddingTop: 8,
+    paddingHorizontal: 8,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 10 },
+      android: { elevation: 8 },
+    }),
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  label: {
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  plusBtn: {
+    position: 'absolute',
+    top: -26,
+    left: '50%',
+    marginLeft: -24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 10,
+  },
+});
 
 // ── TAB NAVIGATOR ─────────────────────────────────────────────
 // useSteps lives HERE so it mounts once and never tears down.
@@ -113,7 +208,6 @@ function TabIcon({ label, focused, activeColor, inactiveColor }: {
 function TabNavigator() {
   const { colorScheme } = useThemeStore();
   const { profile } = useAuthStore();
-  const theme = colors[colorScheme];
 
   // ── Single source of truth for step tracking ──────────────
   // Calling useSteps here means the pedometer subscription + 60s save
@@ -125,45 +219,59 @@ function TabNavigator() {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: theme.tabBar,
-          borderTopColor: theme.border,
-          borderTopWidth: 0.5,
-          height: 80,
-          paddingBottom: 12,
-          paddingTop: 8,
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 12,
-            },
-            android: { elevation: 8 },
-          }),
-        },
-        tabBarActiveTintColor: theme.tabBarActive,
-        tabBarInactiveTintColor: theme.tabBarInactive,
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', marginTop: 2 },
-        tabBarIcon: ({ focused }) => (
-          <TabIcon
-            label={route.name}
-            focused={focused}
-            activeColor={theme.tabBarActive}
-            inactiveColor={theme.tabBarInactive}
-          />
-        ),
-      })}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home"     component={HomeScreen} />
       <Tab.Screen name="Calorie"  component={CalorieScreen} />
-      <Tab.Screen name="Meals"    component={MealsScreen} />
-      <Tab.Screen name="Activity" component={WorkoutScreen} />
-      <Tab.Screen name="Social"   component={SocialScreen} />
-      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="AICoach"  component={AICoachScreen} />
+      <Tab.Screen name="Notes"    component={NotesScreen} />
+
+      {/* Hidden tabs — show bottom bar via CustomTabBar */}
+      <Tab.Screen name="Activity"             component={WorkoutScreen}             options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Progress"             component={ProgressScreen}             options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Streaks"              component={StreaksScreen}              options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Sleep"                component={SleepScreen}                options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Notifications"        component={NotificationsScreen}        options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Meals"                component={MealsScreen}                options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="FoodScanner"          component={FoodScannerScreen}          options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="MealPlan"             component={MealPlanScreen}             options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Accountability"       component={AccountabilityScreen}       options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="PartnerChat"          component={PartnerChatScreen}          options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="QuickStart"           component={QuickStartScreen}           options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Analysis"             component={AnalysisScreen}             options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Recap"                component={RecapScreen}                options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="IntermittentFasting"  component={IntermittentFastingScreen}  options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="BodyMeasurements"     component={BodyMeasurementsScreen}     options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="EquipmentPreferences" component={EquipmentPreferencesScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="DownloadData"         component={DownloadDataScreen}         options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Language"             component={LanguageScreen}             options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Privacy"              component={PrivacyScreen}              options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Goals"                component={GoalsScreen}                options={{ tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>
+  );
+}
+
+// ── AUTH STACK (no headers — screens have own UI) ────────────
+function AuthStack() {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Welcome"      component={WelcomeScreen} />
+      <RootStack.Screen name="Onboarding"   component={OnboardingScreen} />
+      <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
+    </RootStack.Navigator>
+  );
+}
+
+// ── APP STACK (no default headers — screens have own back buttons) ──
+function AppStack() {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Main"                    component={TabNavigator} />
+      <RootStack.Screen name="Settings"                component={SettingsScreen} />
+      <RootStack.Screen name="EditProfile"             component={EditProfileScreen} />
+      <RootStack.Screen name="Subscription"            component={SubscriptionScreen} />
+    </RootStack.Navigator>
   );
 }
 
@@ -171,52 +279,15 @@ function TabNavigator() {
 export default function AppNavigator() {
   const { user, isOnboarding } = useAuthStore();
   const showAuth = !user || isOnboarding;
+  const navKey = (user && !isOnboarding) ? `authed-${user.id}` : 'guest';
 
   return (
-    <NavigationContainer key={user ? `authed-${user.id}` : 'guest'}>
+    <NavigationContainer key={navKey}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {showAuth ? (
-          <>
-            <RootStack.Screen name="Welcome"      component={WelcomeScreen} />
-            <RootStack.Screen name="Login"        component={LoginScreen} />
-            <RootStack.Screen name="Onboarding"   component={OnboardingScreen} />
-            <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
-          </>
-        ) : (
-          <>
-            <RootStack.Screen name="Main"                    component={TabNavigator} />
-            <RootStack.Screen name="Settings"                component={SettingsScreen} />
-            <RootStack.Screen name="Progress"                component={ProgressScreen} />
-            <RootStack.Screen name="Streaks"                 component={StreaksScreen} />
-            <RootStack.Screen name="FoodScanner"             component={FoodScannerScreen} />
-            <RootStack.Screen name="Notifications"           component={NotificationsScreen} />
-            <RootStack.Screen name="EditProfile"             component={EditProfileScreen} />
-            <RootStack.Screen name="Goals"                   component={GoalsScreen} />
-            <RootStack.Screen name="QuickStart"              component={QuickStartScreen} />
-            <RootStack.Screen name="Subscription"            component={SubscriptionScreen} />
-            <RootStack.Screen name="Credits"                 component={CreditsScreen} />
-            <RootStack.Screen name="PurchaseCredits"         component={PurchaseCreditsScreen} />
-            <RootStack.Screen name="Language"                component={LanguageScreen} />
-            <RootStack.Screen name="Privacy"                 component={PrivacyScreen} />
-            <RootStack.Screen name="DownloadData"            component={DownloadDataScreen} />
-            <RootStack.Screen name="Recap"                   component={RecapScreen} />
-            <RootStack.Screen name="IntermittentFasting"     component={IntermittentFastingScreen} />
-            <RootStack.Screen name="Sleep"                   component={SleepScreen} />
-            <RootStack.Screen name="Coach"                   component={CoachScreen} />
-            <RootStack.Screen name="Profile"                 component={ProfileScreen} />
-            <RootStack.Screen name="Leaderboard"             component={LeaderboardScreen} />
-            <RootStack.Screen name="Community"               component={CommunityScreen} />
-            <RootStack.Screen name="Chat"                    component={ChatScreen} />
-            <RootStack.Screen name="Accountability"          component={AccountabilityScreen} />
-            <RootStack.Screen name="Live"                    component={LiveScreen} />
-            <RootStack.Screen name="BodyMeasurements"        component={BodyMeasurementsScreen} />
-
-            {/* ── NEW SCREENS ADDED ── */}
-            <RootStack.Screen name="GoLive"                  component={GoLiveScreen} />
-            <RootStack.Screen name="WatchLive"               component={WatchLiveScreen} />
-            <RootStack.Screen name="EquipmentPreferences"    component={EquipmentPreferencesScreen} />
-          </>
-        )}
+        <RootStack.Screen
+          name={showAuth ? 'Auth' : 'App'}
+          component={showAuth ? AuthStack : AppStack}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

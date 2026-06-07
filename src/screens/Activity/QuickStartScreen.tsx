@@ -1,85 +1,43 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  Dimensions, Platform,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
-import { useState, useEffect, useRef } from 'react';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import Svg from 'react-native-svg';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
-import * as Speech from 'expo-speech';
+import { getExerciseIllustration } from '../../components/ExerciseIllustrations';
+import AnimatedExerciseDemo from '../../components/AnimatedExerciseDemo';
+import { EXERCISE_LIBRARY, CATEGORY_MAP, getExercisesByCategory } from '../../data/exerciseLibrary';
+import type { ExerciseCategory } from '../../data/exerciseLibrary';
+import { useWorkoutVoice } from '../../hooks/useWorkoutVoice';
+
+const { width: SW } = Dimensions.get('window');
 
 interface QuickExercise {
+  id: string;
   name: string;
   duration: number;
   calories_per_minute: number;
   seconds: number;
   calories_burned: number;
   done: boolean;
+  category: ExerciseCategory;
+  instructions: string[];
+  equipment: string;
+  difficulty: string;
 }
 
-const QUICK_WORKOUTS: Record<string, {
-  name: string;
-  exercises: { name: string; duration: number; calories_per_minute: number }[];
-}> = {
-  'Morning Cardio Blast': {
-    name: 'Morning Cardio Blast',
-    exercises: [
-      { name: 'Jumping Jacks', duration: 60, calories_per_minute: 8 },
-      { name: 'High Knees', duration: 45, calories_per_minute: 10 },
-      { name: 'Mountain Climbers', duration: 45, calories_per_minute: 11 },
-      { name: 'Burpees', duration: 30, calories_per_minute: 12 },
-      { name: 'Running in Place', duration: 60, calories_per_minute: 9 },
-    ],
-  },
-  'Full Body Strength': {
-    name: 'Full Body Strength',
-    exercises: [
-      { name: 'Push Ups', duration: 45, calories_per_minute: 7 },
-      { name: 'Squats', duration: 45, calories_per_minute: 7 },
-      { name: 'Lunges', duration: 45, calories_per_minute: 7 },
-      { name: 'Plank', duration: 60, calories_per_minute: 5 },
-      { name: 'Glute Bridges', duration: 45, calories_per_minute: 5 },
-    ],
-  },
-  'Core Crusher': {
-    name: 'Core Crusher',
-    exercises: [
-      { name: 'Crunches', duration: 45, calories_per_minute: 5 },
-      { name: 'Leg Raises', duration: 45, calories_per_minute: 5 },
-      { name: 'Russian Twists', duration: 45, calories_per_minute: 6 },
-      { name: 'Plank', duration: 60, calories_per_minute: 5 },
-      { name: 'Bicycle Crunches', duration: 45, calories_per_minute: 6 },
-    ],
-  },
-  'Leg Day': {
-    name: 'Leg Day',
-    exercises: [
-      { name: 'Squats', duration: 45, calories_per_minute: 7 },
-      { name: 'Lunges', duration: 45, calories_per_minute: 7 },
-      { name: 'Glute Bridges', duration: 45, calories_per_minute: 5 },
-      { name: 'Jump Squats', duration: 30, calories_per_minute: 10 },
-      { name: 'Wall Sit', duration: 60, calories_per_minute: 5 },
-    ],
-  },
-};
+const DEFAULT_CATEGORY: ExerciseCategory = 'Full Body';
 
-// ── VOICE COACH ───────────────────────────────────────────────
-// Uses expo-speech (free, device TTS, no API key needed)
-// ElevenLabs skipped — requires paid API + dev build
-const speak = (text: string) => {
-  Speech.stop();
-  Speech.speak(text, {
-    language: 'en-US',
-    pitch: 1.0,
-    rate: 0.95,
-  });
+const SPEAK_TRIGGER = {
+  TEN_LEFT: 11,
+  FIVE_FOUR: 6,
 };
 
 export default function QuickStartScreen() {
@@ -89,33 +47,46 @@ export default function QuickStartScreen() {
   const { user } = useAuthStore();
   const theme = colors[colorScheme];
 
-  const workoutName = route.params?.name ?? 'Morning Cardio Blast';
-  const workoutData = QUICK_WORKOUTS[workoutName] ?? QUICK_WORKOUTS['Morning Cardio Blast'];
+  const { speak, stop: stopSpeech, voiceName } = useWorkoutVoice();
+
+  const category: ExerciseCategory = route.params?.category ?? DEFAULT_CATEGORY;
+  const catMeta = CATEGORY_MAP[category];
+
+  const categoryExercises = getExercisesByCategory(category);
+  const defaultExercises = categoryExercises.length > 0 ? categoryExercises :
+    EXERCISE_LIBRARY.filter(e => e.category === DEFAULT_CATEGORY);
 
   const [exercises, setExercises] = useState<QuickExercise[]>(
-    workoutData.exercises.map((e) => ({
-      ...e,
-      seconds: 0,
-      calories_burned: 0,
-      done: false,
+    defaultExercises.map((e) => ({
+      id: e.id, name: e.name, duration: e.defaultDuration,
+      calories_per_minute: e.caloriesPerMinute, seconds: 0,
+      calories_burned: 0, done: false, category: e.category,
+      instructions: e.instructions, equipment: e.equipment, difficulty: e.difficulty,
     }))
   );
   const [activeIndex, setActiveIndex] = useState(-1);
   const [workoutSeconds, setWorkoutSeconds] = useState(0);
   const [workoutStarted, setWorkoutStarted] = useState(false);
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState(0);
+  const [showComplete, setShowComplete] = useState(false);
 
   const workoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Stop speech when screen unmounts
   useEffect(() => {
     return () => {
-      Speech.stop();
+      stopSpeech();
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
       if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     };
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    return () => {
+      if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
+      if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
+    };
+  }, []));
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -139,417 +110,334 @@ export default function QuickStartScreen() {
     return `${secs}s`;
   };
 
-  const handleStartExercise = (index: number) => {
-    // Start workout timer on first exercise
+  const handleBack = () => {
+    if (workoutStarted) {
+      Alert.alert('Leave workout?', 'Your progress will not be saved.', [
+        { text: 'Keep going', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => { stopSpeech(); navigation.goBack(); } },
+      ]);
+    } else {
+      stopSpeech();
+      navigation.goBack();
+    }
+  };
+
+  const startExercise = (index: number) => {
+    if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
+
     if (!workoutStarted) {
       setWorkoutStarted(true);
-
-      // Voice: announce workout start
-      speak(`Starting ${workoutData.name}. Let's go!`);
-
-      workoutTimerRef.current = setInterval(() => {
-        setWorkoutSeconds((prev) => prev + 1);
-      }, 1000);
+      speak(`Starting ${catMeta?.label || category} workout. Let's go!`);
+      workoutTimerRef.current = setInterval(() => setWorkoutSeconds(p => p + 1), 1000);
     }
 
-    if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     setActiveIndex(index);
-
-    const exercise = exercises[index];
-    const duration = exercise.duration;
-    setExerciseSecondsLeft(duration);
-
-    // Voice: announce exercise starting
-    speak(`Starting ${exercise.name}. ${duration} seconds. Go!`);
+    const ex = exercises[index];
+    setExerciseSecondsLeft(ex.duration);
+    speak(`Starting ${ex.name}. ${ex.duration} seconds. Go!`);
 
     exerciseTimerRef.current = setInterval(() => {
-      setExerciseSecondsLeft((prev) => {
-        // Voice: 10 second warning
-        if (prev === 11) {
-          speak('Ten seconds left. Push through!');
-        }
-        // Voice: 5 second countdown
-        if (prev === 6) {
-          speak('Five. Four. Three. Two. One.');
-        }
-
+      setExerciseSecondsLeft(prev => {
+        if (prev === SPEAK_TRIGGER.TEN_LEFT) speak('Ten seconds left! Push through!');
+        if (prev === SPEAK_TRIGGER.FIVE_FOUR) speak('5, 4, 3, 2, 1');
         if (prev <= 1) {
           clearInterval(exerciseTimerRef.current!);
-          handleCompleteExercise(index);
+          completeExercise(index);
           return 0;
         }
         return prev - 1;
       });
-
-      setExercises((prev) =>
-        prev.map((ex, i) => {
-          if (i !== index) return ex;
-          const newSeconds = ex.seconds + 1;
-          const newCal = Math.round((ex.calories_per_minute / 60) * newSeconds);
-          return { ...ex, seconds: newSeconds, calories_burned: newCal };
-        })
-      );
+      setExercises(prev => prev.map((ex, i) => {
+        if (i !== index) return ex;
+        const ns = ex.seconds + 1;
+        return { ...ex, seconds: ns, calories_burned: Math.round((ex.calories_per_minute / 60) * ns) };
+      }));
     }, 1000);
   };
 
-  const handleCompleteExercise = (index: number) => {
+  const completeExercise = (index: number) => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
-
-    setExercises((prev) =>
-      prev.map((ex, i) => i === index ? { ...ex, done: true } : ex)
-    );
+    setExercises(prev => prev.map((ex, i) => i === index ? { ...ex, done: true } : ex));
     setActiveIndex(-1);
     setExerciseSecondsLeft(0);
 
     const nextIndex = index + 1;
-
     if (nextIndex < exercises.length) {
-      // Voice: exercise done, next coming up
-      const nextExercise = exercises[nextIndex];
-      speak(
-        `${exercises[index].name} complete! Great work. ` +
-        `Next up: ${nextExercise.name} in 3 seconds.`
-      );
-      // Auto start next exercise after 3 seconds
-      setTimeout(() => handleStartExercise(nextIndex), 3000);
+      speak(`${exercises[index].name} complete! Next up: ${exercises[nextIndex].name} in 3 seconds.`);
+      setTimeout(() => startExercise(nextIndex), 3000);
     } else {
-      // Voice: all exercises done
-      speak('All exercises complete! Tap the button to finish your workout.');
+      speak('All exercises complete! Great work!');
+      setShowComplete(true);
     }
   };
 
-  const handleCompleteWorkout = async () => {
+  const finishWorkout = async () => {
     if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
-    Speech.stop();
+    stopSpeech();
 
     const totalCal = exercises.reduce((sum, ex) => sum + ex.calories_burned, 0);
-    const timeStr = totalWorkoutTime();
 
-    try {
-      if (user?.id) {
+    if (user?.id) {
+      try {
         const { supabase } = await import('../../services/supabase');
         await supabase.from('workout_sessions').insert({
-          user_id: user.id,
-          name: workoutData.name,
-          status: 'completed',
-          duration_seconds: workoutSeconds,
-          calories_burned: totalCal,
+          user_id: user.id, name: `${catMeta?.label || category} Workout`, status: 'completed',
+          duration_seconds: workoutSeconds, calories_burned: totalCal,
           completed_at: new Date().toISOString(),
-          exercises: exercises.map((ex) => ({
-            name: ex.name,
-            seconds: ex.seconds,
-            calories: ex.calories_burned,
-          })),
+          exercises: exercises.map(ex => ({ name: ex.name, seconds: ex.seconds, calories: ex.calories_burned })),
         });
-
-        // ── Workout complete notification ─────────────────────
-        try {
-          const { notifyWorkoutComplete } = await import(
-            '../../services/notificationService'
-          );
-          await notifyWorkoutComplete(
-            user.id,
-            workoutData.name,
-            totalCal,
-            workoutSeconds
-          );
-        } catch (e) {
-          // Silent fail — non critical
-        }
-      }
-    } catch (error) {
-      console.error('Failed to save session:', error);
+        const { notifyWorkoutComplete } = await import('../../services/notificationService');
+        await notifyWorkoutComplete(user.id, `${catMeta?.label || category} Workout`, totalCal, workoutSeconds);
+      } catch {}
     }
 
-    // Voice: final congratulation
-    speak(
-      `Workout complete! You burned ${totalCal} calories in ${
-        Math.floor(workoutSeconds / 60)
-      } minutes. Amazing work!`
-    );
-
-    Alert.alert(
-      '🎉 Workout Complete!',
-      `Great work!\n\nWorkout: ${workoutData.name}\nTime: ${timeStr}\nCalories burned: ${totalCal} kcal\nExercises: ${exercises.length}`,
-      [{
-        text: 'Awesome!',
-        onPress: () => navigation.goBack(),
-      }]
-    );
+    navigation.getParent()?.navigate('Activity');
   };
 
   const totalCalories = exercises.reduce((sum, ex) => sum + ex.calories_burned, 0);
-  const completedCount = exercises.filter((e) => e.done).length;
+  const completedCount = exercises.filter(e => e.done).length;
+  const progress = exercises.length > 0 ? completedCount / exercises.length : 0;
+
+  const activeExercise = activeIndex >= 0 ? exercises[activeIndex] : null;
+  const activeExerciseData = activeExercise
+    ? EXERCISE_LIBRARY.find(e => e.id === activeExercise.id) ?? null
+    : null;
+  const catColor = catMeta?.color ?? theme.accent;
 
   return (
-    <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
-
+    <AndroidSafeView backgroundColor={theme.bg} style={{ flex: 1 }}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => {
-            if (workoutStarted) {
-              Alert.alert(
-                'Leave workout?',
-                'Your progress will not be saved.',
-                [
-                  { text: 'Keep going', style: 'cancel' },
-                  {
-                    text: 'Leave',
-                    style: 'destructive',
-                    onPress: () => {
-                      Speech.stop();
-                      navigation.goBack();
-                    },
-                  },
-                ]
-              );
-            } else {
-              Speech.stop();
-              navigation.goBack();
-            }
-          }}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={theme.textPrimary} />
-          <Text style={[styles.backText, { color: theme.textPrimary }]}>Activity</Text>
+      <View style={[styles.header, { backgroundColor: theme.bg }]}>
+        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.pageTitle, { color: theme.textPrimary }]}>
-          {workoutData.name}
-        </Text>
-        <View style={{ width: 60 }} />
-      </View>
-
-      {/* Timer bar */}
-      <View style={[styles.timerBar, {
-        backgroundColor: theme.card,
-        borderColor: theme.border,
-      }]}>
-        <View style={styles.timerItem}>
-          <Text style={[styles.timerLabel, { color: theme.textMuted }]}>TIME</Text>
-          <Text style={[styles.timerValue, { color: theme.textPrimary }]}>
-            {formatTime(workoutSeconds)}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+            {catMeta?.label || category} Workout
+          </Text>
+          <Text style={[styles.headerSub, { color: theme.textMuted }]}>
+            {completedCount} of {exercises.length} done
           </Text>
         </View>
-        <View style={[styles.timerDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.timerItem}>
-          <Text style={[styles.timerLabel, { color: theme.textMuted }]}>CALORIES</Text>
-          <Text style={[styles.timerValue, { color: theme.accent }]}>
-            {totalCalories} kcal
-          </Text>
-        </View>
-        <View style={[styles.timerDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.timerItem}>
-          <Text style={[styles.timerLabel, { color: theme.textMuted }]}>DONE</Text>
-          <Text style={[styles.timerValue, { color: theme.accent }]}>
-            {completedCount}/{exercises.length}
-          </Text>
+        <View style={[styles.workoutBadge, { backgroundColor: workoutStarted ? catColor + '22' : theme.border }]}>
+          <Ionicons name="flame" size={14} color={workoutStarted ? catColor : theme.textMuted} />
+          <Text style={[styles.workoutBadgeText, { color: workoutStarted ? catColor : theme.textMuted }]}>{totalCalories}</Text>
         </View>
       </View>
 
-      {/* Active exercise banner */}
-      {activeIndex >= 0 && (
-        <View style={[styles.activeBanner, { backgroundColor: theme.accent }]}>
-          <View>
-            <Text style={styles.activeBannerLabel}>NOW DOING</Text>
-            <Text style={styles.activeBannerName}>{exercises[activeIndex].name}</Text>
-          </View>
-          <View style={styles.activeBannerRight}>
-            <Text style={styles.activeBannerTimer}>
-              {formatTime(exerciseSecondsLeft)}
-            </Text>
-            <Text style={styles.activeBannerLeft}>remaining</Text>
-          </View>
-        </View>
-      )}
+      {/* Progress bar */}
+      <View style={[styles.progressBg, { backgroundColor: theme.border }]}>
+        <LinearGradient
+          colors={[catColor, catColor + 'CC'] as [string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` as unknown as number }]}
+        />
+      </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {exercises.map((ex, i) => (
-          <View
-            key={ex.name}
-            style={[styles.exerciseRow, {
-              backgroundColor: theme.card,
-              borderColor: ex.done
-                ? theme.accent
-                : i === activeIndex
-                ? (theme as any).orange
-                : theme.border,
-              borderWidth: i === activeIndex ? 2 : 1,
-            }]}
-          >
-            {/* Exercise number */}
-            <View style={[styles.exNumber, {
-              backgroundColor: ex.done
-                ? theme.accent
-                : i === activeIndex
-                ? (theme as any).orange
-                : theme.border + '88',
-            }]}>
-              {ex.done ? (
-                <Ionicons name="checkmark" size={16} color={theme.bg} />
-              ) : (
-                <Text style={[styles.exNumberText, {
-                  color: i === activeIndex ? theme.bg : theme.textMuted,
-                }]}>
-                  {i + 1}
-                </Text>
-              )}
+      {/* Timer stats */}
+      <View style={[styles.statsRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.statItem}>
+          <Ionicons name="time-outline" size={16} color={theme.textMuted} />
+          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{formatTime(workoutSeconds)}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>elapsed</Text>
+        </View>
+        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+        <View style={styles.statItem}>
+          <Ionicons name="flame-outline" size={16} color="#FF6B35" />
+          <Text style={[styles.statValue, { color: '#FF6B35' }]}>{totalCalories}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>kcal</Text>
+        </View>
+        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+        <View style={styles.statItem}>
+          <Ionicons name="checkmark-circle-outline" size={16} color={catColor} />
+          <Text style={[styles.statValue, { color: catColor }]}>{completedCount}/{exercises.length}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>done</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Active exercise banner */}
+        {activeExercise && activeExerciseData && (
+          <AnimatedExerciseDemo
+            exercise={activeExerciseData}
+            isActive={activeIndex >= 0}
+            secondsLeft={exerciseSecondsLeft}
+          />
+        )}
+
+        {!activeExercise && !showComplete && (
+          <View style={[styles.categoryBadgeWrap]}>
+            <View style={[styles.categoryBadge, { backgroundColor: catColor + '15' }]}>
+              <Svg width={20} height={20} viewBox="0 0 100 100">
+                {(() => {
+                  const IllusComp = getExerciseIllustration(category);
+                  return <IllusComp color={catColor} />;
+                })()}
+              </Svg>
+              <Text style={[styles.categoryBadgeText, { color: catColor }]}>
+                {catMeta?.label || category} · {exercises.length} exercises
+              </Text>
             </View>
+          </View>
+        )}
 
-            {/* Exercise info */}
-            <View style={styles.exInfo}>
-              <Text style={[styles.exName, {
-                color: ex.done ? theme.accent : theme.textPrimary,
+        {/* Exercise list */}
+        {exercises.map((ex, i) => {
+          const isActive = i === activeIndex;
+          const isDone = ex.done;
+
+          return (
+            <TouchableOpacity key={ex.id}
+              onPress={() => { if (!isDone && !isActive && !workoutStarted) startExercise(i); }}
+              activeOpacity={0.8}
+              style={[styles.exCard, {
+                backgroundColor: isDone ? catColor + '08' : isActive ? catColor + '10' : theme.card,
+                borderColor: isDone ? catColor : isActive ? catColor : theme.border,
+                borderWidth: isActive ? 1.5 : 1,
               }]}>
-                {ex.name}
-              </Text>
-              <Text style={[styles.exMeta, { color: theme.textMuted }]}>
-                {formatDuration(ex.duration)} · {ex.calories_per_minute} kcal/min
-              </Text>
-              {ex.seconds > 0 && (
-                <Text style={[styles.exProgress, { color: theme.accent }]}>
-                  {formatTime(ex.seconds)} done · {ex.calories_burned} kcal burned
+              <View style={[styles.exIllusWrap, { backgroundColor: catColor + '12' }]}>
+                <Svg width={36} height={36} viewBox="0 0 100 100">
+                  {(() => {
+                    const IllusComp = getExerciseIllustration(ex.category);
+                    return <IllusComp color={catColor} />;
+                  })()}
+                </Svg>
+              </View>
+              <View style={styles.exInfo}>
+                <Text style={[styles.exName, { color: isDone ? catColor : theme.textPrimary }]}>{ex.name}</Text>
+                <Text style={[styles.exMeta, { color: theme.textMuted }]}>
+                  {formatDuration(ex.duration)} · {ex.calories_per_minute} kcal/min
                 </Text>
-              )}
-            </View>
+                {ex.seconds > 0 && (
+                  <Text style={[styles.exProgressText, { color: catColor }]}>
+                    {formatTime(ex.seconds)} · {ex.calories_burned} kcal
+                  </Text>
+                )}
+              </View>
+              <View style={styles.exActions}>
+                {isDone ? (
+                  <View style={[styles.exDoneBadge, { backgroundColor: catColor }]}>
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  </View>
+                ) : isActive ? (
+                  <TouchableOpacity onPress={() => completeExercise(i)}
+                    style={[styles.exDoneBtn, { backgroundColor: catColor }]}>
+                    <Text style={styles.exDoneBtnText}>Skip</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity onPress={() => startExercise(i)}
+                    style={[styles.exStartBtn, { borderColor: catColor }]}>
+                    <Ionicons name="play" size={12} color={catColor} />
+                    <Text style={[styles.exStartBtnText, { color: catColor }]}>Start</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
 
-            {/* Action button */}
-            {ex.done ? (
-              <Text style={[styles.exDoneText, { color: theme.accent }]}>✓ Done</Text>
-            ) : i === activeIndex ? (
-              <TouchableOpacity
-                onPress={() => handleCompleteExercise(i)}
-                style={[styles.doneBtn, { backgroundColor: (theme as any).orange }]}
-              >
-                <Text style={[styles.doneBtnText, { color: theme.bg }]}>Done</Text>
+        {/* Complete button */}
+        {completedCount > 0 && !showComplete && (
+          <TouchableOpacity onPress={finishWorkout} activeOpacity={0.85}
+            style={[styles.completeWrap, Platform.select({ ios: { shadowColor: catColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 } })]}>
+            <LinearGradient
+              colors={[catColor, catColor + 'CC'] as [string, string]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.completeBtn}>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={styles.completeBtnText}>Complete Workout</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
+        {/* Complete modal */}
+        {showComplete && (
+          <View style={styles.completeOverlay}>
+            <LinearGradient colors={[theme.heroCard, '#1a1a2e'] as [string, string]}
+              style={styles.completeCard}>
+              <Text style={styles.completeEmoji}>🎉</Text>
+              <Text style={styles.completeTitle}>Workout Complete!</Text>
+              <Text style={styles.completeSub}>You crushed your {catMeta?.label || category} workout!</Text>
+              <View style={styles.completeStats}>
+                <View style={styles.completeStat}>
+                  <Ionicons name="time-outline" size={20} color="#fff" />
+                  <Text style={styles.completeStatValue}>{totalWorkoutTime()}</Text>
+                  <Text style={styles.completeStatLabel}>Duration</Text>
+                </View>
+                <View style={styles.completeStat}>
+                  <Ionicons name="flame" size={20} color="#FF6B35" />
+                  <Text style={[styles.completeStatValue, { color: '#FF6B35' }]}>{totalCalories}</Text>
+                  <Text style={styles.completeStatLabel}>Calories</Text>
+                </View>
+                <View style={styles.completeStat}>
+                  <Ionicons name="barbell-outline" size={20} color={catColor} />
+                  <Text style={[styles.completeStatValue, { color: catColor }]}>{exercises.length}</Text>
+                  <Text style={styles.completeStatLabel}>Exercises</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={finishWorkout} activeOpacity={0.85}
+                style={[styles.completeDoneBtn, { backgroundColor: catColor }]}>
+                <Text style={styles.completeDoneBtnText}>Back to Activity</Text>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={() => handleStartExercise(i)}
-                style={[styles.startBtn, { borderColor: theme.accent }]}
-              >
-                <Ionicons name="play" size={14} color={theme.accent} />
-                <Text style={[styles.startBtnText, { color: theme.accent }]}>Start</Text>
-              </TouchableOpacity>
-            )}
+            </LinearGradient>
           </View>
-        ))}
-
-        {/* Complete workout button */}
-        <TouchableOpacity
-          onPress={handleCompleteWorkout}
-          style={[styles.completeBtn, { backgroundColor: theme.accent }]}
-        >
-          <Ionicons name="checkmark-circle" size={20} color={theme.bg} />
-          <Text style={[styles.completeBtnText, { color: theme.bg }]}>
-            Complete Workout
-          </Text>
-        </TouchableOpacity>
+        )}
       </ScrollView>
     </AndroidSafeView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scrollContent: { paddingBottom: 100, paddingTop: spacing.sm },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: fontSize.lg, fontWeight: '800', letterSpacing: -0.3 },
+  headerSub: { fontSize: fontSize.xs, marginTop: 1 },
+  workoutBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: 99 },
+  workoutBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backText: { fontSize: fontSize.lg, fontWeight: '400' },
-  pageTitle: { fontSize: fontSize.base, fontWeight: '700', textAlign: 'center', flex: 1 },
+  progressBg: { height: 3, marginHorizontal: spacing.lg, borderRadius: 2, overflow: 'hidden', marginBottom: spacing.sm },
+  progressFill: { height: '100%', borderRadius: 2 },
 
-  timerBar: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  timerItem: { flex: 1, alignItems: 'center' },
-  timerDivider: { width: 1, marginHorizontal: spacing.sm },
-  timerLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
-  timerValue: { fontSize: fontSize.lg, fontWeight: '800' },
+  statsRow: { flexDirection: 'row', marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.sm, borderRadius: 14, borderWidth: 1 },
+  statItem: { flex: 1, alignItems: 'center', gap: 2 },
+  statDivider: { width: 1, marginVertical: 4 },
+  statValue: { fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
+  statLabel: { fontSize: 9, fontWeight: '600' },
 
-  activeBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-  },
-  activeBannerLabel: {
-    fontSize: 9, fontWeight: '700',
-    color: 'rgba(0,0,0,0.6)', letterSpacing: 0.5,
-  },
-  activeBannerName: { fontSize: fontSize.lg, fontWeight: '800', color: '#0C0D10' },
-  activeBannerRight: { alignItems: 'flex-end' },
-  activeBannerTimer: { fontSize: 22, fontWeight: '800', color: '#0C0D10' },
-  activeBannerLeft: { fontSize: 9, color: 'rgba(0,0,0,0.6)', fontWeight: '600' },
+  scrollContent: { paddingBottom: 120, paddingTop: spacing.xs },
 
-  exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-  },
-  exNumber: {
-    width: 32, height: 32, borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  exNumberText: { fontSize: fontSize.sm, fontWeight: '700' },
+  categoryBadgeWrap: { alignItems: 'center', marginBottom: spacing.md },
+  categoryBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full },
+  categoryBadgeText: { fontSize: fontSize.sm, fontWeight: '700' },
+
+  exCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.sm, borderRadius: 14, overflow: 'hidden' },
+  exIllusWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   exInfo: { flex: 1 },
-  exName: { fontSize: fontSize.base, fontWeight: '700' },
+  exName: { fontSize: fontSize.base, fontWeight: '700', letterSpacing: -0.2 },
   exMeta: { fontSize: fontSize.xs, marginTop: 2 },
-  exProgress: { fontSize: fontSize.xs, marginTop: 4, fontWeight: '600' },
-  exDoneText: { fontSize: fontSize.sm, fontWeight: '700', flexShrink: 0 },
+  exProgressText: { fontSize: fontSize.xs, fontWeight: '700', marginTop: 4 },
+  exActions: { flexShrink: 0 },
+  exDoneBadge: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  exDoneBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: 8 },
+  exDoneBtnText: { color: '#fff', fontSize: fontSize.xs, fontWeight: '800' },
+  exStartBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 8, borderWidth: 1.5 },
+  exStartBtnText: { fontSize: fontSize.xs, fontWeight: '700' },
 
-  startBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-  startBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
-  doneBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    flexShrink: 0,
-  },
-  doneBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
+  completeWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 16, overflow: 'hidden' },
+  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
+  completeBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '800', letterSpacing: 0.3 },
 
-  completeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-  },
-  completeBtnText: { fontSize: fontSize.lg, fontWeight: '700' },
+  completeOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', padding: spacing.lg },
+  completeCard: { borderRadius: 24, padding: spacing.xl, alignItems: 'center', gap: spacing.sm },
+  completeEmoji: { fontSize: 48 },
+  completeTitle: { fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
+  completeSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+  completeStats: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.md },
+  completeStat: { alignItems: 'center', gap: 4 },
+  completeStatValue: { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
+  completeStatLabel: { fontSize: 9, color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
+  completeDoneBtn: { paddingHorizontal: spacing.xxl, paddingVertical: spacing.md, borderRadius: 14, marginTop: spacing.sm },
+  completeDoneBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '800' },
 });

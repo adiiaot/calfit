@@ -68,23 +68,12 @@ export default function WelcomeScreen() {
             style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
           >
             <Text style={[styles.primaryBtnText, { color: theme.bg }]}>
-              Get Started — It's Free
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}
-            style={[styles.secondaryBtn, {
-              borderColor: theme.border,
-            }]}
-          >
-            <Text style={[styles.secondaryBtnText, { color: theme.textPrimary }]}>
-              I already have an account
+              Get Started
             </Text>
           </TouchableOpacity>
 
           <Text style={[styles.disclaimer, { color: theme.textMuted }]}>
-            No credit card required · Cancel anytime
+            Your data stays on this device. No sign-up required.
           </Text>
         </View>
       </View>

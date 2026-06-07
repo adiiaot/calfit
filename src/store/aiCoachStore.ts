@@ -44,6 +44,11 @@ interface AiCoachState {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const MIN_LOADING_MS = 1200;
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function paramsMatch(a: WorkoutParams, b: WorkoutParams): boolean {
   return (
@@ -83,12 +88,16 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
     }
 
     set({ isLoading: true, error: null });
+    const startedAt = Date.now();
 
     try {
       const workout = await generateWorkout(userId, {
         ...params,
         previousWorkouts: savedWorkouts.slice(0, 5),
       });
+
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_LOADING_MS) await delay(MIN_LOADING_MS - elapsed);
 
       set({
         currentWorkout: workout,
@@ -105,6 +114,8 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
         }],
       }));
     } catch (e: any) {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_LOADING_MS) await delay(MIN_LOADING_MS - elapsed);
       set({ error: e?.message ?? 'Failed to generate workout', isLoading: false });
     }
   },
@@ -257,6 +268,14 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
         ]);
       } catch {}
 
+      // Notify user that AI coach responded
+      try {
+        const { sendInstantNotification } = await import('../services/reminderService');
+        const { notifyCoachResponse } = await import('../services/notificationService');
+        await sendInstantNotification('AI Coach 💬', 'Your AI Coach has responded. Tap to view.', { type: 'coach' });
+        await notifyCoachResponse(userId);
+      } catch {}
+
       if (result.action) {
         if (result.action.type === 'generate_workout' && result.action.data) {
           const params: WorkoutParams = {
@@ -280,6 +299,10 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
         chatStartedAt: null,
         chatError: e?.message ?? 'Chat error',
       }));
+      try {
+        const { sendInstantNotification } = await import('../services/reminderService');
+        await sendInstantNotification('AI Coach ⚠️', 'Your AI Coach encountered an error. Please try again.', { type: 'coach' });
+      } catch {}
     }
   },
 

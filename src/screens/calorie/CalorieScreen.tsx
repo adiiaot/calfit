@@ -13,6 +13,7 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { getTodayCalories, getTodayWater, logFood, logWater } from '../../services/profileService';
 import { supabase } from '../../services/supabase';
 import { searchFoods } from '../../services/foodSearchService';
+import { lookupFoodNutrition } from '../../services/nvidia-client';
 import { CalorieTrendChart } from '../../components/TrendCharts';
 
 
@@ -181,8 +182,9 @@ function AddFoodModal({ visible, theme, mealType, onClose, onAdd, savedMeals, on
   const [manualProtein, setManualProtein] = useState('');
   const [manualCarbs, setManualCarbs] = useState('');
   const [manualFat, setManualFat] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
-  const reset = () => { setView('choice'); setQuery(''); setResults([]); setSelected(null); setPortion('100'); setManualName(''); setManualCal(''); setManualProtein(''); setManualCarbs(''); setManualFat(''); };
+  const reset = () => { setView('choice'); setQuery(''); setResults([]); setSelected(null); setPortion('100'); setManualName(''); setManualCal(''); setManualProtein(''); setManualCarbs(''); setManualFat(''); setAiLoading(false); };
 
   const handleSearch = async (q: string) => {
     setQuery(q);
@@ -208,6 +210,20 @@ function AddFoodModal({ visible, theme, mealType, onClose, onAdd, savedMeals, on
     if (!manualName || !manualCal) { Alert.alert('Required', 'Please enter food name and calories.'); return; }
     onAdd({ food_name: manualName, calories: parseInt(manualCal) || 0, protein_g: parseInt(manualProtein) || 0, carbs_g: parseInt(manualCarbs) || 0, fats_g: parseInt(manualFat) || 0, meal_type: mealType });
     reset(); onClose();
+  };
+
+  const handleAutoFill = async () => {
+    if (!manualName.trim()) { Alert.alert('Missing name', 'Enter a food name first.'); return; }
+    setAiLoading(true);
+    const { user } = useAuthStore.getState();
+    if (!user?.id) { setAiLoading(false); return; }
+    const result = await lookupFoodNutrition(user.id, manualName.trim());
+    setAiLoading(false);
+    if (!result) { Alert.alert('No results', 'Could not estimate nutrition for that food. Try being more specific.'); return; }
+    setManualCal(String(result.calories));
+    setManualProtein(String(result.protein_g));
+    setManualCarbs(String(result.carbs_g));
+    setManualFat(String(result.fats_g));
   };
 
   const MEAL_LABELS: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
@@ -351,6 +367,13 @@ function AddFoodModal({ visible, theme, mealType, onClose, onAdd, savedMeals, on
                   </View>
                 ))}
               </View>
+              <TouchableOpacity onPress={handleAutoFill} disabled={aiLoading} activeOpacity={0.85}
+                style={[styles.aiFillBtn, { borderColor: theme.accent, opacity: aiLoading ? 0.6 : 1 }]}>
+                <Ionicons name="sparkles-outline" size={16} color={theme.accent} />
+                <Text style={[styles.aiFillBtnText, { color: theme.accent }]}>
+                  {aiLoading ? 'Looking up...' : 'Auto-fill with AI'}
+                </Text>
+              </TouchableOpacity>
               <View style={styles.editPerfectRow}>
                 <TouchableOpacity onPress={() => setView('choice')} activeOpacity={0.8}
                   style={[styles.editBtn, { borderColor: theme.border }]}>
@@ -373,16 +396,6 @@ function AddFoodModal({ visible, theme, mealType, onClose, onAdd, savedMeals, on
 // ── MEAL PLAN TAB ──────────────────────────────────────────────
 function MealPlanTab({ theme }: { theme: typeof colors.light }) {
   const navigation = useNavigation<any>();
-  const [plan, setPlan] = useState<{ meal: string; foods: string[]; cals: number }[] | null>(null);
-
-  const generatePlan = async () => {
-    setPlan([
-      { meal: 'Breakfast', foods: ['Oatmeal with berries', 'Scrambled eggs', 'Green smoothie'], cals: 420 },
-      { meal: 'Lunch', foods: ['Grilled chicken salad', 'Quinoa bowl', 'Mixed veggies'], cals: 550 },
-      { meal: 'Dinner', foods: ['Baked salmon', 'Sweet potato', 'Steamed broccoli'], cals: 620 },
-      { meal: 'Snacks', foods: ['Greek yogurt', 'Almonds', 'Apple slices'], cals: 280 },
-    ]);
-  };
 
   return (
     <ScrollView contentContainerStyle={mp.scroll} showsVerticalScrollIndicator={false}>
@@ -392,41 +405,13 @@ function MealPlanTab({ theme }: { theme: typeof colors.light }) {
         </View>
         <Text style={[mp.heroTitle, { color: theme.textPrimary }]}>Meal Planner</Text>
         <Text style={[mp.heroSub, { color: theme.textMuted }]}>
-          Plan your meals for the day and hit your nutrition goals
+          Create personalized meal plans with AI — tailored to your budget, preferences, and health goals
         </Text>
-        {!plan ? (
-          <TouchableOpacity onPress={generatePlan} activeOpacity={0.85} style={[mp.generateBtn, { backgroundColor: theme.accent }]}>
-            <Ionicons name="sparkles-outline" size={18} color="#fff" />
-            <Text style={mp.generateBtnText}>Generate Meal Plan</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={() => setPlan(null)} activeOpacity={0.85} style={[mp.resetBtn, { borderColor: theme.border }]}>
-            <Text style={[mp.resetBtnText, { color: theme.textMuted }]}>Reset</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity onPress={() => navigation.navigate('MealPlan')} activeOpacity={0.85} style={[mp.goBtn, { backgroundColor: theme.accent }]}>
+          <Ionicons name="sparkles-outline" size={18} color="#fff" />
+          <Text style={mp.goBtnText}>Go to Meal Planner</Text>
+        </TouchableOpacity>
       </LinearGradient>
-
-      {plan?.map((section) => (
-        <View key={section.meal} style={[mp.mealCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={mp.mealHeader}>
-            <Text style={[mp.mealName, { color: theme.textPrimary }]}>{section.meal}</Text>
-            <Text style={[mp.mealCal, { color: theme.accent }]}>{section.cals} kcal</Text>
-          </View>
-          {section.foods.map((food) => (
-            <View key={food} style={[mp.foodRow, { borderColor: theme.border }]}>
-              <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
-              <Text style={[mp.foodName, { color: theme.textSecondary }]}>{food}</Text>
-            </View>
-          ))}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Main', { screen: 'Calorie' })}
-            style={[mp.logBtn, { borderColor: theme.accent }]}
-          >
-            <Ionicons name="add-circle-outline" size={16} color={theme.accent} />
-            <Text style={[mp.logBtnText, { color: theme.accent }]}>Log these meals</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -437,19 +422,9 @@ const mp = StyleSheet.create({
   hero: { borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, alignItems: 'center', marginBottom: spacing.md },
   heroIconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(45,220,140,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
   heroTitle: { fontSize: fontSize.xl, fontWeight: '800', marginBottom: spacing.xs },
-  heroSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18, marginBottom: spacing.lg },
-  generateBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full },
-  generateBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '700' },
-  resetBtn: { paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
-  resetBtnText: { fontSize: fontSize.sm, fontWeight: '600' },
-  mealCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
-  mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  mealName: { fontSize: fontSize.base, fontWeight: '700' },
-  mealCal: { fontSize: fontSize.sm, fontWeight: '700' },
-  foodRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6, borderBottomWidth: 0.5 },
-  foodName: { fontSize: fontSize.sm, flex: 1 },
-  logBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1, marginTop: spacing.sm },
-  logBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
+  heroSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18, marginBottom: spacing.lg, paddingHorizontal: spacing.md },
+  goBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full },
+  goBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '700' },
 });
 
 // ── MAIN SCREEN ───────────────────────────────────────────────
@@ -602,6 +577,9 @@ export default function CalorieScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
           </TouchableOpacity>
+          <Text style={[styles.scanDisclaimer, { color: theme.textMuted }]}>
+            Camera estimates are approximate — always verify with nutrition labels
+          </Text>
 
           {meals.map((m) => (
             <MealSection key={m.type} theme={theme} title={m.title} mealType={m.type}
@@ -730,4 +708,14 @@ const styles = StyleSheet.create({
   macroInput: { flex: 1, padding: spacing.sm, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
   macroInputText: { fontSize: fontSize.lg, fontWeight: '800', width: '100%' },
   macroInputLabel: { fontSize: 9, marginTop: 2, textAlign: 'center' },
+  aiFillBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, paddingVertical: spacing.md,
+    borderRadius: radius.md, borderWidth: 1.5, borderStyle: 'dashed',
+  },
+  aiFillBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
+  scanDisclaimer: {
+    fontSize: fontSize.xs, textAlign: 'center', marginTop: -spacing.sm,
+    marginBottom: spacing.md, paddingHorizontal: spacing.xl, lineHeight: 16,
+  },
 });

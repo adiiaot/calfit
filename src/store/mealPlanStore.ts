@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { generateMealPlan } from '../services/nvidia-client';
 import type { GeneratedMealPlan, MealPlanParams } from '../types/ai-coach.types';
 
+const MIN_LOADING_MS = 1500;
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 interface MealPlanState {
   currentPlan: GeneratedMealPlan | null;
   savedPlans: GeneratedMealPlan[];
@@ -25,10 +31,16 @@ export const useMealPlanStore = create<MealPlanState>((set, get) => ({
   generatePlan: async (userId: string, params: MealPlanParams) => {
     set({ isLoading: true, error: null, currentPlan: null });
 
+    const startedAt = Date.now();
+
     try {
       const plan = await generateMealPlan(userId, params);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_LOADING_MS) await delay(MIN_LOADING_MS - elapsed);
       set({ currentPlan: plan, isLoading: false });
     } catch (e: any) {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_LOADING_MS) await delay(MIN_LOADING_MS - elapsed);
       set({ error: e?.message ?? 'Failed to generate meal plan', isLoading: false });
     }
   },

@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../shared/AndriodSafeView';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
@@ -287,6 +287,23 @@ export default function AccountabilityScreen() {
   const partnerStreak    = firstPartner?.streak_count ?? 0;
   const partnerName      = firstPartner?.full_name ?? 'Partner';
   const partnerAvatar    = firstPartner?.avatar_url ?? null;
+
+  const milestoneNotified = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user || safePartners.length === 0) return;
+    const milestones = [7, 14, 21, 30, 60, 90, 100];
+    safePartners.forEach((p) => {
+      const streak = (p.partner_profile as any)?.streak_count ?? 0;
+      const name = (p.partner_profile as any)?.full_name ?? 'Your partner';
+      const key = `${p.partner_id}-${streak}`;
+      if (milestones.includes(streak) && !milestoneNotified.current.has(key)) {
+        milestoneNotified.current.add(key);
+        import('../../../services/notificationService').then(({ notifyPartnerStreak }) =>
+          notifyPartnerStreak(user.id, name, streak)
+        );
+      }
+    });
+  }, [safePartners, user]);
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>

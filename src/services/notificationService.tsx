@@ -177,6 +177,42 @@ export const notifyProfileComplete = async (userId: string) => {
   );
 };
 
+export const notifyPartnerMessage = async (userId: string, partnerName: string, messageType: string) => {
+  const labels: Record<string, string> = {
+    text: 'sent you a message',
+    image: 'sent you a photo',
+    video: 'sent you a video',
+    audio: 'sent you a voice note',
+  };
+  await sendNotification(
+    userId,
+    'social',
+    `💬 ${partnerName}`,
+    `${partnerName} ${labels[messageType] ?? 'sent you a message'}. Tap to view.`,
+    'View Chat'
+  );
+};
+
+export const notifyPartnerStreak = async (userId: string, partnerName: string, streakCount: number) => {
+  await sendNotification(
+    userId,
+    'streak',
+    `🔥 ${partnerName} is on fire!`,
+    `${partnerName} has reached a ${streakCount}-day streak! Cheer them on!`,
+    'View Streaks'
+  );
+};
+
+export const notifyCoachResponse = async (userId: string) => {
+  await sendNotification(
+    userId,
+    'coach',
+    'AI Coach Ready 🤖',
+    'Your AI Coach has new insights and tips for you. Tap to chat.',
+    'Open Coach'
+  );
+};
+
 export const notifyUpgradePrompt = async (userId: string) => {
   await sendNotification(
     userId,

@@ -112,6 +112,22 @@ export const scheduleStreakReminder = async (enabled: boolean): Promise<void> =>
   await scheduleDailyReminder(REMINDER_IDS.STREAK, "🔥 Don't break your streak", 'Check in today to keep your streak alive. Tap to check in now.', 20, 0);
 };
 
+// ── INSTANT LOCAL NOTIFICATION (for partner messages, coach, etc.) ──
+export const sendInstantNotification = async (
+  title: string,
+  body: string,
+  data?: Record<string, any>
+): Promise<void> => {
+  try {
+    const granted = await requestNotificationPermissions();
+    if (!granted) return;
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: true, data: data ?? {} },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1 },
+    });
+  } catch (_) {}
+};
+
 // ── SCHEDULE ALL ──────────────────────────────────────────────
 export const scheduleAllReminders = async (prefs: {
   meals: boolean; water: boolean; workout: boolean;

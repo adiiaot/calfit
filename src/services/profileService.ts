@@ -118,9 +118,10 @@ export const logFood = async (
     fats_g?: number;
   }
 ): Promise<boolean> => {
+  const today = new Date().toISOString().split('T')[0];
   const { error } = await supabase
     .from('food_logs')
-    .insert({ user_id: userId, ...entry });
+    .insert({ user_id: userId, date: today, ...entry });
 
   if (error) {
     console.error('Error logging food:', error.message);

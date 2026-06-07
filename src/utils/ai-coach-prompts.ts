@@ -88,12 +88,16 @@ Remember: ONLY output the JSON. Nothing else.`;
 };
 
 export const generateMealPlanPrompt = (params: MealPlanParams): string => {
+  const budgetStr = params.budget_mode === 'fixed'
+    ? `- Fixed Budget: ${params.budget_amount} (${params.budget_period || 'week'})`
+    : `- Budget Level: ${params.budget_level} (auto-calculated based on food costs)`;
+
   return `
 Generate a detailed daily meal plan with the following preferences:
 
 **Client Preferences:**
 - Dietary Preferences: ${params.dietary_preferences.join(', ') || 'None specified'}
-- Budget Level: ${params.budget_level}
+${budgetStr}
 - Daily Calorie Target: ${params.calories_target} kcal
 - Meals per Day: ${params.meals_per_day}
 - Excluded Foods: ${params.excluded_foods.join(', ') || 'None'}
@@ -103,10 +107,13 @@ Generate a detailed daily meal plan with the following preferences:
 **Requirements:**
 1. Create ${params.meals_per_day} meals covering the full day
 2. Total calories should be close to ${params.calories_target} kcal
-3. Consider the budget level — suggest affordable ingredients for 'low', mid-range for 'moderate', premium for 'high'
-4. Avoid any excluded foods
-5. Include estimated protein, carbs, fats for each meal
-6. Suggest realistic, easy-to-prepare meals
+3. You have deep knowledge of local food markets and ingredient costs in Nigeria and other countries. Suggest realistic, locally available ingredients.
+4. For Nigerian cuisine: use ingredients like yam, plantain, rice, beans, garri, egusi, okra, tomatoes, pepper, onions, palm oil, vegetable oil, groundnut, fish, chicken, beef, goat meat, stockfish, ogi, millet, guinea corn, sweet potatoes, cassava, leafy greens (ugu, bitterleaf, waterleaf), etc.
+5. ${params.budget_mode === 'fixed'
+     ? `Respect the fixed budget of ${params.budget_amount} (${params.budget_period || 'week'}). Suggest affordable ingredient combinations that fit within this amount.`
+     : `Consider the budget level — suggest affordable ingredients for 'low', mid-range for 'moderate', premium for 'high'. For 'low' budget, focus on staple foods like rice, beans, yam, eggs, seasonal vegetables.`}
+6. Avoid any excluded foods
+7. Include estimated protein, carbs, fats for each meal using realistic portion sizes
 
 **Output Rules:**
 - Respond ONLY with valid JSON (no markdown, no preamble, no backticks)
@@ -132,7 +139,7 @@ Generate a detailed daily meal plan with the following preferences:
     "carbs_g": 200,
     "fats_g": 60
   },
-  "ai_notes": "Why this meal plan suits their preferences and goals"
+  "ai_notes": "Why this meal plan suits their preferences, budget, and goals. Include practical shopping tips."
 }
 
 Remember: ONLY output the JSON. Nothing else.`;

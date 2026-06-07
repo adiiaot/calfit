@@ -501,3 +501,88 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
 
   return null;
 }
+
+// ── FOOD LOOKUP (Text) ──────────────────────────────────────────
+// Takes a food name and returns estimated nutrition info via AI
+export async function lookupFoodNutrition(
+  userId: string,
+  foodName: string
+): Promise<{
+  name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fats_g: number;
+  serving_size: string;
+} | null> {
+  if (!API_KEY) return null;
+
+  const prompt = `You are a nutrition database. Given a food name, estimate its nutritional values per standard serving.
+
+Food: "${foodName}"
+
+Respond ONLY with valid JSON (no markdown, no preamble):
+{
+  "name": "Food name",
+  "calories": 250,
+  "protein_g": 12,
+  "carbs_g": 30,
+  "fats_g": 8,
+  "serving_size": "1 cup (200g)"
+}`;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const startTime = Date.now();
+    try {
+      const res = await fetch(`${BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: 300,
+        }),
+      });
+
+      const latencyMs = Date.now() - startTime;
+
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: `Lookup HTTP ${res.status}: ${errBody}` });
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
+          continue;
+        }
+        return null;
+      }
+
+      const data = await res.json();
+      const responseText = data?.choices?.[0]?.message?.content ?? '';
+      await logApiUsage({ userId, status: 'success', latencyMs, tokensInput: data?.usage?.prompt_tokens, tokensOutput: data?.usage?.completion_tokens });
+
+      const parsed = extractJSON<{
+        name: string; calories: number; protein_g: number;
+        carbs_g: number; fats_g: number; serving_size: string;
+      }>(responseText);
+
+      if (parsed && parsed.name && typeof parsed.calories === 'number') {
+        return parsed;
+      }
+
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
+        continue;
+      }
+    } catch (e: any) {
+      const latencyMs = Date.now() - startTime;
+      await logApiUsage({ userId, status: 'timeout', latencyMs, errorMessage: e?.message ?? 'Lookup network error' });
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
+        continue;
+      }
+    }
+  }
+
+  return null;
+}

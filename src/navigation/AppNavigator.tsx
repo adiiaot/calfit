@@ -46,9 +46,9 @@ import LanguageScreen from '../screens/settings/LanguageScreen';
 import PrivacyScreen from '../screens/settings/PrivacyScreen';
 import GoalsScreen from '../screens/settings/GoalsScreen';
 import QuickStartScreen from '../screens/Activity/QuickStartScreen';
+import AnalysisScreen from '../screens/Activity/AnalysisScreen';
 import SubscriptionScreen from '../screens/earnings/SubscriptionScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
-import LoginScreen from '../screens/onboarding/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import RecapScreen from '../screens/progress/RecapScreen';
 import IntermittentFastingScreen from '../screens/meals/IntermittentFastingScreen';
@@ -92,6 +92,10 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const [radialOpen, setRadialOpen] = useState(false);
+
+  // Hide tab bar on PartnerChat screen
+  const currentRoute = state.routeNames[state.index];
+  if (currentRoute === 'PartnerChat') return null;
 
   const handleRadialSelect = (key: string) => {
     setRadialOpen(false);
@@ -235,6 +239,7 @@ function TabNavigator() {
       <Tab.Screen name="Accountability"       component={AccountabilityScreen}       options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="PartnerChat"          component={PartnerChatScreen}          options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="QuickStart"           component={QuickStartScreen}           options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="Analysis"             component={AnalysisScreen}             options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Recap"                component={RecapScreen}                options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="IntermittentFasting"  component={IntermittentFastingScreen}  options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="BodyMeasurements"     component={BodyMeasurementsScreen}     options={{ tabBarItemStyle: { display: 'none' } }} />
@@ -252,7 +257,6 @@ function AuthStack() {
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
       <RootStack.Screen name="Welcome"      component={WelcomeScreen} />
-      <RootStack.Screen name="Login"        component={LoginScreen} />
       <RootStack.Screen name="Onboarding"   component={OnboardingScreen} />
       <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
     </RootStack.Navigator>

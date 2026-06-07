@@ -115,8 +115,10 @@ function StepStats({ theme, height, setHeight, weight, setWeight }: {
 }
 
 // ── ACCOUNT ────────────────────────────────────────────────────
-function StepAccount({ theme, isLoading, onSignUp }: {
-  theme: typeof colors.light; isLoading: boolean; onSignUp: () => void;
+function StepAccount({ theme, name, setName, username, setUsername, isLoading, onSignUp }: {
+  theme: typeof colors.light; name: string; setName: (v: string) => void;
+  username: string; setUsername: (v: string) => void;
+  isLoading: boolean; onSignUp: () => void;
 }) {
   return (
     <StepWrap>
@@ -124,21 +126,33 @@ function StepAccount({ theme, isLoading, onSignUp }: {
         <LinearGradient colors={['#F0427C', '#FF6B35', '#FFB830']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logoCircle}>
           <Text style={styles.logoLetter}>C</Text>
         </LinearGradient>
-        <StepTitle text="You're all set!" theme={theme} />
-        <StepSub text="Create your account to save your progress and settings." theme={theme} />
+        <StepTitle text="Your Profile" theme={theme} />
+        <StepSub text="Set your display name and username to personalise your experience." theme={theme} />
       </View>
-      <View style={[styles.demoBadge, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-        <Ionicons name="lock-open-outline" size={16} color={theme.accent} />
-        <Text style={[styles.demoBadgeText, { color: theme.accent }]}>Demo mode — anonymous account, no password needed</Text>
+      <View style={styles.fieldsWrap}>
+        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Display Name</Text>
+        <View style={[styles.fieldInput, { backgroundColor: theme.card, borderColor: name ? theme.accent : theme.border }]}>
+          <Ionicons name="person-outline" size={18} color={theme.textMuted} />
+          <TextInput value={name} onChangeText={setName} placeholder="e.g. John Doe"
+            placeholderTextColor={theme.textMuted} autoCapitalize="words"
+            style={[styles.fieldTextInput, { color: theme.textPrimary }]} />
+        </View>
+        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Username</Text>
+        <View style={[styles.fieldInput, { backgroundColor: theme.card, borderColor: username ? theme.accent : theme.border }]}>
+          <Ionicons name="at-outline" size={18} color={theme.textMuted} />
+          <TextInput value={username} onChangeText={(t) => setUsername(t.replace(/[^a-z0-9_]/g, '').toLowerCase())}
+            placeholder="e.g. johndoe" placeholderTextColor={theme.textMuted} autoCapitalize="none"
+            style={[styles.fieldTextInput, { color: theme.textPrimary }]} />
+        </View>
       </View>
       <TouchableOpacity onPress={onSignUp} disabled={isLoading} activeOpacity={0.85} style={styles.signUpBtnWrap}>
         <LinearGradient colors={[theme.accent, '#0DAE6C'] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signUpBtn}>
-          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.signUpBtnText}>Create My Account →</Text>}
+          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.signUpBtnText}>Save & Continue →</Text>}
         </LinearGradient>
       </TouchableOpacity>
       <View style={[styles.privacyNote, { backgroundColor: theme.accentDim as string, borderColor: theme.accent + '33' }]}>
         <Ionicons name="shield-checkmark-outline" size={16} color={theme.accent} />
-        <Text style={[styles.privacyText, { color: theme.textSecondary }]}>Anonymous demo — no personal data stored. Delete anytime.</Text>
+        <Text style={[styles.privacyText, { color: theme.textSecondary }]}>Your data stays on this device. No sign-up or email required.</Text>
       </View>
     </StepWrap>
   );
@@ -168,6 +182,8 @@ export default function OnboardingScreen() {
   const [goal, setGoal] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const currentIndex = flow.indexOf(step);
@@ -188,6 +204,8 @@ export default function OnboardingScreen() {
   const saveProfile = async (userId: string) => {
     await supabase.from('profiles').upsert({
       id: userId,
+      full_name: name || null,
+      calfit_id: username || null,
       goal: goal || null,
       height_cm: parseFloat(height) || null,
       current_weight_kg: parseFloat(weight) || null,
@@ -238,7 +256,7 @@ export default function OnboardingScreen() {
       case 'welcome':  return <StepWelcome theme={theme} />;
       case 'goal':     return <StepGoal theme={theme} selected={goal} onSelect={setGoal} />;
       case 'stats':    return <StepStats theme={theme} height={height} setHeight={setHeight} weight={weight} setWeight={setWeight} />;
-      case 'account':  return <StepAccount theme={theme} isLoading={isLoading} onSignUp={handleSignUp} />;
+      case 'account':  return <StepAccount theme={theme} name={name} setName={setName} username={username} setUsername={setUsername} isLoading={isLoading} onSignUp={handleSignUp} />;
       case 'generating': return <StepGenerating theme={theme} />;
       default: return null;
     }
@@ -270,12 +288,9 @@ export default function OnboardingScreen() {
             </LinearGradient>
           </TouchableOpacity>
           {step === 'welcome' && (
-            <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.signInRow}>
-              <Text style={[styles.signInText, { color: 'rgba(255,255,255,0.50)' }]}>
-                Already have an account?{' '}
-                <Text style={{ color: theme.accent, fontWeight: '700' }}>Sign in</Text>
-              </Text>
-            </TouchableOpacity>
+            <Text style={[styles.signInText, { color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: spacing.md }]}>
+              Your data stays on this device
+            </Text>
           )}
         </View>
       )}

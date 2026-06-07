@@ -362,13 +362,22 @@ export default function AICoachScreen() {
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          onPress={() => setShowProfile(true)}
-          hitSlop={12}
-          style={[styles.profileBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-        >
-          <Ionicons name="person-outline" size={20} color={theme.textPrimary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Analysis')}
+            hitSlop={12}
+            style={[styles.profileBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
+            <Ionicons name="analytics-outline" size={20} color={theme.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowProfile(true)}
+            hitSlop={12}
+            style={[styles.profileBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
+            <Ionicons name="person-outline" size={20} color={theme.textPrimary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {renderTabBar()}

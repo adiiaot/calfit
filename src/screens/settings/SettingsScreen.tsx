@@ -214,26 +214,47 @@ export default function SettingsScreen() {
     updatePref('sleepReminders', val, () => scheduleSleepReminder(val));
 
   const handleSignOut = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: signOut },
-    ]);
+    Alert.alert(
+      'Sign Out',
+      'This will clear your session. Your data stays on this device — just restart the app to pick up where you left off.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: signOut },
+      ]
+    );
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert('Delete Account', 'This permanently deletes your account and all data. This cannot be undone.', [
+    Alert.alert('Delete Account', 'This permanently deletes all your data from this device. This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete Forever',
+        text: 'Export Data First',
+        onPress: () => navigation.navigate('Main', { screen: 'DownloadData' }),
+      },
+      {
+        text: 'Delete Everything',
         style: 'destructive',
-        onPress: async () => {
-          try {
-            const { supabase } = await import('../../services/supabase');
-            await supabase.functions.invoke('delete-account', { body: { userId: user?.id } });
-            await signOut();
-          } catch {
-            Alert.alert('Error', 'Could not delete account. Please contact aotnetworklabs@gmail.com.');
-          }
+        onPress: () => {
+          Alert.alert(
+            'Are you sure?',
+            'All your progress, meals, workouts and settings will be permanently removed.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete Forever',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    const { supabase } = await import('../../services/supabase');
+                    await supabase.functions.invoke('delete-account', { body: { userId: user?.id } });
+                    await signOut();
+                  } catch {
+                    Alert.alert('Error', 'Could not delete account. Please contact aotnetworklabs@gmail.com.');
+                  }
+                },
+              },
+            ]
+          );
         },
       },
     ]);

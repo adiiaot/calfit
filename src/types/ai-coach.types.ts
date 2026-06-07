@@ -82,6 +82,9 @@ export interface GeneratedMealPlan {
   };
   dietary_preferences: string[];
   budget_level: 'low' | 'moderate' | 'high';
+  budget_amount?: number;
+  budget_period?: 'day' | 'week' | 'month';
+  budget_mode?: 'fixed' | 'auto';
   excluded_foods: string[];
   cuisine_style: string;
   health_goal: string;
@@ -92,6 +95,9 @@ export interface GeneratedMealPlan {
 export interface MealPlanParams {
   dietary_preferences: string[];
   budget_level: 'low' | 'moderate' | 'high';
+  budget_amount?: number;
+  budget_period?: 'day' | 'week' | 'month';
+  budget_mode?: 'fixed' | 'auto';
   calories_target: number;
   meals_per_day: number;
   excluded_foods: string[];

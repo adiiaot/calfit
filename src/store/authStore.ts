@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { Profile } from '../services/profileService';
 
+/** Supported AI coach personality styles for user interaction. */
 type CoachPersonality = 'balanced' | 'motivator' | 'strict' | 'calm' | 'friendly';
 
+/** Authentication and user profile state managed by the auth store. */
 interface AuthState {
   user: User | null; session: Session | null; profile: Profile | null;
   isLoading: boolean; isAuthenticated: boolean; isOnboarding: boolean;
@@ -19,6 +21,13 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
+/**
+ * Zustand store hook for authentication, session management, profile loading,
+ * onboarding state, and coach personality preferences.
+ *
+ * @returns AuthState — The full store including user, session, profile fields
+ * and all action methods (signIn, signUp, signOut, loadProfile, etc.).
+ */
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null, session: null, profile: null, isLoading: false,
   isAuthenticated: false, isOnboarding: false, userTier: 'free',

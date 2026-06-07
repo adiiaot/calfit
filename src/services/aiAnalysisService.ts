@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 
+/** Analysis of a user's workout data over a time period. */
 export interface WorkoutAnalysis {
   totalSessions: number;
   totalCalories: number;
@@ -14,6 +15,7 @@ export interface WorkoutAnalysis {
   suggestions: string[];
 }
 
+/** Weekly summary of workout sessions. */
 export interface WeeklyBreakdown {
   weekStart: string;
   sessions: number;
@@ -21,6 +23,7 @@ export interface WeeklyBreakdown {
   totalMinutes: number;
 }
 
+/** Prediction of when a user will reach their next fitness goal. */
 export interface GoalPrediction {
   estimatedDate: string | null;
   confidence: 'high' | 'medium' | 'low';
@@ -28,6 +31,7 @@ export interface GoalPrediction {
   milestoneNext: Milestone | null;
 }
 
+/** Represents a fitness milestone a user is working toward. */
 export interface Milestone {
   label: string;
   targetCalories: number;
@@ -35,8 +39,10 @@ export interface Milestone {
   currentProgress: number;
 }
 
+/** Supported time ranges for workout analysis. */
 export type TimeRange = '7d' | '30d' | '90d';
 
+/** Fetches and analyzes workout data for a user over a given time range. @param userId - The user's ID. @param timeRange - The time range to analyze (defaults to 30d). @returns A comprehensive WorkoutAnalysis object. */
 export async function fetchWorkoutAnalysis(
   userId: string,
   timeRange: TimeRange = '30d'

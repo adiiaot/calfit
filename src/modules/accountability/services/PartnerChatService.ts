@@ -1,7 +1,9 @@
 import { supabase } from '../../../services/supabase';
 
+/** Supported media types for chat messages. */
 export type MessageType = 'text' | 'image' | 'video' | 'audio';
 
+/** A single chat message between accountability partners. */
 export interface ChatMessage {
   id: string;
   sender_id: string;
@@ -14,6 +16,7 @@ export interface ChatMessage {
   read: boolean;
 }
 
+/** Result returned after attempting to send a message. */
 export interface SendMessageResult {
   success: boolean;
   message?: string;
@@ -24,6 +27,14 @@ const fileToBlob = async (uri: string): Promise<Blob> => {
   return response.blob();
 };
 
+/**
+ * Upload a media file (image, video, or audio) to the "partner-media" storage bucket.
+ *
+ * @param userId - The user ID used to namespace the uploaded file.
+ * @param fileUri - The local file URI to upload.
+ * @param fileType - The category of media being uploaded.
+ * @returns The public URL of the uploaded file, or null on failure.
+ */
 export const uploadMedia = async (
   userId: string,
   fileUri: string,
@@ -64,6 +75,17 @@ export const uploadMedia = async (
   }
 };
 
+/**
+ * Send a message that contains media (image / video / audio).
+ *
+ * @param senderId - The message sender's user ID.
+ * @param receiverId - The message recipient's user ID.
+ * @param messageType - The type of media being sent.
+ * @param mediaUrl - The public URL of the uploaded media.
+ * @param text - Optional text caption accompanying the media.
+ * @param duration - Optional playback duration in seconds (audio/video).
+ * @returns A result indicating success or failure with an error message.
+ */
 export const sendMediaMessage = async (
   senderId: string,
   receiverId: string,
@@ -89,6 +111,14 @@ export const sendMediaMessage = async (
   return { success: true };
 };
 
+/**
+ * Send a plain-text message to a partner.
+ *
+ * @param senderId - The message sender's user ID.
+ * @param receiverId - The message recipient's user ID.
+ * @param message - The text content to send (must not be empty).
+ * @returns A result indicating success or failure with an error message.
+ */
 export const sendMessage = async (
   senderId: string,
   receiverId: string,
@@ -111,6 +141,15 @@ export const sendMessage = async (
   return { success: true };
 };
 
+/**
+ * Load the most recent chat messages between the user and a partner, ordered newest-first,
+ * then reversed to chronological order.
+ *
+ * @param userId - The requesting user's ID.
+ * @param partnerId - The partner's user ID.
+ * @param limit - Maximum number of messages to fetch (default 50).
+ * @returns An array of chat messages in chronological order (oldest first).
+ */
 export const loadMessages = async (
   userId: string,
   partnerId: string,
@@ -132,6 +171,14 @@ export const loadMessages = async (
   return (data as ChatMessage[]).reverse();
 };
 
+/**
+ * Subscribe to real-time incoming messages from a specific partner.
+ *
+ * @param userId - The current user's ID (messages are received as the receiver).
+ * @param partnerId - The partner's user ID (messages are expected from this sender).
+ * @param onMessage - Callback invoked with each new ChatMessage received.
+ * @returns An unsubscribe function to clean up the subscription.
+ */
 export const subscribeToMessages = (
   userId: string,
   partnerId: string,
@@ -158,6 +205,12 @@ export const subscribeToMessages = (
   };
 };
 
+/**
+ * Get the total number of unread messages for a user across all partners.
+ *
+ * @param userId - The user ID to count unread messages for.
+ * @returns The count of unread messages, or 0 on error.
+ */
 export const getUnreadCount = async (userId: string): Promise<number> => {
   const { count, error } = await supabase
     .from('partner_messages')
@@ -169,6 +222,12 @@ export const getUnreadCount = async (userId: string): Promise<number> => {
   return count ?? 0;
 };
 
+/**
+ * Mark all unread messages from a specific sender as read.
+ *
+ * @param userId - The receiver's user ID.
+ * @param senderId - The sender's user ID whose messages should be marked read.
+ */
 export const markAsRead = async (userId: string, senderId: string): Promise<void> => {
   await supabase
     .from('partner_messages')

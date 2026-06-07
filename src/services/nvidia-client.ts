@@ -84,6 +84,7 @@ async function logApiUsage(params: {
   }
 }
 
+/** Generates a personalized workout plan using the NVIDIA AI model. Falls back to a default workout if the API is unavailable or returns invalid data. @param userId - The authenticated user's ID. @param params - Workout parameters including duration, difficulty, target muscles, and optional previous workouts for context. @returns A validated GeneratedWorkout object. @throws Never throws — falls back to a default workout on failure. */
 export async function generateWorkout(
   userId: string,
   params: WorkoutParams & { previousWorkouts?: GeneratedWorkout[] }
@@ -240,6 +241,7 @@ function fallbackMealPlan(params: MealPlanParams): GeneratedMealPlan {
   };
 }
 
+/** Generates a personalized meal plan using the NVIDIA AI model. Falls back to a default meal plan if the API is unavailable or returns invalid data. @param userId - The authenticated user's ID. @param params - Meal plan parameters including calorie target, dietary preferences, budget level, and health goal. @returns A validated GeneratedMealPlan object. @throws Never throws — falls back to a default meal plan on failure. */
 export async function generateMealPlan(
   userId: string,
   params: MealPlanParams
@@ -331,6 +333,7 @@ export async function generateMealPlan(
 
 // ── AI COACH CHAT ──────────────────────────────────────────────
 // Conversational chat with the AI coach. Maintains message history.
+/** Sends a chat message to the AI fitness coach and returns the coach's reply. Maintains conversation context via the message history. @param userId - The authenticated user's ID. @param messages - Array of prior chat messages with role ('user'/'assistant') and content. @param userProfile - Optional profile info (name, goal, fitnessLevel) used to tailor the coach's system prompt. @returns An object containing the coach's text `reply` and an optional parsed `action` from embedded action tags. @throws Never throws — returns a fallback error message on failure. */
 export async function sendCoachChatMessage(
   userId: string,
   messages: { role: string; content: string }[],
@@ -406,6 +409,7 @@ export async function sendCoachChatMessage(
 
 // ── FOOD SCANNER (Vision) ──────────────────────────────────────
 // Takes a base64 image and returns detected food items with nutrition info
+/** Analyzes a food image using the NVIDIA vision model and returns detected food items with estimated nutritional values. @param userId - The authenticated user's ID. @param imageBase64 - Base64-encoded JPEG image of the food. @returns An object with an `items` array of detected foods and `total_calories`, or `null` on failure. @throws Never throws — returns `null` on failure. */
 export async function scanFoodImage(
   userId: string,
   imageBase64: string
@@ -504,6 +508,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
 
 // ── FOOD LOOKUP (Text) ──────────────────────────────────────────
 // Takes a food name and returns estimated nutrition info via AI
+/** Looks up estimated nutritional information for a given food name using the NVIDIA AI model. @param userId - The authenticated user's ID. @param foodName - The name of the food to look up (sanitized and truncated to 200 characters). @returns An object with the food name, calories, macros, and serving size, or `null` if the lookup fails or input is empty. @throws Never throws — returns `null` on failure. */
 export async function lookupFoodNutrition(
   userId: string,
   foodName: string

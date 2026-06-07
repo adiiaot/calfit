@@ -13,6 +13,7 @@
 
 import { supabase } from './supabase';
 
+/** Represents a personal record entry for a user. */
 export interface PersonalRecord {
   id: string;
   user_id: string;
@@ -23,6 +24,7 @@ export interface PersonalRecord {
   session_name: string;
 }
 
+/** Result of checking for new personal records after a workout. */
 export interface PRResult {
   isNewPR: boolean;
   newRecords: {
@@ -43,9 +45,7 @@ function formatDuration(seconds: number): string {
   return `${s}s`;
 }
 
-// ── MAIN FUNCTION ─────────────────────────────────────────────
-// Call after a workout session is saved to Supabase.
-// Returns which PRs (if any) were beaten so you can show a celebration.
+/** Checks for new personal records after a workout and saves them. @param userId - The user's ID. @param sessionName - The workout session name. @param workoutSeconds - Total duration in seconds. @param totalCalories - Total calories burned. @param exercises - Array of exercises with name, seconds, and calories. @returns Object indicating whether new PRs were set and their details. */
 export async function checkAndSavePRs(
   userId: string,
   sessionName: string,
@@ -186,8 +186,7 @@ export async function checkAndSavePRs(
   }
 }
 
-// ── FETCH ALL PRs FOR A USER ──────────────────────────────────
-// Used by ProfileScreen and PRShowcaseCard
+/** Fetches all personal records for a user. @param userId - The user's ID. @returns Array of PersonalRecord objects. */
 export async function fetchPersonalRecords(userId: string): Promise<PersonalRecord[]> {
   try {
     const { data } = await supabase

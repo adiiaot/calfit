@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
-  StyleSheet, TextInput, KeyboardAvoidingView, Platform, FlatList,
+  StyleSheet, TextInput, Keyboard, Platform, FlatList, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +17,7 @@ import { AILoadingSkeleton } from '../components/AILoadingSkeleton';
 import { SavedWorkoutsList } from '../components/SavedWorkoutsList';
 import { FitnessProfileModal } from '../components/FitnessProfileModal';
 import { ChatBubble } from '../components/ChatBubble';
+import { VoiceMicButton } from '../components/VoicemicButton';
 import type { FitnessLevel, FitnessGoal, Equipment, GeneratedWorkout } from '../types/ai-coach.types';
 
 type Tab = 'generate' | 'saved' | 'chat';
@@ -44,12 +45,19 @@ export default function AICoachScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   const [showProfile, setShowProfile] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
   const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>('beginner');
   const [goals, setGoals] = useState<FitnessGoal[]>([]);
   const [duration, setDuration] = useState(30);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', e => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -90,11 +98,22 @@ export default function AICoachScreen() {
     });
   };
 
-  const handleSendChat = async () => {
-    if (!chatInput.trim() || !user) return;
-    const msg = chatInput.trim();
+  const handleSendChat = async (text?: string) => {
+    const msg = (text ?? chatInput).trim();
+    if (!msg || !user || store.isChatLoading) return;
     setChatInput('');
+    Keyboard.dismiss();
     await store.sendMessage(user.id, msg);
+  };
+
+  const handleSuggestionTap = (suggestion: string) => {
+    setChatInput(suggestion);
+    setTimeout(() => handleSendChat(suggestion), 100);
+  };
+
+  const handleVoiceTranscribed = (text: string) => {
+    setChatInput(text);
+    setTimeout(() => handleSendChat(text), 100);
   };
 
   const renderTabBar = () => (
@@ -127,20 +146,22 @@ export default function AICoachScreen() {
 
   const renderEmptyChat = () => (
     <View style={styles.chatEmpty}>
-      <View style={[styles.chatEmptyIconWrap, { backgroundColor: theme.accent + '15' }]}>
-        <Ionicons name="chatbubbles-outline" size={36} color={theme.accent} />
+      <View style={[styles.chatEmptyIconWrap, { backgroundColor: theme.accent + '18' }]}>
+        <Ionicons name="chatbubbles-outline" size={40} color={theme.accent} />
       </View>
-      <Text style={[styles.chatEmptyTitle, { color: theme.textPrimary }]}>Ask me anything</Text>
-      <Text style={[styles.chatEmptySub, { color: theme.textMuted }]}>
-        Workouts, meal plans, form tips, or motivation
+      <Text style={[styles.chatEmptyTitle, { color: theme.textPrimary }]}>Your AI Fitness Coach</Text>
+      <Text style={[styles.chatEmptySub, { color: theme.textSecondary }]}>
+        Ask anything about workouts, nutrition, or motivation
       </Text>
       <View style={styles.suggestions}>
         {SUGGESTIONS.map(s => (
           <TouchableOpacity
             key={s}
-            onPress={() => { setChatInput(s); }}
+            onPress={() => handleSuggestionTap(s)}
+            activeOpacity={0.7}
             style={[styles.suggestionChip, { backgroundColor: theme.card, borderColor: theme.border }]}
           >
+            <Ionicons name="sparkles" size={12} color={theme.accent} style={{ marginRight: 4 }} />
             <Text style={[styles.suggestionText, { color: theme.textSecondary }]}>{s}</Text>
           </TouchableOpacity>
         ))}
@@ -150,6 +171,7 @@ export default function AICoachScreen() {
 
   function ThinkingBubble({ theme, startedAt }: { theme: typeof colors.light; startedAt: number | null }) {
     const [elapsed, setElapsed] = useState(0);
+    const dotOpacity = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
 
     useEffect(() => {
       const timer = setInterval(() => {
@@ -158,7 +180,15 @@ export default function AICoachScreen() {
       return () => clearInterval(timer);
     }, [startedAt]);
 
-    const estimate = Math.max(15 - elapsed, 0);
+    useEffect(() => {
+      const pulse = (i: number) => {
+        Animated.sequence([
+          Animated.timing(dotOpacity[i], { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dotOpacity[i], { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ]).start(() => pulse((i + 1) % 3));
+      };
+      pulse(0);
+    }, []);
 
     return (
       <View style={[styles.thinkingRow, { paddingHorizontal: spacing.lg }]}>
@@ -168,35 +198,26 @@ export default function AICoachScreen() {
         <View style={[styles.thinkingBubble, { backgroundColor: '#1A1D26', borderColor: 'rgba(255,255,255,0.08)' }]}>
           <View style={styles.thinkingDots}>
             {[0, 1, 2].map((i) => (
-              <View key={i} style={[styles.thinkingDot, { backgroundColor: theme.textMuted, opacity: i === 1 ? 0.5 : 0.3 }]} />
+              <Animated.View key={i} style={[styles.thinkingDot, { opacity: dotOpacity[i] }]} />
             ))}
           </View>
           <Text style={[styles.thinkingTimer, { color: theme.textMuted }]}>
-            Thinking... {elapsed}s elapsed
+            Thinking{'.'.repeat((elapsed % 3) + 1)} {elapsed}s
           </Text>
-          {estimate > 0 && (
-            <Text style={[styles.thinkingEstimate, { color: theme.textMuted }]}>
-              Est. ~{estimate}s remaining
-            </Text>
-          )}
         </View>
       </View>
     );
   }
 
   const renderChat = () => (
-    <KeyboardAvoidingView
-      style={styles.chatContainer}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.top}
-    >
+    <View style={styles.chatContainer}>
       {store.chatMessages.length === 0 && !store.isChatLoading ? renderEmptyChat() : (
         <>
           {store.chatMessages.length > 0 && (
             <View style={[styles.chatActions, { borderBottomColor: theme.border }]}>
-              <TouchableOpacity onPress={() => store.clearChat()} style={[styles.clearChatBtn, { backgroundColor: theme.red + '15' }]}>
-                <Ionicons name="trash-outline" size={14} color={theme.red} />
-                <Text style={[styles.clearChatText, { color: theme.red }]}>Clear Chat</Text>
+              <TouchableOpacity onPress={() => store.clearChat()} style={[styles.clearChatBtn, { backgroundColor: theme.red + '12' }]}>
+                <Ionicons name="trash-outline" size={13} color={theme.red} />
+                <Text style={[styles.clearChatText, { color: theme.red }]}>Clear</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -216,13 +237,18 @@ export default function AICoachScreen() {
             }
             contentContainerStyle={styles.chatList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
             showsVerticalScrollIndicator={false}
           />
         </>
       )}
 
-      <View style={[styles.chatInputBar, { backgroundColor: theme.card, borderTopColor: theme.border, borderTopWidth: 1 }]}>
+      <View style={[
+        styles.chatInputBar,
+        { backgroundColor: theme.card, borderTopColor: theme.border, paddingBottom: Math.max(keyboardHeight, Platform.OS === 'ios' ? 20 : spacing.sm) },
+      ]}>
         <View style={[styles.chatInputWrap, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+          <VoiceMicButton theme={theme} onTranscribed={handleVoiceTranscribed} size={34} />
           <TextInput
             value={chatInput}
             onChangeText={setChatInput}
@@ -231,19 +257,20 @@ export default function AICoachScreen() {
             style={[styles.chatInput, { color: theme.textPrimary }]}
             multiline
             maxLength={500}
-            onSubmitEditing={handleSendChat}
+            onSubmitEditing={() => handleSendChat()}
             returnKeyType="send"
+            blurOnSubmit
           />
           <TouchableOpacity
-            onPress={handleSendChat}
+            onPress={() => handleSendChat()}
             disabled={!chatInput.trim() || store.isChatLoading}
-            style={[styles.sendBtn, { backgroundColor: chatInput.trim() ? theme.accent : theme.border }]}
+            style={[styles.sendBtn, { backgroundColor: chatInput.trim() ? theme.accent : theme.border + '80' }]}
           >
-            <Ionicons name="arrow-up" size={18} color={chatInput.trim() ? '#fff' : theme.textMuted} />
+            <Ionicons name="arrow-up" size={16} color={chatInput.trim() ? '#fff' : theme.textMuted} />
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 
   const renderGenerateContent = () => {
@@ -477,25 +504,24 @@ const styles = StyleSheet.create({
 
   // Chat styles
   chatContainer: { flex: 1 },
-  chatList: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
-  chatActions: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, borderBottomWidth: 0.5 },
-  clearChatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: radius.full },
+  chatList: { paddingTop: spacing.xs, paddingBottom: spacing.sm },
+  chatActions: { flexDirection: 'row', justifyContent: 'center', paddingVertical: spacing.xs, borderBottomWidth: 0.5 },
+  clearChatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
   clearChatText: { fontSize: fontSize.xs, fontWeight: '600' },
-  chatEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl },
-  chatEmptyIconWrap: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
-  chatEmptyTitle: { fontSize: fontSize.lg, fontWeight: '800', textAlign: 'center', marginBottom: spacing.xs },
-  chatEmptySub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 18, marginBottom: spacing.lg },
-  suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
-  suggestionChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
-  suggestionText: { fontSize: fontSize.sm, fontWeight: '500' },
-  chatInputBar: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, paddingBottom: Platform.OS === 'ios' ? 20 : spacing.sm },
-  chatInputWrap: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: radius.lg, borderWidth: 1, paddingLeft: spacing.md },
-  chatInput: { flex: 1, paddingVertical: spacing.sm, maxHeight: 100, fontSize: fontSize.base },
-  sendBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', margin: 4 },
+  chatEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl, paddingBottom: 60 },
+  chatEmptyIconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
+  chatEmptyTitle: { fontSize: fontSize.xxl, fontWeight: '800', textAlign: 'center', marginBottom: spacing.xs },
+  chatEmptySub: { fontSize: fontSize.base, textAlign: 'center', lineHeight: 20, marginBottom: spacing.xl, paddingHorizontal: spacing.lg },
+  suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center', paddingHorizontal: spacing.md },
+  suggestionChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
+  suggestionText: { fontSize: fontSize.base, fontWeight: '500' },
+  chatInputBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  chatInputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.xl, borderWidth: 1, paddingLeft: spacing.xs, gap: 2 },
+  chatInput: { flex: 1, paddingVertical: spacing.sm, maxHeight: 100, fontSize: fontSize.base, paddingLeft: spacing.xs },
+  sendBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', margin: 3 },
   thinkingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginBottom: spacing.md },
-  thinkingBubble: { maxWidth: '78%', paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: radius.lg, borderBottomLeftRadius: 4, borderWidth: 1, gap: 4 },
-  thinkingDots: { flexDirection: 'row', gap: 4, marginBottom: 2 },
-  thinkingDot: { width: 6, height: 6, borderRadius: 3 },
-  thinkingTimer: { fontSize: 11, fontWeight: '600' },
-  thinkingEstimate: { fontSize: 10, fontWeight: '400' },
+  thinkingBubble: { maxWidth: '78%', paddingHorizontal: spacing.md, paddingVertical: 12, borderRadius: radius.lg, borderBottomLeftRadius: 4, borderWidth: 1, gap: 6 },
+  thinkingDots: { flexDirection: 'row', gap: 5, marginBottom: 4 },
+  thinkingDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#6A6690' },
+  thinkingTimer: { fontSize: fontSize.sm, fontWeight: '500', color: '#6A6690' },
 });

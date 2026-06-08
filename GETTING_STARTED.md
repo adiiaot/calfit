@@ -25,9 +25,8 @@ npm install
    - `Project URL` (e.g. `https://xxxxx.supabase.co`)
    - `anon public key`
 3. In the Supabase Dashboard, open **SQL Editor**
-4. Run the migration files in order:
-   - `supabase/migrations/001_create_insert_partner_reverse.sql`
-   - `supabase/migrations/002_storage_rls_policies.sql`
+4. Run the migration file:
+   - `supabase/migrations/000_full_schema.sql`
 5. Create storage buckets:
    - **Storage → New bucket** → name: `avatars` → Public
    - **Storage → New bucket** → name: `partner-media` → Public

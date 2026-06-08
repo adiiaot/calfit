@@ -149,8 +149,8 @@ npx expo run:ios
 ```
 
 
-````
-````
+```
+
   <h3>Support AOT Network</h3>
   <p>Love the product? Buy me a tip to support ongoing development.</p>
   <a href="https://selar.com/showlove/aotayo" class="tip-button">Buy me a coffee ☕</a>

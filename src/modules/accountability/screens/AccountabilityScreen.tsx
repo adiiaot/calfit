@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../shared/AndriodSafeView';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../../store/themeStore';
@@ -15,8 +15,6 @@ import { PartnerInviteSheet } from '../components/PartnerInviteSheet';
 import { EmptyState } from '../../shared/EmptyState';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { usePartner } from '../hooks/usePartner';
-import { getOrCreateConversation } from '../../chat/services/chatServices';
-
 // ── SAFE COLORS ───────────────────────────────────────────────
 const BLUE   = '#6699FF';
 const PURPLE = '#B280FF';
@@ -251,22 +249,6 @@ export default function AccountabilityScreen() {
     }
   };
 
-  const handleMessage = async (partnerId: string, partnerData: any) => {
-    if (!user?.id) return;
-    const convId = await getOrCreateConversation(user.id, partnerId);
-    if (convId) {
-      navigation.navigate('Chat', {
-        conversationId: convId,
-        otherUserId: partnerId,
-        otherUserName: partnerData?.partner_profile?.full_name ?? 'Partner',
-        otherUserCalfitId: partnerData?.partner_profile?.calfit_id ?? '',
-        otherUserAvatar: partnerData?.partner_profile?.avatar_url ?? null,
-        otherUserGoal: partnerData?.partner_profile?.goal ?? '',
-        otherUserStreak: partnerData?.partner_profile?.streak_count ?? 0,
-      });
-    }
-  };
-
   const handleRemove = (partnerId: string, partnerName: string) => {
     Alert.alert(
       'Remove Partner',
@@ -275,14 +257,6 @@ export default function AccountabilityScreen() {
         { text: 'Cancel', style: 'cancel' },
         { text: 'Remove', style: 'destructive', onPress: () => remove(partnerId) },
       ]
-    );
-  };
-
-  const handleCallPartner = () => {
-    Alert.alert(
-      'Audio & Video Calls — Coming Soon',
-      'Partner calls activate once the Agora account is connected by BigCut. This will enable direct audio and video calls between accountability partners.',
-      [{ text: 'Got it' }]
     );
   };
 
@@ -296,10 +270,40 @@ export default function AccountabilityScreen() {
   const myStreak = (profile as any)?.streak_count ?? 0;
   const myAvatar = (profile as any)?.avatar_url ?? null;
 
-  const firstPartner     = partners[0]?.partner_profile as any;
+  const safePartners = partners
+    .filter(p => p !== null && p !== undefined)
+    .map(p => ({
+      ...p,
+      partner_profile: p.partner_profile ?? {
+        full_name: 'CalFit User',
+        calfit_id: '',
+        streak_count: 0,
+        avatar_url: null,
+        goal: '',
+      } as any,
+    }));
+
+  const firstPartner     = safePartners[0]?.partner_profile as any;
   const partnerStreak    = firstPartner?.streak_count ?? 0;
   const partnerName      = firstPartner?.full_name ?? 'Partner';
   const partnerAvatar    = firstPartner?.avatar_url ?? null;
+
+  const milestoneNotified = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user || safePartners.length === 0) return;
+    const milestones = [7, 14, 21, 30, 60, 90, 100];
+    safePartners.forEach((p) => {
+      const streak = (p.partner_profile as any)?.streak_count ?? 0;
+      const name = (p.partner_profile as any)?.full_name ?? 'Your partner';
+      const key = `${p.partner_id}-${streak}`;
+      if (milestones.includes(streak) && !milestoneNotified.current.has(key)) {
+        milestoneNotified.current.add(key);
+        import('../../../services/notificationService').then(({ notifyPartnerStreak }) =>
+          notifyPartnerStreak(user.id, name, streak)
+        );
+      }
+    });
+  }, [safePartners, user]);
 
   return (
     <AndroidSafeView backgroundColor={theme.bg} style={styles.safe}>
@@ -317,7 +321,7 @@ export default function AccountabilityScreen() {
           <Text style={styles.headerTitle}>Accountability</Text>
           <Text style={styles.headerSub}>Keep each other on track</Text>
         </View>
-        {partners.length < MAX_PARTNERS && (
+        {safePartners.length < MAX_PARTNERS && (
           <TouchableOpacity onPress={() => setShowInvite(true)} style={styles.addBtn}>
             <Ionicons name="person-add-outline" size={16} color="#fff" />
             <Text style={styles.addBtnText}>Add</Text>
@@ -329,7 +333,7 @@ export default function AccountabilityScreen() {
       <View style={[styles.limitBar, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
         <Ionicons name="people-outline" size={13} color={theme.accent} />
         <Text style={[styles.limitText, { color: theme.accent }]}>
-          {partners.length}/{MAX_PARTNERS} partners · Fitness progress only is shared
+          {safePartners.length}/{MAX_PARTNERS} partners · Fitness progress only is shared
         </Text>
       </View>
 
@@ -345,7 +349,7 @@ export default function AccountabilityScreen() {
             <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={BLUE} colors={[BLUE]} />
           }
         >
-          {partners.length === 0 ? (
+          {safePartners.length === 0 ? (
             <>
               {/* Empty state with feature preview */}
               <View style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg, marginTop: spacing.lg }]}>
@@ -356,13 +360,11 @@ export default function AccountabilityScreen() {
                 >
                   <Text style={styles.featureTitle}>Stay Consistent Together</Text>
                   <Text style={[styles.featureSub, { color: 'rgba(255,255,255,0.75)' }]}>
-                    Add up to 3 partners by CalFit ID. Share streaks, set goals, and message each other.
+                    Add up to 3 partners by CalFit ID. Share streaks, set goals, and stay accountable together.
                   </Text>
                   {[
                     { icon: 'flame-outline',   text: 'Compare streaks side by side',   color: ORANGE },
                     { icon: 'flag-outline',    text: 'Set and track shared goals',     color: GREEN  },
-                    { icon: 'chatbubble-outline', text: 'Message partners directly',   color: BLUE   },
-                    { icon: 'call-outline',    text: 'Audio & video calls (coming)',   color: PURPLE },
                   ].map((f) => (
                     <View key={f.text} style={styles.featureRow}>
                       <View style={[styles.featureIcon, { backgroundColor: f.color + '22' }]}>
@@ -399,42 +401,14 @@ export default function AccountabilityScreen() {
               </View>
 
               {/* Shared goal */}
-              {partners[0] && (
+              {safePartners[0] && (
                 <SharedGoalCard
                   theme={theme}
                   partnerName={partnerName}
-                  partnerId={(partners[0] as any).partner_id}
+                  partnerId={(safePartners[0] as any)?.partner_id}
                   currentUserId={user?.id ?? ''}
                 />
               )}
-
-              {/* Quick actions row */}
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  onPress={() => partners[0] && handleMessage(
-                    (partners[0] as any).partner_id,
-                    partners[0]
-                  )}
-                  style={[styles.actionBtn, { backgroundColor: BLUE + '18', borderColor: BLUE + '40' }]}
-                >
-                  <Ionicons name="chatbubble-outline" size={18} color={BLUE} />
-                  <Text style={[styles.actionBtnText, { color: BLUE }]}>Message</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleCallPartner}
-                  style={[styles.actionBtn, { backgroundColor: PURPLE + '18', borderColor: PURPLE + '40' }]}
-                >
-                  <Ionicons name="call-outline" size={18} color={PURPLE} />
-                  <Text style={[styles.actionBtnText, { color: PURPLE }]}>Call</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleCallPartner}
-                  style={[styles.actionBtn, { backgroundColor: PINK + '18', borderColor: PINK + '40' }]}
-                >
-                  <Ionicons name="videocam-outline" size={18} color={PINK} />
-                  <Text style={[styles.actionBtnText, { color: PINK }]}>Video</Text>
-                </TouchableOpacity>
-              </View>
 
               {/* Partner cards */}
               <View style={styles.sectionHeader}>
@@ -442,27 +416,30 @@ export default function AccountabilityScreen() {
                   Your Partners
                 </Text>
               </View>
-              {partners.map((partner) => (
+              {safePartners.map((partner) => (
                 <PartnerCard
                   key={(partner as any).id}
                   partner={partner}
                   theme={theme}
                   currentUserId={user?.id ?? ''}
-                  onMessage={() => handleMessage((partner as any).partner_id, partner)}
-                  onRemove={() => handleRemove((partner as any).partner_id, (partner as any).partner_profile?.full_name ?? 'Partner')}
+                  onRemove={() => handleRemove((partner as any).partner_id, (partner as any).partner_profile?.full_name ?? 'CalFit User')}
                   onProfilePress={() => navigation.navigate('Profile' as never, { userId: (partner as any).partner_id } as never)}
+                  onChatPress={() => navigation.navigate('PartnerChat', {
+                    partnerId: (partner as any).partner_id,
+                    partnerName: (partner as any).partner_profile?.full_name ?? 'Partner',
+                  })}
                 />
               ))}
 
               {/* Add more button if slots remain */}
-              {partners.length < MAX_PARTNERS && (
+              {safePartners.length < MAX_PARTNERS && (
                 <TouchableOpacity
                   onPress={() => setShowInvite(true)}
                   style={[styles.addMoreBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
                 >
                   <Ionicons name="person-add-outline" size={18} color={theme.accent} />
                   <Text style={[styles.addMoreText, { color: theme.accent }]}>
-                    Add another partner ({MAX_PARTNERS - partners.length} slot{MAX_PARTNERS - partners.length !== 1 ? 's' : ''} left)
+                    Add another partner ({MAX_PARTNERS - safePartners.length} slot{MAX_PARTNERS - safePartners.length !== 1 ? 's' : ''} left)
                   </Text>
                 </TouchableOpacity>
               )}
@@ -472,12 +449,11 @@ export default function AccountabilityScreen() {
           {/* How it works */}
           <View style={[styles.howCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Text style={[styles.howTitle, { color: theme.textPrimary }]}>How Accountability Works</Text>
-            {[
-              { icon: '🔍', text: 'Find partners by their @CalFit ID' },
-              { icon: '🔥', text: 'Only streaks & workout activity are shared' },
-              { icon: '💬', text: 'Message directly through CalFit' },
-              { icon: '🎯', text: 'Set shared goals to stay focused together' },
-            ].map((r) => (
+              {[
+                { icon: '🔍', text: 'Find partners by their @CalFit ID' },
+                { icon: '🔥', text: 'Only streaks & workout activity are shared' },
+                { icon: '🎯', text: 'Set shared goals to stay focused together' },
+              ].map((r) => (
               <View key={r.text} style={styles.howRow}>
                 <Text style={{ fontSize: 16 }}>{r.icon}</Text>
                 <Text style={[styles.howText, { color: theme.textSecondary }]}>{r.text}</Text>
@@ -520,9 +496,6 @@ const styles = StyleSheet.create({
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   featureIcon:{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   featureRowText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '500' },
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md },
-  actionBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
-  actionBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
   sectionHeader: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm, marginTop: spacing.sm },
   sectionTitle: { fontSize: fontSize.base, fontWeight: '700' },
   addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed' },

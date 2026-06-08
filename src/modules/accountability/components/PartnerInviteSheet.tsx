@@ -1,6 +1,7 @@
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Modal, ActivityIndicator, ScrollView,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,7 +77,11 @@ export function PartnerInviteSheet({
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         <TouchableOpacity style={styles.dismiss} onPress={handleClose} />
         <View style={[styles.sheet, {
           backgroundColor: theme.card,
@@ -89,6 +94,11 @@ export function PartnerInviteSheet({
             </TouchableOpacity>
           </View>
 
+          <ScrollView
+            style={styles.bodyScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.body}>
             <Text style={[styles.label, { color: theme.textSecondary }]}>
               Enter their CalFit ID
@@ -182,8 +192,9 @@ export function PartnerInviteSheet({
               }
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       </View>
+    </KeyboardAvoidingView>
     </Modal>
   );
 }

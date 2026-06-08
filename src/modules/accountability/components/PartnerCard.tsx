@@ -4,21 +4,23 @@ import { colors, spacing, radius, fontSize } from '../../../theme';
 import { UserAvatar } from '../../shared/UserAvatar';
 import { PartnerData } from '../services/PartnerService';
 
+const ORANGE = '#FFB347';
+
 interface Props {
   partner: PartnerData;
   theme: typeof colors.dark;
   currentUserId: string;
-  onMessage: () => void;
   onRemove: () => void;
   onProfilePress: () => void;
+  onChatPress?: () => void;
 }
 
 export function PartnerCard({
   partner,
   theme,
-  onMessage,
   onRemove,
   onProfilePress,
+  onChatPress,
 }: Props) {
   const profile = partner.partner_profile;
   if (!profile) return null;
@@ -81,8 +83,8 @@ export function PartnerCard({
 
       {/* Stats */}
       <View style={styles.statsRow}>
-        <View style={[styles.stat, { backgroundColor: theme.orange + '18' }]}>
-          <Text style={[styles.statValue, { color: theme.orange }]}>
+        <View style={[styles.stat, { backgroundColor: ORANGE + '18' }]}>
+          <Text style={[styles.statValue, { color: ORANGE }]}>
             {profile.streak_count ?? 0}🔥
           </Text>
           <Text style={[styles.statLabel, { color: theme.textMuted }]}>Streak</Text>
@@ -103,16 +105,12 @@ export function PartnerCard({
         )}
       </View>
 
-      {/* Message button */}
-      <TouchableOpacity
-        onPress={onMessage}
-        style={[styles.messageBtn, { backgroundColor: theme.accent }]}
-      >
-        <Ionicons name="paper-plane-outline" size={16} color={theme.bg} />
-        <Text style={[styles.messageBtnText, { color: theme.bg }]}>
-          Send Message
-        </Text>
-      </TouchableOpacity>
+      {onChatPress && (
+        <TouchableOpacity onPress={onChatPress} style={styles.chatRow}>
+          <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.accent} />
+          <Text style={[styles.chatText, { color: theme.accent }]}>Send Message</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -155,13 +153,10 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: fontSize.base, fontWeight: '800' },
   statLabel: { fontSize: 9 },
-  messageBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
+  chatRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.md,
+    borderWidth: 1, borderColor: 'rgba(45,220,140,0.3)',
   },
-  messageBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+  chatText: { fontSize: fontSize.sm, fontWeight: '700' },
 });

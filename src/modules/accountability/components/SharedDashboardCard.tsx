@@ -39,8 +39,8 @@ export function SharedDashboardCard({
 
       {/* Side by side streaks */}
       <View style={styles.streakRow}>
-        <View style={[styles.streakBox, { backgroundColor: theme.orange + '18' }]}>
-          <Text style={[styles.streakValue, { color: theme.orange }]}>
+        <View style={[styles.streakBox, { backgroundColor: theme.amber + '18' }]}>
+          <Text style={[styles.streakValue, { color: theme.amber }]}>
             {myStreak}🔥
           </Text>
           <Text style={[styles.streakName, { color: theme.textMuted }]}>{myName}</Text>

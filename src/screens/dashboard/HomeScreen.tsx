@@ -17,12 +17,12 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, dayRingColors, spacing, radius, fontSize } from '../../theme';
 import Avatar from '../../components/Avatar';
-import FoodIllustration from '../../components/FoodIllustration';
 import { getTodayCalories, getTodayWater, logWater } from '../../services/profileService';
 import { supabase } from '../../services/supabase';
 
 // ── NEW: Comeback Banner ──────────────────────────────────────
 import { ComebackBanner } from '../../components/ComebackBanner';
+import { BurnoutBanner } from '../../components/BurnoutBanner';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SLIDE_GAP = 12;
@@ -46,7 +46,7 @@ function StreakRow({ theme, streakCount }: {
 
   return (
     <TouchableOpacity
-      onPress={() => navigation.getParent()?.navigate('Streaks')}
+      onPress={() => navigation.navigate('Streaks')}
       activeOpacity={0.85}
       style={[styles.streakCard, { backgroundColor: theme.card, borderColor: theme.border }]}
     >
@@ -97,15 +97,21 @@ function CalorieSlide({ theme, consumed, goal }: {
     <TouchableOpacity
       onPress={() => navigation.navigate('Main', { screen: 'Calorie' })}
       activeOpacity={0.92}
-      style={[styles.slide, { backgroundColor: theme.heroCard, width: SLIDE_W }]}
+      style={[styles.slide, { backgroundColor: theme.heroCard, width: SLIDE_W, overflow: 'hidden' }]}
     >
-      {/* Food illustration */}
-      <View style={styles.foodIllustrationWrap}>
-        <FoodIllustration size={210} />
-      </View>
+      {/* Decorative gradient circles */}
+      <View style={styles.decoCircle1} />
+      <View style={styles.decoCircle2} />
+      <View style={styles.decoCircle3} />
+      <View style={styles.decoCircle4} />
       <Text style={styles.slideChip}>🔥 Calories Today</Text>
       <Text style={styles.calorieBig}>{consumed.toLocaleString()}</Text>
-      <Text style={styles.calorieSubLabel}>kcal consumed</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+        <Text style={styles.calorieSubLabel}>kcal consumed</Text>
+        <View style={styles.calorieChip}>
+          <Text style={styles.calorieChipText}>{pct < 1 ? `${Math.round(pct * 100)}%` : 'Goal Met'}</Text>
+        </View>
+      </View>
       <View style={styles.progressBg}>
         <LinearGradient
           colors={[theme.gradStart, theme.gradMid] as [string, string]}
@@ -114,10 +120,11 @@ function CalorieSlide({ theme, consumed, goal }: {
         />
       </View>
       <View style={styles.calorieFootRow}>
-        <Text style={styles.calorieRemaining}>
-          {remaining > 0 ? `${remaining.toLocaleString()} kcal remaining` : 'Goal reached 🎉'}
-        </Text>
-        <Text style={styles.calorieGoalText}>Goal: {goal.toLocaleString()}</Text>
+        <View style={[styles.remainingPill, { backgroundColor: theme.gradStart + '22', borderColor: theme.gradStart + '55' }]}>
+          <Text style={styles.calorieRemaining}>
+            {remaining > 0 ? `${remaining.toLocaleString()} kcal left` : 'Goal reached 🎉'}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -198,7 +205,7 @@ function StatsSlide({ theme, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs
       value: sleepHrs > 0 ? `${sleepHrs}h` : '—',
       sub: '/ 8h', pct: sleepPct,
       gradColors: [theme.purple, '#7B3FE4'] as [string, string],
-      onPress: () => navigation.getParent()?.navigate('Sleep'),
+      onPress: () => navigation.navigate('Sleep'),
     },
   ];
 
@@ -321,7 +328,7 @@ function StatCards({ theme, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs 
   const stats = [
     { label: 'Water', value: waterMl > 0 ? `${waterL}L` : '—', sub: waterMl > 0 ? `of ${waterGoalL}L` : 'not logged', color: '#2BBCB0', cardBg: theme.waterCard, pct: waterMl > 0 ? Math.min(waterMl / waterGoalMl, 1) : 0, icon: 'water-outline' as const, onPress: () => navigation.navigate('Main', { screen: 'Calorie' }) },
     { label: 'Steps', value: liveSteps > 0 ? liveSteps.toLocaleString() : '—', sub: liveSteps > 0 ? `of ${stepGoalFormatted}` : 'tracking...', color: theme.accent, cardBg: theme.stepsCard, pct: liveSteps > 0 ? Math.min(liveSteps / stepGoal, 1) : 0, icon: 'footsteps-outline' as const, onPress: () => navigation.navigate('Main', { screen: 'Activity' }) },
-    { label: 'Sleep', value: sleepHrs > 0 ? `${sleepHrs}h` : '—', sub: sleepHrs > 0 ? 'of 8h' : 'not logged', color: theme.purple, cardBg: theme.sleepCard, pct: sleepHrs > 0 ? Math.min(sleepHrs / 8, 1) : 0, icon: 'moon-outline' as const, onPress: () => navigation.getParent()?.navigate('Sleep') },
+    { label: 'Sleep', value: sleepHrs > 0 ? `${sleepHrs}h` : '—', sub: sleepHrs > 0 ? 'of 8h' : 'not logged', color: theme.purple, cardBg: theme.sleepCard, pct: sleepHrs > 0 ? Math.min(sleepHrs / 8, 1) : 0, icon: 'moon-outline' as const, onPress: () => navigation.navigate('Sleep') },
   ];
 
   return (
@@ -345,46 +352,7 @@ function StatCards({ theme, waterMl, waterGoalMl, liveSteps, stepGoal, sleepHrs 
   );
 }
 
-// ── SCANNER SHORTCUT ──────────────────────────────────────────
-function ScannerShortcut({ theme }: { theme: typeof colors.light }) {
-  const navigation = useNavigation<any>();
-  return (
-    <TouchableOpacity onPress={() => navigation.getParent()?.navigate('FoodScanner')} activeOpacity={0.85} style={styles.scannerCardWrapper}>
-      <LinearGradient colors={[theme.gradStart, theme.gradMid] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.scannerCard}>
-        <View style={styles.scannerLeft}>
-          <View style={styles.scannerIconCircle}><Ionicons name="camera" size={22} color={theme.gradStart} /></View>
-          <View>
-            <Text style={styles.scannerTitle}>Scan Food</Text>
-            <Text style={styles.scannerSub}>Point camera at any food to log instantly</Text>
-          </View>
-        </View>
-        <View style={styles.scannerArrowCircle}><Ionicons name="chevron-forward" size={18} color={theme.gradStart} /></View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}
 
-// ── COACH CARD ────────────────────────────────────────────────
-function CoachCard({ theme }: { theme: typeof colors.light }) {
-  const navigation = useNavigation<any>();
-  return (
-    <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Coach')}
-      style={[styles.coachCard, { backgroundColor: theme.card, borderColor: theme.border }]} activeOpacity={0.8}>
-      <View style={styles.coachLeft}>
-        <View style={[styles.coachIcon, { backgroundColor: theme.accentDim as string }]}>
-          <Ionicons name="chatbubble-ellipses" size={22} color={theme.accent} />
-        </View>
-        <View style={styles.coachText}>
-          <Text style={[styles.coachTitle, { color: theme.textPrimary }]}>CalFit Coach</Text>
-          <Text style={[styles.coachSub, { color: theme.textSecondary }]}>How are you feeling today? Tap to chat</Text>
-        </View>
-      </View>
-      <View style={[styles.coachChevron, { backgroundColor: theme.accent }]}>
-        <Ionicons name="arrow-forward" size={16} color="#fff" />
-      </View>
-    </TouchableOpacity>
-  );
-}
 
 // ── QUICK LOG ─────────────────────────────────────────────────
 function QuickLog({ theme, onWaterLog, onSleepLog }: {
@@ -410,54 +378,59 @@ function QuickLog({ theme, onWaterLog, onSleepLog }: {
   );
 }
 
-// ── QUICK NAV ─────────────────────────────────────────────────
-function QuickNav({ theme }: { theme: typeof colors.light }) {
+// ── PARTNERS SECTION ───────────────────────────────────────────
+function PartnersSection({ theme }: { theme: typeof colors.light }) {
   const navigation = useNavigation<any>();
   return (
-    <View style={styles.quickNav}>
-      {[
-        { label: 'Leaderboard', icon: 'trophy-outline' as const,   route: 'Leaderboard' },
-        { label: 'Partners',    icon: 'people-outline' as const,    route: 'Accountability' },
-        { label: 'Community',   icon: 'megaphone-outline' as const, route: 'Community' },
-      ].map((item) => (
-        <TouchableOpacity key={item.route}
-          onPress={() => navigation.getParent()?.navigate(item.route as never)}
-          style={[styles.quickNavBtn, { backgroundColor: theme.card, borderColor: theme.border }]} activeOpacity={0.8}>
-          <Ionicons name={item.icon} size={20} color={theme.accent} />
-          <Text style={[styles.quickNavLabel, { color: theme.textSecondary }]}>{item.label}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+    <TouchableOpacity
+      onPress={() => navigation.navigate('Accountability')}
+      activeOpacity={0.85}
+      style={[styles.partnersCard, { backgroundColor: theme.card, borderColor: '#6699FF' }]}
+    >
+      <View style={styles.partnersLeft}>
+        <View style={[styles.partnersIconWrap, { backgroundColor: '#6699FF' + '18' }]}>
+          <Ionicons name="people-outline" size={20} color="#6699FF" />
+        </View>
+        <View>
+          <Text style={[styles.partnersTitle, { color: theme.textPrimary }]}>Accountability Partners</Text>
+          <Text style={[styles.partnersSub, { color: theme.textMuted }]}>
+            Stay motivated together
+          </Text>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+    </TouchableOpacity>
   );
 }
 
-// ── FRIENDS TICKER ────────────────────────────────────────────
-function FriendsTicker({ theme }: { theme: typeof colors.light }) {
+// ── STREAKS SECTION ───────────────────────────────────────────
+function HomeStreaksSection({ theme, streakCount }: { theme: typeof colors.light; streakCount: number }) {
   const navigation = useNavigation<any>();
-  const hasFriends = false;
   return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: spacing.lg }]}>
-      <View style={styles.tickerHeader}>
-        <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>Friends Activity</Text>
-        <View style={styles.liveBadge}>
-          <View style={[styles.liveDot, { backgroundColor: hasFriends ? theme.accent : theme.border }]} />
-          <Text style={[styles.liveText, { color: hasFriends ? theme.accent : theme.textMuted }]}>LIVE</Text>
+    <TouchableOpacity
+      onPress={() => navigation.navigate('Streaks')}
+      activeOpacity={0.85}
+      style={[styles.streaksCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+    >
+      <View style={styles.streaksLeft}>
+        <View style={[styles.streaksIconWrap, { backgroundColor: '#FFB347' + '18' }]}>
+          <Ionicons name="flame-outline" size={20} color="#FFB347" />
+        </View>
+        <View>
+          <Text style={[styles.streaksTitle, { color: theme.textPrimary }]}>Streaks</Text>
+          <Text style={[styles.streaksSub, { color: theme.textMuted }]}>
+            {streakCount > 0 ? `${streakCount}-day streak 🔥` : 'Start your streak today'}
+          </Text>
         </View>
       </View>
-      {!hasFriends && (
-        <>
-          <Text style={[styles.emptyFriendsText, { color: theme.textPrimary }]}>No friends activity yet.</Text>
-          <Text style={[styles.emptyFriendsSub, { color: theme.textSecondary }]}>Invite friends to join CalFit and see their activity here in real time.</Text>
-          <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Credits')}
-            style={[styles.inviteBtn, { backgroundColor: theme.accentDim as string, borderColor: theme.accent }]}>
-            <Ionicons name="mail-outline" size={16} color={theme.accent} />
-            <Text style={[styles.inviteBtnText, { color: theme.accent }]}>Copy Invite Link</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
+      <View style={[styles.streaksBadge, { backgroundColor: '#FFB347' + '18' }]}>
+        <Text style={styles.streaksBadgeText}>{streakCount}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
+
+
 
 // ── MAIN SCREEN ───────────────────────────────────────────────
 export default function HomeScreen() {
@@ -501,7 +474,7 @@ export default function HomeScreen() {
       setWaterMl(water);
       setSleepHrs(sleepRes.data?.hours ?? 0);
       setUnreadCount(notifRes.count ?? 0);
-    } catch (e) { console.error('HomeScreen loadData error:', e); }
+    } catch (e) { if (__DEV__) console.error('HomeScreen loadData error:', e); }
     finally { setIsRefreshing(false); }
   };
 
@@ -523,7 +496,7 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate('Notifications')}
+            onPress={() => navigation.navigate('Notifications')}
             style={[styles.headerIconBtn, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Ionicons name="notifications-outline" size={22} color={theme.textPrimary} />
             {unreadCount > 0 && (
@@ -532,7 +505,7 @@ export default function HomeScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Settings')}>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
             <Avatar size={38} />
           </TouchableOpacity>
         </View>
@@ -545,6 +518,9 @@ export default function HomeScreen() {
       >
         {/* ── COMEBACK BANNER — only shows if inactive 2+ days ── */}
         {user?.id && <ComebackBanner userId={user.id} theme={theme} />}
+
+        {/* ── BURNOUT BANNER — reminds to rest when sleep low + activity high ── */}
+        {user?.id && <BurnoutBanner userId={user.id} theme={theme} />}
 
         {/* 1. Streak — fixed, always visible */}
         <StreakRow theme={theme} streakCount={streakCount} />
@@ -563,16 +539,16 @@ export default function HomeScreen() {
           liveSteps={liveSteps} stepGoal={stepGoal} sleepHrs={sleepHrs}
         />
 
-        <ScannerShortcut theme={theme} />
-        <CoachCard theme={theme} />
-
         <View style={styles.sectionPad}>
           <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Quick Log</Text>
-          <QuickLog theme={theme} onWaterLog={handleWaterLog} onSleepLog={() => navigation.getParent()?.navigate('Sleep')} />
+          <QuickLog theme={theme} onWaterLog={handleWaterLog} onSleepLog={() => navigation.navigate('Sleep')} />
         </View>
 
-        <QuickNav theme={theme} />
-        <FriendsTicker theme={theme} />
+        <View style={styles.sectionPad}>
+          <PartnersSection theme={theme} />
+          <View style={{ height: spacing.sm }} />
+          <HomeStreaksSection theme={theme} streakCount={streakCount} />
+        </View>
         <View style={{ height: spacing.xl }} />
       </ScrollView>
     </AndroidSafeView>
@@ -611,17 +587,24 @@ const styles = StyleSheet.create({
   // ── CAROUSEL ──
   carouselWrap: { marginBottom: spacing.md },
   slide: { borderRadius: radius.lg, padding: spacing.lg, overflow: 'hidden', minHeight: 175 },
-  foodIllustrationWrap: { position: 'absolute', right: -40, top: -20, opacity: 0.85 },
   slideChip: { fontSize: fontSize.xs, fontWeight: '700', color: 'rgba(255,255,255,0.55)', marginBottom: 6, letterSpacing: 0.5 },
 
-  // Calorie slide
+  // Calorie slide — decorative circles
+  decoCircle1: { position: 'absolute', top: -30, right: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(240,66,124,0.12)' },
+  decoCircle2: { position: 'absolute', top: -10, right: 30, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,107,53,0.10)' },
+  decoCircle3: { position: 'absolute', bottom: -20, right: -10, width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(45,220,140,0.08)' },
+  decoCircle4: { position: 'absolute', bottom: 40, left: -30, width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,184,48,0.07)' },
+
+  // Calorie slide — main content
   calorieBig: { fontSize: 52, fontWeight: '900', color: '#fff', lineHeight: 56 },
-  calorieSubLabel: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.55)', marginBottom: spacing.md },
+  calorieSubLabel: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.55)' },
+  calorieChip: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.10)' },
+  calorieChipText: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.60)' },
   progressBg: { height: 7, borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.15)' },
   progressFill: { height: '100%', borderRadius: 4 },
-  calorieFootRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm },
-  calorieRemaining: { fontSize: fontSize.sm, color: '#F0427C', fontWeight: '600' },
-  calorieGoalText: { fontSize: 14, color: 'rgb(255, 255, 255)' },
+  calorieFootRow: { flexDirection: 'row', marginTop: spacing.sm },
+  remainingPill: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1 },
+  calorieRemaining: { fontSize: fontSize.xs, color: '#F0427C', fontWeight: '700' },
 
   // Macros slide
   macroGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm, gap: spacing.sm },
@@ -659,43 +642,31 @@ const styles = StyleSheet.create({
   smallCardSub: { fontSize: 9, marginTop: 1 },
   statArrow: { position: 'absolute', bottom: 8, right: 8, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
 
-  // ── SCANNER ──
-  scannerCardWrapper: { marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: radius.lg, overflow: 'hidden' },
-  scannerCard: { padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  scannerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
-  scannerIconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  scannerTitle: { fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
-  scannerSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.80)', marginTop: 2 },
-  scannerArrowCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-
-  // ── COACH ──
-  coachCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  coachLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
-  coachIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  coachText: { flex: 1 },
-  coachTitle: { fontSize: fontSize.base, fontWeight: '700' },
-  coachSub: { fontSize: fontSize.xs, marginTop: 2 },
-  coachChevron: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-
   // ── QUICK LOG ──
   quickLogRow: { flexDirection: 'row', gap: spacing.sm },
   quickLogBtn: { flex: 1, paddingVertical: spacing.sm + 2, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', gap: 4 },
   quickLogText: { fontSize: fontSize.xs, fontWeight: '700' },
 
-  // ── QUICK NAV ──
-  quickNav: { flexDirection: 'row', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md },
-  quickNavBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
-  quickNavLabel: { fontSize: fontSize.xs, fontWeight: '600' },
+  // ── PARTNERS SECTION ──
+  partnersCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: spacing.md, borderRadius: radius.lg, borderWidth: 2, borderColor: '#6699FF',
+  },
+  partnersLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  partnersIconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  partnersTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  partnersSub: { fontSize: fontSize.xs, marginTop: 1 },
 
-  // ── FRIENDS ──
-  card: { marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
-  cardLabel: { fontSize: fontSize.sm, fontWeight: '600' },
-  tickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  liveDot: { width: 6, height: 6, borderRadius: 3 },
-  liveText: { fontSize: fontSize.xs, fontWeight: '700' },
-  emptyFriendsText: { fontSize: fontSize.base, fontWeight: '600', marginBottom: 4 },
-  emptyFriendsSub: { fontSize: fontSize.sm, lineHeight: 18, marginBottom: spacing.md },
-  inviteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: radius.lg, borderWidth: 1, alignSelf: 'stretch' },
-  inviteBtnText: { fontSize: fontSize.base, fontWeight: '700' },
+  // ── HOME STREAKS SECTION ──
+  streaksCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: spacing.md, borderRadius: radius.lg, borderWidth: 1,
+  },
+  streaksLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  streaksIconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  streaksTitle: { fontSize: fontSize.base, fontWeight: '700' },
+  streaksSub: { fontSize: fontSize.xs, marginTop: 1 },
+  streaksBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full },
+  streaksBadgeText: { fontSize: fontSize.lg, fontWeight: '900', color: '#FFB347' },
+
 });

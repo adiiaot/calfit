@@ -46,7 +46,7 @@ async function loadStats(userId: string, period: Period) {
     supabase.from('profiles')
       .select('streak_count,weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml,height_cm')
       .eq('id', userId).single(),
-    supabase.from('body_measurements').select('*').eq('user_id', userId).order('measured_at', { ascending: false }).limit(2),
+    supabase.from('body_measurements').select('id,user_id,chest_cm,waist_cm,hips_cm,arms_cm,thighs_cm,neck_cm,measured_at').eq('user_id', userId).order('measured_at', { ascending: false }).limit(2),
   ]);
 
   const foodData    = (food.data ?? []) as any[];
@@ -224,9 +224,6 @@ export default function ProgressScreen() {
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <TouchableOpacity onPress={() => navigation.navigate('Main' as never)} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#fff" />
-        </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>My Progress</Text>
           <Text style={styles.headerSub}>{name}'s fitness journey</Text>
@@ -450,7 +447,7 @@ const styles = StyleSheet.create({
   safe:     { flex: 1 },
   scroll:   { paddingBottom: 40 },
   header:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 4 },
-  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+
   headerTitle: { fontSize: fontSize.xl, fontWeight: '800', color: '#fff' },
   headerSub: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
   recapBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.18)' },

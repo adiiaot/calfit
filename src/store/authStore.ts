@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { Profile } from '../services/profileService';
 
+/** Supported AI coach personality styles for user interaction. */
 type CoachPersonality = 'balanced' | 'motivator' | 'strict' | 'calm' | 'friendly';
 
+/** Authentication and user profile state managed by the auth store. */
 interface AuthState {
   user: User | null; session: Session | null; profile: Profile | null;
   isLoading: boolean; isAuthenticated: boolean; isOnboarding: boolean;
@@ -11,7 +13,7 @@ interface AuthState {
   setLiveSteps: (steps: number) => void;
   setSession: (session: Session | null) => void;
   setOnboarding: (v: boolean) => void;
-  loadProfile: (userId: string) => Promise<void>;
+  loadProfile: (userId: string) => Promise<Profile | null>;
   updateProfile: (updates: Partial<Profile>) => void;
   setCoachPersonality: (personality: CoachPersonality) => void;
   signIn: (email: string, password: string) => Promise<void>;
@@ -19,6 +21,13 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
+/**
+ * Zustand store hook for authentication, session management, profile loading,
+ * onboarding state, and coach personality preferences.
+ *
+ * @returns AuthState — The full store including user, session, profile fields
+ * and all action methods (signIn, signUp, signOut, loadProfile, etc.).
+ */
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null, session: null, profile: null, isLoading: false,
   isAuthenticated: false, isOnboarding: false, userTier: 'free',
@@ -40,7 +49,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // loadProfile might flip isOnboarding based on profile state which would
     // unmount OnboardingScreen mid-flow.
     if (!get().isOnboarding) {
-      get().loadProfile(session.user.id);
+      get().loadProfile(session.user.id).catch((e) => { if (__DEV__) console.error(e); });
     }
   },
 
@@ -52,11 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (profile) {
         set({ profile });
 
-        // Only change isOnboarding if OnboardingScreen hasn't locked it.
-        // If isOnboarding is already true (mid-flow), leave it alone.
         if (!get().isOnboarding) {
-          // No goal = brand new OAuth user from LoginScreen who needs onboarding
-          // Has goal = returning user → stay on home screen (isOnboarding stays false)
           if (!profile.goal) {
             set({ isOnboarding: true });
           }
@@ -66,8 +71,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ isOnboarding: true });
         }
       }
+
+      return profile;
     } catch (e) {
-      console.error('[authStore] loadProfile error:', e);
+      if (__DEV__) console.error('[authStore] loadProfile error:', e);
+      return null;
     }
   },
 

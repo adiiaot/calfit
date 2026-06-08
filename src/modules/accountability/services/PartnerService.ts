@@ -1,5 +1,6 @@
 import { supabase } from '../../../services/supabase';
 
+/** A partner connection with the associated profile data of the partner user. */
 export interface PartnerData {
   id: string;
   partner_id: string;
@@ -18,6 +19,7 @@ export interface PartnerData {
   } | null;
 }
 
+/** A minimal user profile returned in autocomplete search results. */
 export interface CalfitUserSuggestion {
   id: string;
   full_name: string;
@@ -26,9 +28,14 @@ export interface CalfitUserSuggestion {
   goal: string;
 }
 
-// ── AUTOCOMPLETE SEARCH ───────────────────────────────────────
-// Returns up to 6 users whose CalFit ID starts with the query.
-// Requires at least 2 characters to avoid returning everyone.
+/**
+ * Search for up to 6 users whose CalFit ID starts with the given query.
+ * Requires at least 2 characters to avoid broad results.
+ *
+ * @param query - The partial CalFit ID to search for.
+ * @param currentUserId - The requesting user's ID (excluded from results).
+ * @returns An array of matching user suggestions, or an empty array on error.
+ */
 export const searchCalfitUsers = async (
   query: string,
   currentUserId: string
@@ -46,7 +53,12 @@ export const searchCalfitUsers = async (
   return data as CalfitUserSuggestion[];
 };
 
-// ── LOAD PARTNERS ─────────────────────────────────────────────
+/**
+ * Load all active partners for the given user, including their profile data.
+ *
+ * @param userId - The requesting user's ID.
+ * @returns An array of active partner records with nested profile data.
+ */
 export const loadPartners = async (userId: string): Promise<PartnerData[]> => {
   const { data, error } = await supabase
     .from('partners')
@@ -61,13 +73,21 @@ export const loadPartners = async (userId: string): Promise<PartnerData[]> => {
     .eq('status', 'active');
 
   if (error) {
-    console.error('loadPartners error:', error.message);
+    if (__DEV__) console.error('loadPartners error:', error.message);
     return [];
   }
   return (data as any[]) ?? [];
 };
 
-// ── ADD PARTNER ───────────────────────────────────────────────
+/**
+ * Add an accountability partner by their CalFit ID.
+ * Creates bidirectional partner rows — the direct insert and a reverse row
+ * via a SECURITY DEFINER function to bypass RLS.
+ *
+ * @param userId - The requesting user's ID.
+ * @param partnerCalfitId - The partner's CalFit ID to look up and connect with.
+ * @returns An object indicating success or failure with a user-facing message.
+ */
 export const addPartner = async (
   userId: string,
   partnerCalfitId: string
@@ -81,7 +101,7 @@ export const addPartner = async (
     .maybeSingle();
 
   if (findError) {
-    console.error('addPartner find error:', findError.message);
+    if (__DEV__) console.error('addPartner find error:', findError.message);
     return { success: false, message: 'Something went wrong. Please try again.' };
   }
   if (!partnerProfile) {
@@ -115,7 +135,7 @@ export const addPartner = async (
     .insert({ user_id: userId, partner_id: partnerProfile.id, status: 'active' });
 
   if (err1 && err1.code !== '23505') {
-    console.error('addPartner insert row 1 error:', err1.message, err1.code);
+    if (__DEV__) console.error('addPartner insert row 1 error:', err1.message, err1.code);
     return { success: false, message: 'Could not add partner. Please try again.' };
   }
 
@@ -131,7 +151,7 @@ export const addPartner = async (
   if (err2) {
     // Log but don't fail — current user's row is saved and functional.
     // Partner will see the connection when they next open their app.
-    console.warn('addPartner reverse row warning:', err2.message);
+    if (__DEV__) console.warn('addPartner reverse row warning:', err2.message);
   }
 
   return {
@@ -140,7 +160,13 @@ export const addPartner = async (
   };
 };
 
-// ── REMOVE PARTNER ────────────────────────────────────────────
+/**
+ * Remove an existing partner connection from both sides.
+ *
+ * @param userId - The requesting user's ID.
+ * @param partnerId - The partner's user ID to disconnect from.
+ * @returns True if the current user's row was deleted successfully.
+ */
 export const removePartner = async (
   userId: string,
   partnerId: string
@@ -161,6 +187,14 @@ export const removePartner = async (
   return !e1;
 };
 
+/**
+ * Update the shared goal between the user and their partner.
+ *
+ * @param userId - The requesting user's ID.
+ * @param partnerId - The partner's user ID.
+ * @param goal - The new shared goal text.
+ * @returns True if the update succeeded.
+ */
 export const updateSharedGoal = async (
   userId: string,
   partnerId: string,

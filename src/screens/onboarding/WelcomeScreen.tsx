@@ -17,10 +17,10 @@ export default function WelcomeScreen() {
 
   const features = [
     { icon: 'nutrition-outline', text: 'Track calories, macros & water intake' },
-    { icon: 'chatbubble-ellipses-outline', text: 'AI Coach powered by Claude API' },
+    { icon: 'chatbubble-ellipses-outline', text: 'AI Coach — personalized workouts & meal plans' },
     { icon: 'barbell-outline', text: 'Workouts, sleep & step tracking' },
-    { icon: 'people-outline', text: 'Social feed & accountability partner' },
-    { icon: 'star-outline', text: 'Earn CalFit Points & referral rewards' },
+    { icon: 'people-outline', text: 'Accountability partner for shared goals' },
+    { icon: 'flash-outline', text: 'Smart progress tracking & insights' },
   ];
 
   return (
@@ -68,23 +68,12 @@ export default function WelcomeScreen() {
             style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
           >
             <Text style={[styles.primaryBtnText, { color: theme.bg }]}>
-              Get Started — It's Free
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}
-            style={[styles.secondaryBtn, {
-              borderColor: theme.border,
-            }]}
-          >
-            <Text style={[styles.secondaryBtnText, { color: theme.textPrimary }]}>
-              I already have an account
+              Get Started
             </Text>
           </TouchableOpacity>
 
           <Text style={[styles.disclaimer, { color: theme.textMuted }]}>
-            No credit card required · Cancel anytime
+            Your data stays on this device. No sign-up required.
           </Text>
         </View>
       </View>

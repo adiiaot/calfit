@@ -53,13 +53,14 @@ export const searchFoods = async (query: string): Promise<FoodResult[]> => {
           servingSize: p.serving_size ?? '100g',
           image:       p.image_small_url,
           // ── Micronutrients — undefined if not in API response ──
-          fiber_g:      n.fiber_100g      != null ? Math.round(n.fiber_100g      * 10) / 10 : undefined,
-          sugar_g:      n.sugars_100g     != null ? Math.round(n.sugars_100g     * 10) / 10 : undefined,
-          sodium_mg:    n.sodium_100g     != null ? Math.round(n.sodium_100g     * 1000 * 10) / 10 : undefined, // g→mg
-          vitamin_c_mg: n['vitamin-c_100g'] != null ? Math.round(n['vitamin-c_100g'] * 1000 * 10) / 10 : undefined,
-          calcium_mg:   n.calcium_100g    != null ? Math.round(n.calcium_100g    * 1000 * 10) / 10 : undefined,
-          iron_mg:      n.iron_100g       != null ? Math.round(n.iron_100g       * 1000 * 10) / 10 : undefined,
-          potassium_mg: n.potassium_100g  != null ? Math.round(n.potassium_100g  * 1000 * 10) / 10 : undefined,
+          // Open Food Facts returns ALL nutrients in g/100g; convert to mg where needed
+          fiber_g:      +(n.fiber_100g?.toFixed(1) ?? 0) || undefined,
+          sugar_g:      +(n.sugars_100g?.toFixed(1) ?? 0) || undefined,
+          sodium_mg:    n.sodium_100g     != null ? +(n.sodium_100g     * 1000).toFixed(1) : undefined,  // g→mg
+          vitamin_c_mg: n['vitamin-c_100g'] != null ? +(n['vitamin-c_100g'] * 1000).toFixed(1) : undefined,
+          calcium_mg:   n.calcium_100g    != null ? +(n.calcium_100g    * 1000).toFixed(1) : undefined,
+          iron_mg:      n.iron_100g       != null ? +(n.iron_100g       * 1000).toFixed(1) : undefined,
+          potassium_mg: n.potassium_100g  != null ? +(n.potassium_100g  * 1000).toFixed(1) : undefined,
         };
       });
 

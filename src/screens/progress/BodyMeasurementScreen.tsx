@@ -52,7 +52,7 @@ export default function BodyMeasurementsScreen() {
     setIsLoading(true);
     const { data } = await supabase
       .from('body_measurements')
-      .select('*')
+      .select('id,user_id,chest_cm,waist_cm,hips_cm,arms_cm,thighs_cm,neck_cm,measured_at')
       .eq('user_id', user.id)
       .order('measured_at', { ascending: false })
       .limit(10);

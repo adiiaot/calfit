@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Share, ActivityIndicator, Dimensions,
+  Share, ActivityIndicator, Dimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
@@ -11,7 +11,6 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
-import ViewShot from 'react-native-view-shot';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_W = SCREEN_W - spacing.lg * 2;
@@ -216,6 +215,19 @@ const st = StyleSheet.create({
   label: { fontSize: 10, fontWeight: '600', textAlign: 'center' },
 });
 
+// ── CAPTURE WRAPPER (Expo Go safe) ────────────────────────────
+// On Android (APK builds) wraps in ViewShot for image capture.
+// On iOS (Expo Go) uses a plain View since the native module isn't available.
+function CaptureWrapper({ children, cardRef }: { children: React.ReactNode; cardRef: any }) {
+  if (Platform.OS === 'android') {
+    try {
+      const VS = require('react-native-view-shot').default;
+      return <VS ref={cardRef} options={{ format: 'jpg', quality: 0.95 }}>{children}</VS>;
+    } catch {}
+  }
+  return <View ref={cardRef} collapsable={false}>{children}</View>;
+}
+
 // ── RECAP CARD ────────────────────────────────────────────────
 function RecapCard({
   data, template, recapType, userName, cardRef,
@@ -232,7 +244,7 @@ function RecapCard({
     : 0;
 
   return (
-    <ViewShot ref={cardRef} options={{ format: 'jpg', quality: 0.95 }}>
+    <CaptureWrapper cardRef={cardRef}>
       <LinearGradient
         colors={[t.bg1, t.bg2] as [string, string]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -305,7 +317,7 @@ function RecapCard({
           </View>
         </View>
       </LinearGradient>
-    </ViewShot>
+    </CaptureWrapper>
   );
 }
 

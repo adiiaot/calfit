@@ -1,6 +1,25 @@
 # CalFit — Personal Fitness & Nutrition Coach
 
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Expo](https://img.shields.io/badge/Expo-54-000020?logo=expo)](https://expo.dev/)
+[![React Native](https://img.shields.io/badge/React_Native-0.81-61DAFB?logo=react)](https://reactnative.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase)](https://supabase.com/)
+[![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
+[![Buy on Selar](https://img.shields.io/badge/Buy_on-Selar-5B2D90)](https://selar.com/aotayo)
+
+> **Built by [AOT Network](https://github.com/adiiaot)** — Full-stack fitness & nutrition coaching platform with AI integration.
+
 A React Native (Expo) mobile app for calorie tracking, workouts, sleep monitoring, intermittent fasting, AI-powered coaching & journaling, and accountability partners.
+
+---
+
+## Screenshots
+
+<!-- Add app screenshots here once captured -->
+<!-- ![Home Dashboard](screenshots/home.png) ![Calorie Tracker](screenshots/calorie.png) -->
+<!-- ![AI Coach](screenshots/aicoach.png) ![Workouts](screenshots/workout.png) -->
+
+---
 
 ## Features
 
@@ -22,96 +41,89 @@ A React Native (Expo) mobile app for calorie tracking, workouts, sleep monitorin
 | **Subscription** | Free / Pro / Premium tiers (IAP stubbed for future store deployment) |
 | **Data Export** | Download all user data as CSV or text report |
 
+---
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Mobile | React Native 0.81 + Expo 54 |
 | Language | TypeScript 5.9 |
-| Navigation | React Navigation v7 (Stack + Bottom Tabs) |
+| Navigation | React Navigation v7 (Stack + Bottom Tabs + Radial Menu) |
 | State | Zustand v5 |
 | Backend/Auth | Supabase (Auth, PostgreSQL, Realtime, Storage) |
 | AI | NVIDIA Llama 3.1 70B (chat) + Llama 3.2 90B Vision (food scanner) |
 | Food DB | Open Food Facts API + local Nigerian food database |
-| Notifications | expo-notifications |
-| Payments | expo-iap (stubbed) |
-| Voice | Deepgram STT via VoiceRecorderService |
-| Icons | @expo/vector-icons (Ionicons) |
+| Voice | Deepgram STT (speech-to-text for AI Coach) |
 | Animations | React Native Animated + Lottie |
 | Charts | Pure React Native (no external chart library) |
+
+---
 
 ## Project Structure
 
 ```
 calfit/
-├── App.tsx                       # Root — fonts, auth init, IAP setup
+├── App.tsx                       # Root — fonts, auth init
 ├── index.ts                      # Expo entry
 ├── src/
-│   ├── navigation/
-│   │   └── AppNavigator.tsx      # All routes — AuthStack + AppStack + TabNavigator
-│   ├── screens/
-│   │   ├── onboarding/           # Welcome, Login, Onboarding (5 steps)
-│   │   ├── dashboard/            # Home screen — streak, stats, banners
-│   │   ├── calorie/              # Calorie tracking + Food Scanner (AI vision)
-│   │   ├── meals/                # Health overview + Intermittent Fasting
-│   │   ├── nutrition/            # Notes screen
-│   │   ├── Activity/             # Workout catalog + Quick Start routines
-│   │   ├── progress/             # Progress charts, Recap, Body Measurements
-│   │   ├── streaks/              # Streak display with milestones
-│   │   ├── sleep/                # Sleep logging
-│   │   ├── earnings/             # Subscription plans screen
-│   │   ├── settings/             # Profile, goals, privacy, data export, etc.
-│   │   └── notifications/        # Notification inbox
-│   │   └── AICoachScreen.tsx     # AI Coach (Generate + Saved + Chat tabs)
-│   ├── components/               # Reusable UI components
-│   │   ├── ChatBubble.tsx        # Chat message bubble (user/assistant)
-│   │   ├── RadialMenu.tsx        # Floating radial quick-menu
-│   │   ├── MilestoneCelebration.tsx  # Streak milestone celebration overlay
-│   │   └── ...                   # ExerciseCard, WorkoutForm, TrendCharts, etc.
+│   ├── navigation/               # AppNavigator — AuthStack + AppStack + TabNavigator
+│   ├── screens/                  # 15+ screen groups (onboarding, dashboard, calorie, etc.)
+│   ├── components/               # Reusable UI (ChatBubble, RadialMenu, WorkoutForm, etc.)
 │   ├── modules/
 │   │   ├── accountability/       # Partner management + real-time chat
 │   │   └── shared/               # AndroidSafeView, UserAvatar, EmptyState, ResponsiveScreens
-│   ├── store/                    # Zustand stores
-│   │   ├── authStore.ts          # User, session, profile, onboarding state
-│   │   ├── themeStore.ts         # Dark/light theme
-│   │   └── aiCoachStore.ts       # Workouts, saved, chat messages, cache
-│   ├── services/                 # API and business logic
-│   │   ├── supabase.ts           # Supabase client
-│   │   ├── nvidia-client.ts      # NVIDIA AI — workout gen, chat, food vision scan
-│   │   ├── profileService.ts     # Profile CRUD, food/water/steps queries
-│   │   ├── foodSearchService.ts  # Open Food Facts + Nigerian food DB
-│   │   ├── stepService.ts        # Pedometer wrapper
-│   │   ├── notificationService.ts # In-app notification CRUD
-│   │   ├── reminderService.ts    # Daily notification scheduling
-│   │   ├── iapService.ts         # In-app purchase stubs
-│   │   ├── imageService.ts       # Image picker + avatar upload
-│   │   ├── personalRecordsService.ts # PR detection after workouts
-│   │   └── VoiceRecorderService.ts   # Audio recording + Deepgram STT
-│   ├── hooks/
-│   │   └── useSteps.ts           # Centralized step tracking (pedometer polling)
+│   ├── store/                    # Zustand stores (auth, theme, aiCoach, mealPlan)
+│   ├── services/                 # Supabase, NVIDIA, Deepgram, food search, etc.
+│   ├── hooks/                    # useSteps, useWorkoutVoice
 │   ├── theme/                    # Design tokens (colors, typography, spacing)
-│   ├── types/                    # TypeScript type definitions
-│   └── utils/                    # AI prompts, JSON parser
-├── assets/                       # App icons, splash screen
+│   ├── types/                    # TypeScript definitions
+│   └── utils/                    # AI prompts, JSON parser, strip-markdown
+├── assets/                       # App icons & splash screen
+├── supabase/                     # Database migrations
 ├── app.json                      # Expo configuration
-├── package.json
-└── tsconfig.json
+├── eas.json                      # EAS Build profiles
+└── package.json
 ```
 
+---
 
-## Running the App
+## Try It Out
+
+### Android (APK)
+Download the latest APK: [Google Drive link](https://drive.google.com/drive/folders/1YOUR_FOLDER_ID) *(link will be updated after build)*
+
+### iOS (Expo Go)
+1. Install [Expo Go](https://apps.apple.com/app/expo-go/id982107779) from the App Store
+2. Scan the QR code below with your iPhone camera:
+
+```
+[QR code image will be displayed when expo start is running]
+```
+
+Or clone and run locally:
+
+```bash
+git clone https://github.com/adiiaot/calfit.git
+cd calfit
+npm install
+npx expo start
+```
+
+---
+
+## Running Locally
 
 ```bash
 npm install
 npx expo start
 ```
 
-Scan the QR code with Expo Go (iOS) or the Expo app (Android). For development builds with native modules (camera, IAP, etc.):
+Scan the QR code with **Expo Go (iOS)** or the **Expo app (Android)**.
 
-```bash
-npx expo run:android   # or
-npx expo run:ios
-```
+> **Note:** The Recap screen's image export feature requires the native `react-native-view-shot` module, which is only available in the Android APK build. On iOS (Expo Go), it falls back to text sharing.
+
+---
 
 ## Subscription Tiers
 
@@ -121,12 +133,18 @@ npx expo run:ios
 | Pro | ₦1,999/mo | 20 AI Coach prompts/day, Food Scanner, accountability partners, no ads |
 | Premium | ₦7,999/mo | Unlimited AI Coach, AI Meal Planner, Unlimited Food Scan logs, Unlimited Journal support |
 
+---
+
 ## Key Architecture Decisions
 
 - **Steps tracking** lives in `TabNavigator` (not HomeScreen) so the pedometer subscription survives navigation — all screens read `liveSteps` from Zustand
 - **Onboarding flow** is owned entirely by `OnboardingScreen` — `authStore.setSession` never touches `isOnboarding`
 - **AI cache** — workout generation results are cached for 5 minutes to avoid redundant API calls for identical params
 - **Notifications** — all in-app notification types are defined in `notificationService.tsx` and stored in Supabase
+- **Responsive design** — uses `ResponsiveScreens.ts` with `scaleX`, `scaleY`, `moderateScale` for adaptive layouts across device sizes
+- **Safe area** — custom `AndroidSafeView` wrapper handles status bar, notch, and home indicator on both platforms
+
+---
 
 ## Database Schema (Supabase)
 
@@ -146,11 +164,18 @@ npx expo run:ios
 | partners | Accountability partner relationships |
 | notes | User journal entries |
 
-```
+---
 
+## Portfolio & Verification
 
-```
+This app was built by **AOT Network**. Source code is available on GitHub for verification:
 
-  <h3>Support AOT Network</h3>
-  <p>Love the product? Buy me a tip to support ongoing development.</p>
-  <a href="https://selar.com/showlove/aotayo" class="tip-button">Buy me a coffee ☕</a>
+- **GitHub**: [github.com/adiiaot/calfit](https://github.com/adiiaot/calfit)
+- **Portfolio**: [aotnetwork.vercel.app](https://aotnetwork.vercel.app)
+- **Purchase the app**: [Selar - CalFit](https://selar.com/aotayo)
+
+---
+
+## Buy Me a Coffee
+
+Support ongoing development: [Selar Tip Jar](https://selar.com/showlove/aotayo)

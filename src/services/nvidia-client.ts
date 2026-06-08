@@ -3,13 +3,21 @@ import { buildSystemPrompt, generateWorkoutPrompt, buildCoachChatSystemPrompt, g
 import { extractJSON } from '../utils/json-parser';
 import type { GeneratedWorkout, GeneratedMealPlan, MealPlanParams, Exercise, WorkoutParams, ChatMessage } from '../types/ai-coach.types';
 
-const BASE_URL = process.env.EXPO_PUBLIC_NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
 const MODEL = process.env.EXPO_PUBLIC_NVIDIA_MODEL || 'meta/llama-3.1-70b-instruct';
 const VISION_MODEL = process.env.EXPO_PUBLIC_NVIDIA_VISION_MODEL || 'meta/llama-3.2-90b-vision-instruct';
-const API_KEY = process.env.EXPO_PUBLIC_NVIDIA_API_KEY || '';
 
 const MAX_RETRIES = 3;
 const BASE_DELAY = 1000;
+
+async function invokeAI(body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('ai-proxy', { body });
+    if (error) return { data: null, error: error.message || 'AI proxy error' };
+    return { data, error: null };
+  } catch (e: any) {
+    return { data: null, error: e?.message ?? 'Network error' };
+  }
+}
 
 function validateWorkout(data: any): data is GeneratedWorkout {
   return (
@@ -89,11 +97,6 @@ export async function generateWorkout(
   userId: string,
   params: WorkoutParams & { previousWorkouts?: GeneratedWorkout[] }
 ): Promise<GeneratedWorkout> {
-  if (!API_KEY) {
-    if (__DEV__) console.warn('[nvidia-client] No API key configured, returning fallback workout');
-    return fallbackWorkout(params);
-  }
-
   const prompt = generateWorkoutPrompt({
     ...params,
     previousWorkouts: params.previousWorkouts?.map((w) => w.title),
@@ -105,45 +108,28 @@ export async function generateWorkout(
     const startTime = Date.now();
 
     try {
-      const res = await fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: 'system', content: buildSystemPrompt() },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 1500,
-        }),
+      const { data, error } = await invokeAI({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1500,
       });
 
       const latencyMs = Date.now() - startTime;
 
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => '');
-        lastError = `HTTP ${res.status}: ${errBody}`;
-
-        await logApiUsage({
-          userId,
-          status: 'error',
-          latencyMs,
-          errorMessage: lastError ?? undefined,
-        });
-
+      if (error || !data) {
+        lastError = error || 'No response from AI proxy';
+        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: lastError ?? undefined });
         if (attempt < MAX_RETRIES - 1) {
-          const delay = BASE_DELAY * Math.pow(2, attempt);
-          await new Promise((r) => setTimeout(r, delay));
+          await new Promise((r) => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
           continue;
         }
         return fallbackWorkout(params);
       }
 
-      const data = await res.json();
       const responseText = data?.choices?.[0]?.message?.content ?? '';
       const usage = data?.usage ?? {};
 
@@ -157,43 +143,26 @@ export async function generateWorkout(
         };
 
         await logApiUsage({
-          userId,
-          status: 'success',
-          latencyMs,
-          tokensInput: usage.prompt_tokens,
-          tokensOutput: usage.completion_tokens,
+          userId, status: 'success', latencyMs,
+          tokensInput: usage.prompt_tokens, tokensOutput: usage.completion_tokens,
         });
 
         return workout;
       }
 
       lastError = 'Invalid JSON structure in response';
-      await logApiUsage({
-        userId,
-        status: 'error',
-        latencyMs,
-        errorMessage: lastError ?? undefined,
-      });
+      await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: lastError ?? undefined });
 
       if (attempt < MAX_RETRIES - 1) {
-        const delay = BASE_DELAY * Math.pow(2, attempt);
-        await new Promise((r) => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
         continue;
       }
     } catch (e: any) {
       lastError = e?.message ?? 'Network error';
       const latencyMs = Date.now() - startTime;
-
-      await logApiUsage({
-        userId,
-        status: 'timeout',
-        latencyMs,
-        errorMessage: lastError ?? undefined,
-      });
-
+      await logApiUsage({ userId, status: 'timeout', latencyMs, errorMessage: lastError ?? undefined });
       if (attempt < MAX_RETRIES - 1) {
-        const delay = BASE_DELAY * Math.pow(2, attempt);
-        await new Promise((r) => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
         continue;
       }
     }
@@ -246,11 +215,6 @@ export async function generateMealPlan(
   userId: string,
   params: MealPlanParams
 ): Promise<GeneratedMealPlan> {
-  if (!API_KEY) {
-    if (__DEV__) console.warn('[nvidia-client] No API key configured, returning fallback meal plan');
-    return fallbackMealPlan(params);
-  }
-
   const prompt = generateMealPlanPrompt(params);
   let lastError: string | null = null;
 
@@ -258,25 +222,20 @@ export async function generateMealPlan(
     const startTime = Date.now();
 
     try {
-      const res = await fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: 'system', content: buildSystemPrompt() },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 2000,
-        }),
+      const { data, error } = await invokeAI({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
       });
 
       const latencyMs = Date.now() - startTime;
 
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => '');
-        lastError = `HTTP ${res.status}: ${errBody}`;
+      if (error || !data) {
+        lastError = error || 'No response from AI proxy';
         await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: lastError ?? undefined });
         if (attempt < MAX_RETRIES - 1) {
           await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
@@ -285,7 +244,6 @@ export async function generateMealPlan(
         return fallbackMealPlan(params);
       }
 
-      const data = await res.json();
       const responseText = data?.choices?.[0]?.message?.content ?? '';
       const usage = data?.usage ?? {};
 
@@ -331,51 +289,41 @@ export async function generateMealPlan(
   return fallbackMealPlan(params);
 }
 
-// ── AI COACH CHAT ──────────────────────────────────────────────
-// Conversational chat with the AI coach. Maintains message history.
 /** Sends a chat message to the AI fitness coach and returns the coach's reply. Maintains conversation context via the message history. @param userId - The authenticated user's ID. @param messages - Array of prior chat messages with role ('user'/'assistant') and content. @param userProfile - Optional profile info (name, goal, fitnessLevel) used to tailor the coach's system prompt. @returns An object containing the coach's text `reply` and an optional parsed `action` from embedded action tags. @throws Never throws — returns a fallback error message on failure. */
 export async function sendCoachChatMessage(
   userId: string,
   messages: { role: string; content: string }[],
   userProfile?: { name?: string; goal?: string; fitnessLevel?: string }
 ): Promise<{ reply: string; action?: { type: string; data?: any } }> {
-  if (!API_KEY) {
-    return { reply: 'AI Coach is not configured yet. Set your NVIDIA API key in the .env file.' };
-  }
-
   const systemPrompt = buildCoachChatSystemPrompt(userProfile);
   const apiMessages = [
     { role: 'system', content: systemPrompt },
-    ...messages.slice(-20).map(m => ({ role: m.role, content: m.content })),
+    ...messages.slice(-10).map(m => ({ role: m.role, content: m.content.slice(0, 1000) })),
   ];
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const startTime = Date.now();
     try {
-      const res = await fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
-        body: JSON.stringify({
+      const { data, error } = await invokeAI({
           model: MODEL,
           messages: apiMessages,
           temperature: 0.7,
-          max_tokens: 2000,
-        }),
-      });
+          max_tokens: 1024,
+        });
 
       const latencyMs = Date.now() - startTime;
 
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => '');
-        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: `HTTP ${res.status}: ${errBody}` });
+      if (error || !data) {
+        const errMsg = error || 'No response from AI proxy';
+        if (__DEV__) console.warn('[nvidia-client] sendCoachChatMessage error:', errMsg);
+        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: errMsg });
         if (attempt < MAX_RETRIES - 1) {
           await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
           continue;
         }
-        return { reply: 'Sorry, I could not process your request right now. Please try again.' };
+        return { reply: `Sorry, I could not process your request. (${errMsg})` };
       }
 
-      const data = await res.json();
       const reply = data?.choices?.[0]?.message?.content ?? '';
       const usage = data?.usage ?? {};
 
@@ -384,7 +332,6 @@ export async function sendCoachChatMessage(
         tokensInput: usage.prompt_tokens, tokensOutput: usage.completion_tokens,
       });
 
-      // Check if the reply contains an action command (JSON embedded in reply)
       const actionMatch = reply.match(/<action:(\w+)>(.*?)<\/action>/);
       if (actionMatch) {
         return {
@@ -396,7 +343,9 @@ export async function sendCoachChatMessage(
       return { reply };
     } catch (e: any) {
       const latencyMs = Date.now() - startTime;
-      await logApiUsage({ userId, status: 'timeout', latencyMs, errorMessage: e?.message ?? 'Network error' });
+      const errMsg = e?.message ?? 'Network error';
+      if (__DEV__) console.warn('[nvidia-client] sendCoachChatMessage exception:', errMsg);
+      await logApiUsage({ userId, status: 'timeout', latencyMs, errorMessage: errMsg });
       if (attempt < MAX_RETRIES - 1) {
         await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
         continue;
@@ -407,8 +356,6 @@ export async function sendCoachChatMessage(
   return { reply: 'Unable to reach the AI coach. Please check your connection.' };
 }
 
-// ── FOOD SCANNER (Vision) ──────────────────────────────────────
-// Takes a base64 image and returns detected food items with nutrition info
 /** Analyzes a food image using the NVIDIA vision model and returns detected food items with estimated nutritional values. @param userId - The authenticated user's ID. @param imageBase64 - Base64-encoded JPEG image of the food. @returns An object with an `items` array of detected foods and `total_calories`, or `null` on failure. @throws Never throws — returns `null` on failure. */
 export async function scanFoodImage(
   userId: string,
@@ -417,8 +364,6 @@ export async function scanFoodImage(
   items: Array<{ name: string; calories: number; protein_g: number; carbs_g: number; fats_g: number; serving_size: string }>;
   total_calories: number;
 } | null> {
-  if (!API_KEY) return null;
-
   const prompt = `Analyze this food image. Identify ALL visible food items and estimate their nutritional values per serving.
 
 For each item, provide:
@@ -440,30 +385,25 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const startTime = Date.now();
     try {
-      const res = await fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
-        body: JSON.stringify({
-          model: VISION_MODEL,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
-              ],
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 1000,
-        }),
+      const { data, error } = await invokeAI({
+        model: VISION_MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+            ],
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 1000,
       });
 
       const latencyMs = Date.now() - startTime;
 
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => '');
-        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: `Scan HTTP ${res.status}: ${errBody}` });
+      if (error || !data) {
+        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: error || 'No response' });
         if (attempt < MAX_RETRIES - 1) {
           await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
           continue;
@@ -471,7 +411,6 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
         return null;
       }
 
-      const data = await res.json();
       const responseText = data?.choices?.[0]?.message?.content ?? '';
       const usage = data?.usage ?? {};
 
@@ -506,8 +445,75 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
   return null;
 }
 
-// ── FOOD LOOKUP (Text) ──────────────────────────────────────────
-// Takes a food name and returns estimated nutrition info via AI
+/** Suggests meal ideas based on remaining daily macros. @param userId - The authenticated user's ID. @param remainingProtein - Remaining protein goal in grams. @param remainingCarbs - Remaining carbs goal in grams. @param remainingFats - Remaining fats goal in grams. @returns An array of suggested meals with names and macros, or empty array on failure. @throws Never throws — returns empty array on failure. */
+export async function suggestRecipes(
+  userId: string,
+  remainingProtein: number,
+  remainingCarbs: number,
+  remainingFats: number
+): Promise<Array<{ name: string; ingredients: string[]; calories: number; protein_g: number; carbs_g: number; fats_g: number }>> {
+  const prompt = `Given remaining daily macros of: ${remainingProtein}g protein, ${remainingCarbs}g carbs, ${remainingFats}g fat, suggest 3 meal ideas that fit within these remaining macros.
+
+For each meal, provide:
+- name: meal name
+- ingredients: list of ingredients
+- calories: estimated total calories
+- protein_g: protein in grams
+- carbs_g: carbs in grams  
+- fats_g: fat in grams
+
+Respond ONLY with valid JSON array in this exact structure (no markdown, no preamble):
+[
+  { "name": "Grilled Chicken Salad", "ingredients": ["chicken breast", "mixed greens", "...", "..."], "calories": 450, "protein_g": 35, "carbs_g": 20, "fats_g": 15 }
+]`;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const startTime = Date.now();
+    try {
+      const { data, error } = await invokeAI({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 800,
+      });
+
+      const latencyMs = Date.now() - startTime;
+
+      if (error || !data) {
+        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: error || 'No response' });
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
+          continue;
+        }
+        return [];
+      }
+
+      const responseText = data?.choices?.[0]?.message?.content ?? '';
+      await logApiUsage({ userId, status: 'success', latencyMs, tokensInput: data?.usage?.prompt_tokens, tokensOutput: data?.usage?.completion_tokens });
+
+      const parsed = extractJSON<Array<{ name: string; ingredients: string[]; calories: number; protein_g: number; carbs_g: number; fats_g: number }>>(responseText);
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
+        continue;
+      }
+    } catch (e: any) {
+      const latencyMs = Date.now() - startTime;
+      await logApiUsage({ userId, status: 'timeout', latencyMs, errorMessage: e?.message ?? 'Recipe suggestion error' });
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
+        continue;
+      }
+    }
+  }
+
+  return [];
+}
+
 /** Looks up estimated nutritional information for a given food name using the NVIDIA AI model. @param userId - The authenticated user's ID. @param foodName - The name of the food to look up (sanitized and truncated to 200 characters). @returns An object with the food name, calories, macros, and serving size, or `null` if the lookup fails or input is empty. @throws Never throws — returns `null` on failure. */
 export async function lookupFoodNutrition(
   userId: string,
@@ -520,8 +526,6 @@ export async function lookupFoodNutrition(
   fats_g: number;
   serving_size: string;
 } | null> {
-  if (!API_KEY) return null;
-
   const sanitizedFood = (foodName || '')
     .replace(/[\0\\\x00-\x1f]/g, '')
     .trim()
@@ -546,22 +550,17 @@ Respond ONLY with valid JSON (no markdown, no preamble):
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const startTime = Date.now();
     try {
-      const res = await fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.2,
-          max_tokens: 300,
-        }),
+      const { data, error } = await invokeAI({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 300,
       });
 
       const latencyMs = Date.now() - startTime;
 
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => '');
-        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: `Lookup HTTP ${res.status}: ${errBody}` });
+      if (error || !data) {
+        await logApiUsage({ userId, status: 'error', latencyMs, errorMessage: error || 'No response' });
         if (attempt < MAX_RETRIES - 1) {
           await new Promise(r => setTimeout(r, BASE_DELAY * Math.pow(2, attempt)));
           continue;
@@ -569,7 +568,6 @@ Respond ONLY with valid JSON (no markdown, no preamble):
         return null;
       }
 
-      const data = await res.json();
       const responseText = data?.choices?.[0]?.message?.content ?? '';
       await logApiUsage({ userId, status: 'success', latencyMs, tokensInput: data?.usage?.prompt_tokens, tokensOutput: data?.usage?.completion_tokens });
 

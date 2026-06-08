@@ -13,7 +13,7 @@ import { colors, spacing, radius, fontSize } from '../../theme';
 import { getTodayCalories, getTodayWater, logFood, logWater } from '../../services/profileService';
 import { supabase } from '../../services/supabase';
 import { searchFoods } from '../../services/foodSearchService';
-import { lookupFoodNutrition } from '../../services/nvidia-client';
+import { lookupFoodNutrition, suggestRecipes } from '../../services/nvidia-client';
 import { CalorieTrendChart } from '../../components/TrendCharts';
 
 
@@ -47,6 +47,24 @@ function CalorieHero({ theme, consumed, goal, waterMl, waterGoalMl }: {
   const remaining = Math.max(goal - consumed, 0);
   const pct = Math.min(consumed / goal, 1);
   const waterPct = Math.min(waterMl / waterGoalMl, 1);
+  const [recipeSuggestions, setRecipeSuggestions] = useState<any[] | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+
+  const handleSuggestRecipes = async () => {
+    const { user } = useAuthStore.getState();
+    if (!user?.id) return;
+    setSuggesting(true);
+    const remProtein = Math.round(remaining * 0.3 / 4);
+    const remCarbs = Math.round(remaining * 0.45 / 4);
+    const remFats = Math.round(remaining * 0.25 / 9);
+    const result = await suggestRecipes(user.id, remProtein, remCarbs, remFats);
+    setSuggesting(false);
+    if (result.length > 0) {
+      setRecipeSuggestions(result);
+    } else {
+      Alert.alert('No suggestions', 'Could not generate recipe ideas. Try again later.');
+    }
+  };
 
   return (
     <LinearGradient colors={[theme.heroCard, '#2A1F6B'] as [string, string]} style={styles.heroCard}>
@@ -70,6 +88,46 @@ function CalorieHero({ theme, consumed, goal, waterMl, waterGoalMl }: {
       <Text style={[styles.heroRemaining, { color: theme.gradStart }]}>
         {remaining > 0 ? `${remaining.toLocaleString()} kcal remaining` : 'Goal reached 🎉'}
       </Text>
+      {remaining > 0 && (
+        <TouchableOpacity onPress={handleSuggestRecipes} disabled={suggesting}
+          style={[styles.suggestBtn, { backgroundColor: theme.gradStart + '22', borderColor: theme.gradStart + '55' }]}>
+          <Ionicons name={suggesting ? 'hourglass-outline' : 'bulb-outline'} size={14} color={theme.gradStart} />
+          <Text style={[styles.suggestBtnText, { color: theme.gradStart }]}>
+            {suggesting ? 'Thinking...' : 'Suggest Recipes'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Recipe suggestions modal */}
+      <Modal visible={recipeSuggestions !== null} transparent animationType="slide" onRequestClose={() => setRecipeSuggestions(null)}>
+        <View style={styles.recipeOverlay}>
+          <View style={[styles.recipeSheet, { backgroundColor: theme.card }]}>
+            <View style={styles.recipeHeader}>
+              <Text style={[styles.recipeTitle, { color: theme.textPrimary }]}>Meal Ideas</Text>
+              <TouchableOpacity onPress={() => setRecipeSuggestions(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={24} color={theme.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ gap: spacing.md }}>
+              {recipeSuggestions?.map((meal, i) => (
+                <View key={i} style={[styles.recipeCard, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+                  <Text style={[styles.recipeMealName, { color: theme.textPrimary }]}>{meal.name}</Text>
+                  <Text style={[styles.recipeCal, { color: theme.accent }]}>{meal.calories} kcal</Text>
+                  <View style={styles.recipeMacros}>
+                    <Text style={[styles.recipeMacro, { color: '#FF6B35' }]}>P {meal.protein_g}g</Text>
+                    <Text style={[styles.recipeMacro, { color: '#FFB830' }]}>C {meal.carbs_g}g</Text>
+                    <Text style={[styles.recipeMacro, { color: '#4A90E2' }]}>F {meal.fats_g}g</Text>
+                  </View>
+                  <Text style={[styles.recipeIngredients, { color: theme.textSecondary }]}>
+                    {meal.ingredients?.join(', ')}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.macroPills}>
         {[
           { label: 'Protein', g: Math.round(consumed * 0.3 / 4), color: '#FF6B35' },
@@ -630,6 +688,18 @@ const styles = StyleSheet.create({
   heroPB: { height: 7, borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: spacing.sm },
   heroPBFill: { height: '100%', borderRadius: 4 },
   heroRemaining: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: spacing.md },
+  suggestBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1, marginBottom: spacing.md },
+  suggestBtnText: { fontSize: fontSize.xs, fontWeight: '700' },
+  recipeOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  recipeSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, maxHeight: '70%' },
+  recipeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  recipeTitle: { fontSize: fontSize.lg, fontWeight: '800' },
+  recipeCard: { padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: 4 },
+  recipeMealName: { fontSize: fontSize.base, fontWeight: '700' },
+  recipeCal: { fontSize: fontSize.sm, fontWeight: '600' },
+  recipeMacros: { flexDirection: 'row', gap: spacing.md },
+  recipeMacro: { fontSize: fontSize.xs, fontWeight: '600' },
+  recipeIngredients: { fontSize: fontSize.xs, lineHeight: 16, marginTop: 2 },
   macroPills: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   macroPill: { flex: 1, padding: spacing.sm, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   macroPillVal: { fontSize: fontSize.base, fontWeight: '800' },

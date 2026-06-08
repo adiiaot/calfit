@@ -52,9 +52,18 @@ export default function QuickStartScreen() {
   const category: ExerciseCategory = route.params?.category ?? DEFAULT_CATEGORY;
   const catMeta = CATEGORY_MAP[category];
 
+  // Support custom exercises passed from AI Coach
+  const customExercises: { name: string; sets: number; reps: string; rest: number; form_tips: string }[] = route.params?.exercises ?? [];
+
   const categoryExercises = getExercisesByCategory(category);
-  const defaultExercises = categoryExercises.length > 0 ? categoryExercises :
-    EXERCISE_LIBRARY.filter(e => e.category === DEFAULT_CATEGORY);
+  const defaultExercises = customExercises.length > 0
+    ? customExercises.map((e, i) => ({
+        id: `ai-ex-${i}`, name: e.name, category: category as ExerciseCategory,
+        defaultDuration: e.sets * 45, caloriesPerMinute: 7,
+        difficulty: 'beginner' as const, muscleGroups: [],
+        equipment: 'None', instructions: [e.form_tips, `Sets: ${e.sets} | Reps: ${e.reps} | Rest: ${e.rest}s`],
+      }))
+    : (categoryExercises.length > 0 ? categoryExercises : EXERCISE_LIBRARY.filter(e => e.category === DEFAULT_CATEGORY));
 
   const [exercises, setExercises] = useState<QuickExercise[]>(
     defaultExercises.map((e) => ({
@@ -192,7 +201,7 @@ export default function QuickStartScreen() {
       } catch {}
     }
 
-    navigation.getParent()?.navigate('Activity');
+    navigation.navigate('Activity');
   };
 
   const totalCalories = exercises.reduce((sum, ex) => sum + ex.calories_burned, 0);

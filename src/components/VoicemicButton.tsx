@@ -92,13 +92,9 @@ export function VoiceMicButton({
     if (text) {
       onTranscribed(text);
     } else {
-      // Check if key is missing vs transcription genuinely failed
-      const hasKey = !!process.env.EXPO_PUBLIC_DEEPGRAM_KEY;
       Alert.alert(
-        hasKey ? 'Could not transcribe' : 'Voice-to-text not active yet',
-        hasKey
-          ? 'Could not understand the audio. Please speak clearly and try again, or type your message.'
-          : 'Add your Deepgram API key to .env as EXPO_PUBLIC_DEEPGRAM_KEY. Get 200 hrs/month free at deepgram.com — no credit card needed.',
+        'Could not transcribe',
+        'Could not understand the audio. Please speak clearly and try again, or type your message.',
         [{ text: 'OK' }]
       );
     }

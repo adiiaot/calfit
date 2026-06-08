@@ -187,28 +187,38 @@ export default function AICoachScreen() {
   const renderChat = () => (
     <KeyboardAvoidingView
       style={styles.chatContainer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.top}
     >
       {store.chatMessages.length === 0 && !store.isChatLoading ? renderEmptyChat() : (
-        <FlatList
-          ref={flatListRef}
-          data={[
-            ...store.chatMessages,
-            ...(store.isChatLoading ? [{ id: '__thinking__', role: 'assistant' as const, content: '', timestamp: 0 }] : []),
-          ]}
-          keyExtractor={m => m.id}
-          renderItem={({ item }) =>
-            item.id === '__thinking__' ? (
-              <ThinkingBubble theme={theme} startedAt={store.chatStartedAt} />
-            ) : (
-              <ChatBubble message={item.content} role={item.role} />
-            )
-          }
-          contentContainerStyle={styles.chatList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          {store.chatMessages.length > 0 && (
+            <View style={[styles.chatActions, { borderBottomColor: theme.border }]}>
+              <TouchableOpacity onPress={() => store.clearChat()} style={[styles.clearChatBtn, { backgroundColor: theme.red + '15' }]}>
+                <Ionicons name="trash-outline" size={14} color={theme.red} />
+                <Text style={[styles.clearChatText, { color: theme.red }]}>Clear Chat</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <FlatList
+            ref={flatListRef}
+            data={[
+              ...store.chatMessages,
+              ...(store.isChatLoading ? [{ id: '__thinking__', role: 'assistant' as const, content: '', timestamp: 0 }] : []),
+            ]}
+            keyExtractor={m => m.id}
+            renderItem={({ item }) =>
+              item.id === '__thinking__' ? (
+                <ThinkingBubble theme={theme} startedAt={store.chatStartedAt} />
+              ) : (
+                <ChatBubble message={item.content} role={item.role} />
+              )
+            }
+            contentContainerStyle={styles.chatList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            showsVerticalScrollIndicator={false}
+          />
+        </>
       )}
 
       <View style={[styles.chatInputBar, { backgroundColor: theme.card, borderTopColor: theme.border, borderTopWidth: 1 }]}>
@@ -311,7 +321,10 @@ export default function AICoachScreen() {
           ))}
 
           <View style={styles.actionRow}>
-            <TouchableOpacity onPress={() => navigation.navigate('Activity')} activeOpacity={0.8} style={[styles.useBtn, { backgroundColor: theme.purple }]}>
+            <TouchableOpacity onPress={() => {
+              const exs = store.currentWorkout?.exercises ?? [];
+              navigation.navigate('QuickStart', { category: 'Full Body', exercises: exs, title: store.currentWorkout?.title });
+            }} activeOpacity={0.8} style={[styles.useBtn, { backgroundColor: theme.purple }]}>
               <Ionicons name="play-outline" size={18} color="#fff" />
               <Text style={styles.saveBtnText}>Use in Activity</Text>
             </TouchableOpacity>
@@ -465,6 +478,9 @@ const styles = StyleSheet.create({
   // Chat styles
   chatContainer: { flex: 1 },
   chatList: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  chatActions: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, borderBottomWidth: 0.5 },
+  clearChatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: radius.full },
+  clearChatText: { fontSize: fontSize.xs, fontWeight: '600' },
   chatEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl },
   chatEmptyIconWrap: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
   chatEmptyTitle: { fontSize: fontSize.lg, fontWeight: '800', textAlign: 'center', marginBottom: spacing.xs },

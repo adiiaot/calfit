@@ -1,6 +1,6 @@
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Dimensions,
+  RefreshControl, Dimensions, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
@@ -12,6 +12,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { supabase } from '../../services/supabase';
 import { MoodTrendChart } from '../../components/TrendCharts';
+import { exportProgressReport } from '../../utils/pdf-export';
 
 const { width: SW } = Dimensions.get('window');
 const PINK   = '#FF6B9D';
@@ -200,6 +201,7 @@ export default function ProgressScreen() {
   const [period, setPeriod]       = useState<Period>('Week');
   const [data, setData]           = useState<Awaited<ReturnType<typeof loadStats>> | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useFocusEffect(useCallback(() => { if (user?.id) load(); }, [user?.id, period]));
 
@@ -212,6 +214,17 @@ export default function ProgressScreen() {
 
   const PERIODS: Period[] = ['Week', 'Month', '3 Months', 'Year'];
   const name = profile?.full_name?.split(' ')[0] || 'You';
+
+  const handleExportPDF = useCallback(async () => {
+    if (!data) return;
+    setExporting(true);
+    try {
+      await exportProgressReport(data, period);
+    } catch (e: any) {
+      Alert.alert('Export Failed', e?.message || 'Could not generate PDF');
+    }
+    setExporting(false);
+  }, [data, period]);
 
   const weightProgress = data?.weight && data?.targetWeight
     ? Math.min(Math.abs(data.weight - data.targetWeight) / Math.abs((profile as any)?.starting_weight_kg - data.targetWeight || 1), 1)
@@ -228,6 +241,12 @@ export default function ProgressScreen() {
           <Text style={styles.headerTitle}>My Progress</Text>
           <Text style={styles.headerSub}>{name}'s fitness journey</Text>
         </View>
+        {data && (
+          <TouchableOpacity onPress={handleExportPDF} disabled={exporting} style={[styles.recapBtn, { marginRight: spacing.sm }]}>
+            <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={16} color="#fff" />
+            <Text style={styles.recapBtnText}>PDF</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => navigation.navigate('Recap' as never)} style={styles.recapBtn}>
           <Ionicons name="share-social-outline" size={16} color="#fff" />
           <Text style={styles.recapBtnText}>Recap</Text>

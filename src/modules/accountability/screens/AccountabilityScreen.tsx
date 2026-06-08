@@ -423,7 +423,7 @@ export default function AccountabilityScreen() {
                   theme={theme}
                   currentUserId={user?.id ?? ''}
                   onRemove={() => handleRemove((partner as any).partner_id, (partner as any).partner_profile?.full_name ?? 'CalFit User')}
-                  onProfilePress={() => navigation.navigate('Profile' as never, { userId: (partner as any).partner_id } as never)}
+                  onProfilePress={() => navigation.navigate('PartnerChat', { partnerId: (partner as any).partner_id, partnerName: (partner as any).partner_profile?.full_name ?? 'Partner' } as never)}
                   onChatPress={() => navigation.navigate('PartnerChat', {
                     partnerId: (partner as any).partner_id,
                     partnerName: (partner as any).partner_profile?.full_name ?? 'Partner',

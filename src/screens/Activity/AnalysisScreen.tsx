@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
-  Dimensions, Platform,
+  Dimensions, Platform, Alert,
 } from 'react-native';
 import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, radius, fontSize } from '../../theme';
 import { fetchWorkoutAnalysis, type WorkoutAnalysis, type TimeRange } from '../../services/aiAnalysisService';
+import { exportWorkoutAnalysis } from '../../utils/pdf-export';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -51,6 +52,20 @@ export default function AnalysisScreen() {
 
   useFocusEffect(useCallback(() => { loadAnalysis(); }, [loadAnalysis]));
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!analysis) return;
+    setExporting(true);
+    try {
+      const periodLabel = TIME_OPTIONS.find(o => o.key === timeRange)?.label || timeRange;
+      await exportWorkoutAnalysis(analysis, periodLabel);
+    } catch (e: any) {
+      Alert.alert('Export Failed', e?.message || 'Could not generate PDF');
+    }
+    setExporting(false);
+  }, [analysis, timeRange]);
+
   const trendMeta = analysis ? TREND_META[analysis.recentTrend] ?? TREND_META.insufficient_data : TREND_META.insufficient_data;
 
   return (
@@ -59,10 +74,15 @@ export default function AnalysisScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={theme.textPrimary} />
         </TouchableOpacity>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>AI Analysis</Text>
           <Text style={[styles.headerSub, { color: theme.textMuted }]}>Your workout insights</Text>
         </View>
+        {analysis && (
+          <TouchableOpacity onPress={handleExportPDF} disabled={exporting} style={[styles.exportBtn, { backgroundColor: theme.accent + '15' }]}>
+            <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={20} color={theme.accent} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.timeFilter}>
@@ -272,6 +292,7 @@ export default function AnalysisScreen() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  exportBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: fontSize.lg, fontWeight: '800', letterSpacing: -0.3 },
   headerSub: { fontSize: fontSize.xs, marginTop: 1 },
 

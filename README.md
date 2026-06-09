@@ -5,7 +5,7 @@
 [![React Native](https://img.shields.io/badge/React_Native-0.81-61DAFB?logo=react)](https://reactnative.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase)](https://supabase.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
-[![Buy on Selar](https://img.shields.io/badge/Buy_on-Selar-5B2D90)](https://selar.com/aotayo)
+[![Buy on Selar](https://img.shields.io/badge/Buy_on-Selar-5B2D90)](https://selar.com/39m7437811)
 
 > **Built by [AOT Network](https://github.com/adiiaot)** — Full-stack fitness & nutrition coaching platform with AI integration.
 
@@ -148,16 +148,38 @@ Scan the QR code with **Expo Go (iOS)** or the **Expo app (Android)**.
 
 ---
 
+## License
+
+This project is open-source for **personal and educational use** only.
+
+> Commercial use (rebranding, white-label, selling to clients, app store publication) requires a paid Commercial License.
+> See [LICENSE.md](LICENSE.md) for full terms.
+
+| Use Case | Allowed |
+|----------|---------|
+| Viewing/forking for learning | ✅ |
+| Personal projects | ✅ |
+| Showcasing in portfolio | ✅ |
+| Rebranding & selling to a client | ❌ Requires license |
+| Publishing on App Store / Play Store | ❌ Requires license |
+| Using as a foundation for a commercial product | ❌ Requires license |
+
+**Purchase a Commercial License:**
+- **Selar**: https://selar.com/39m7437811
+- **Custom / Enterprise**: aotnetworklabs@gmail.com
+
+---
+
 ## Portfolio & Verification
 
 This app was built by **AOT Network**. Source code is available on GitHub for verification:
 
 - **View Code on GitHub**: [github.com/adiiaot/calfit](https://github.com/adiiaot/calfit)
 - **Portfolio**: [aotnetwork.vercel.app](https://aotnetwork.vercel.app)
-- **Purchase the app**: [Selar - CalFit](https://selar.com/aotayo)
 
 ---
 
-## Buy Me a Coffee
+## Support
 
-Support ongoing development: [Selar Tip Jar](https://selar.com/showlove/aotayo)
+[![Buy on Selar](https://img.shields.io/badge/Buy_License_on-Selar-5B2D90)](https://selar.com/39m7437811)
+

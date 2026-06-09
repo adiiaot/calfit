@@ -23,13 +23,16 @@
       }
     },
     "android": {
-      "package": "com.aotnetwork.com",
+      "package": "com.aotnetwork.calfit",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080A0F"
       },
       "permissions": [
-        "ACTIVITY_RECOGNITION"
+        "ACTIVITY_RECOGNITION",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -46,11 +49,25 @@
     "plugins": [
       "expo-font",
       "expo-web-browser",
+      "expo-secure-store",
       [
         "expo-notifications",
         {
           "color": "#0DAE6C",
           "sounds": []
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CalFit needs camera access to scan food and log your meals.",
+          "microphonePermission": "CalFit needs microphone access for voice input with the AI Coach."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CalFit needs access to your photos to set your avatar."
         }
       ]
     ],

@@ -636,3 +636,29 @@ Pedometer sensor → expo-sensors → useSteps hook (TabNavigator level) → Zus
 5. **Privacy-Focused** — Minimal data collection, anonymous by default, user data export available.
 6. **No Subscription Required** — All features currently free. Full AI, unlimited chat, food scanning, everything.
 7. **Accountability** — Partner system with shared streaks and real-time chat sets it apart from solo fitness apps.
+
+---
+
+## Licensing
+
+### Personal & Educational Use
+The source code is publicly available on GitHub for **personal, educational, and portfolio purposes only**. You may view, fork, and modify the code for learning or personal projects.
+
+### Commercial Use
+**Commercial use requires a paid Commercial License.** This includes:
+- Rebranding and publishing the app on any app store
+- Selling the app or a derivative to a client
+- Using the codebase as the foundation of a revenue-generating product
+
+### Where to Purchase
+| Platform | Link |
+|---|---|
+| Selar | https://selar.com/39m7437811 |
+| Custom / Enterprise | aotnetworklabs@gmail.com |
+
+### What You Get with a Commercial License
+- Full source code (ZIP of the latest HEAD)
+- Unlimited white-label rights (rebrand, rename, publish as your own)
+- No royalties or revenue sharing
+- No attribution requirements
+- Email support for setup questions

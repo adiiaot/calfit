@@ -42,7 +42,10 @@ aotsecure-v1/
 .aotsecure-v1/
 
 # DOCS
-TODO-TOMORROW.md
+CalFit Screenshots-20260609T181038Z-3-001
+calfit-source.zip
+
+
 
 # typescript
 *.tsbuildinfo
@@ -50,3 +53,4 @@ TODO-TOMORROW.md
 # generated native folders
 /ios
 /android
+/dist

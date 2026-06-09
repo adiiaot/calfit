@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,18 +12,27 @@ import { setContentWidth } from './src/theme/responsive';
 import AppNavigator from './src/navigation/AppNavigator';
 import { setupNotificationHandler } from './src/services/reminderService';
 
-setupNotificationHandler();
+if (Platform.OS !== 'web') setupNotificationHandler();
 
 export default function App() {
   const { setSession, user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
+  const [fontTimeout, setFontTimeout] = useState(false);
 
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontsError] = useFonts({
     PlusJakartaSans_400Regular, PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold,
-    PlusJakartaSans_800ExtraBold, ...Ionicons.font,
+    PlusJakartaSans_800ExtraBold,
+    ...(Platform.OS !== 'web' ? Ionicons.font : {}),
   });
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const t = setTimeout(() => setFontTimeout(true), 5000);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   const onWebLayout = useCallback((e: LayoutChangeEvent) => {
     setContentWidth(e.nativeEvent.layout.width);
@@ -52,7 +61,11 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (!fontsLoaded) {
+  if (Platform.OS === 'web' && fontsError) {
+    console.warn('Font loading error on web, continuing with default fonts:', fontsError);
+  }
+
+  if (!fontsLoaded && !fontsError && !fontTimeout) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.bg }}>
         <ActivityIndicator color={theme.accent} size="large" />

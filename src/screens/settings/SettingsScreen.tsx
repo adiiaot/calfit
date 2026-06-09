@@ -378,7 +378,7 @@ export default function SettingsScreen() {
 
         {/* ── SUPPORT THE DEV ── */}
         <TouchableOpacity
-          onPress={() => { Linking.openURL('https://selar.com/showlove/aotayo'); }}
+          onPress={() => { Linking.openURL('https://selar.com/39m7437811'); }}
           activeOpacity={0.85}
           style={[styles.supportCard, { backgroundColor: theme.card, borderColor: theme.accent + '44' }]}
         >
@@ -403,7 +403,7 @@ export default function SettingsScreen() {
 
         {/* ── APP FOR SALE ── */}
         <TouchableOpacity
-          onPress={() => { Linking.openURL('mailto:aotnetworklabs@gmail.com?subject=CalFit%20App%20-%20Purchase%20Inquiry'); }}
+          onPress={() => { Linking.openURL('https://selar.com/39m7437811'); }}
           activeOpacity={0.85}
           style={[styles.commissionCard, { backgroundColor: theme.card, borderColor: theme.accent + '55' }]}
         >
@@ -413,7 +413,7 @@ export default function SettingsScreen() {
           <View style={styles.commissionInfo}>
             <Text style={[styles.commissionTitle, { color: theme.textPrimary }]}>App for Sale</Text>
             <Text style={[styles.commissionDesc, { color: theme.textMuted }]}>
-              Own the complete CalFit source code. White-label it, rebrand it, launch it. Full AI features, Supabase backend, polished UI. Email aotnetworklabs@gmail.com with your offer.
+              Own the complete CalFit source code. White-label it, rebrand it, launch it. Full AI features, Supabase backend, polished UI. Get it on Selar.
             </Text>
           </View>
         </TouchableOpacity>

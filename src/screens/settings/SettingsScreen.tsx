@@ -411,9 +411,9 @@ export default function SettingsScreen() {
             <Ionicons name="cart-outline" size={22} color={theme.purple} />
           </View>
           <View style={styles.commissionInfo}>
-            <Text style={[styles.commissionTitle, { color: theme.textPrimary }]}>App for Sale — $1,499</Text>
+            <Text style={[styles.commissionTitle, { color: theme.textPrimary }]}>App for Sale</Text>
             <Text style={[styles.commissionDesc, { color: theme.textMuted }]}>
-              Own the complete CalFit source code. White-label it, rebrand it, launch it. Full AI features, Supabase backend, polished UI. Contact aotnetworklabs@gmail.com to purchase.
+              Own the complete CalFit source code. White-label it, rebrand it, launch it. Full AI features, Supabase backend, polished UI. Email aotnetworklabs@gmail.com with your offer.
             </Text>
           </View>
         </TouchableOpacity>

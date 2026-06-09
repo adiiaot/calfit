@@ -54,6 +54,9 @@ export const useMealPlanStore = create<MealPlanState>((set, get) => ({
   },
 
   savePlan: async (userId: string, plan: GeneratedMealPlan) => {
+    const { savedPlans } = get();
+    if (savedPlans.some(p => p.id === plan.id)) return;
+
     try {
       const { supabase } = await import('../services/supabase');
       const { error } = await supabase.from('ai_generated_meal_plans').insert({

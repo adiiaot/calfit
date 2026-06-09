@@ -90,15 +90,45 @@ export default function QuickStartScreen() {
   const workoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const exerciseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const initState = useCallback(() => {
+    const cat: ExerciseCategory = route.params?.category ?? DEFAULT_CATEGORY;
+    const customEx: { name: string; sets: number; reps: string; rest: number; form_tips: string }[] = route.params?.exercises ?? [];
+    const isAi = customEx.length > 0;
+    const catEx = getExercisesByCategory(cat);
+    const defEx = isAi
+      ? customEx.map((e, i) => ({
+          id: `ai-ex-${i}`, name: e.name, category: cat,
+          defaultDuration: 0, caloriesPerMinute: 7,
+          difficulty: 'beginner' as const, muscleGroups: [],
+          equipment: 'None', instructions: [e.form_tips, `Sets: ${e.sets} | Reps: ${e.reps} | Rest: ${e.rest}s`],
+          sets: e.sets, reps: e.reps, rest: e.rest, form_tips: e.form_tips,
+        }))
+      : (catEx.length > 0 ? catEx : EXERCISE_LIBRARY.filter(e => e.category === DEFAULT_CATEGORY));
+    setExercises(defEx.map((e: any) => ({
+      id: e.id, name: e.name, duration: e.defaultDuration || 0,
+      calories_per_minute: e.caloriesPerMinute || 7, seconds: 0,
+      calories_burned: 0, done: false, category: e.category,
+      instructions: e.instructions, equipment: e.equipment, difficulty: e.difficulty,
+      sets: e.sets, reps: e.reps, rest: e.rest, form_tips: e.form_tips,
+    })));
+    setActiveIndex(-1);
+    setWorkoutSeconds(0);
+    setWorkoutStarted(false);
+    setExerciseSecondsLeft(0);
+    setShowComplete(false);
+  }, [route.params?.category, route.params?.exercises]);
+
   useEffect(() => {
+    initState();
     return () => {
       stopSpeech();
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
       if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
     };
-  }, []);
+  }, [initState]);
 
   useFocusEffect(useCallback(() => {
+    setShowComplete(false);
     return () => {
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
       if (exerciseTimerRef.current) clearInterval(exerciseTimerRef.current);
@@ -217,7 +247,9 @@ export default function QuickStartScreen() {
     navigation.navigate('Activity');
   };
 
-  const totalCalories = exercises.reduce((sum, ex) => sum + ex.calories_burned, 0);
+  const totalCalories = isAiWorkout
+    ? Math.round(workoutSeconds * exercises.reduce((s, e) => s + e.calories_per_minute, 0) / exercises.length / 60)
+    : Math.round(exercises.reduce((sum, ex) => sum + ex.calories_burned, 0));
   const completedCount = exercises.filter(e => e.done).length;
   const progress = exercises.length > 0 ? completedCount / exercises.length : 0;
 

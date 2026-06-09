@@ -35,6 +35,7 @@ export default function NotesScreen() {
   const [editContent, setEditContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const sidebarAnim = useRef(new Animated.Value(-300)).current;
 
@@ -77,7 +78,9 @@ export default function NotesScreen() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     if (!user?.id || !editContent.trim()) { Alert.alert('Content required', 'Please write something before saving.'); return; }
+    setSaving(true);
     try {
       if (selectedNote?.id) {
         await supabase.from('notes').update({
@@ -97,6 +100,8 @@ export default function NotesScreen() {
       Alert.alert('Saved', 'Journal entry saved successfully');
     } catch {
       Alert.alert('Error', 'Could not save note.');
+    } finally {
+      setSaving(false);
     }
   };
 

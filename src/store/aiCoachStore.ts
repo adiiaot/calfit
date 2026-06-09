@@ -131,6 +131,7 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
 
   saveWorkout: async (userId: string, workout: GeneratedWorkout) => {
     const { savedWorkouts } = get();
+    if (savedWorkouts.some(w => w.id === workout.id)) return;
 
     try {
       const { supabase } = await import('../services/supabase');

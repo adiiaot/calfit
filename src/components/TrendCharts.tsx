@@ -1,18 +1,3 @@
-// src/components/TrendCharts.tsx
-// ─────────────────────────────────────────────────────────────
-// Calorie Trend Chart + Mood Trend Chart
-//
-// WHY NO EXTERNAL CHART LIB:
-//   Using pure React Native View/Animated rendering to avoid
-//   adding another dependency (victory-native, recharts etc)
-//   that may conflict with Expo SDK version.
-//   Charts are bar-based for simplicity and performance.
-//
-// USAGE:
-//   <CalorieTrendChart userId={user.id} theme={theme} />
-//   <MoodTrendChart userId={user.id} theme={theme} />
-// ─────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,

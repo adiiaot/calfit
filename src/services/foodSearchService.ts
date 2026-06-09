@@ -1,9 +1,3 @@
-// src/services/foodSearchService.ts
-//
-// UPDATED: FoodResult now includes micronutrient fields.
-// Open Food Facts returns these when available — we extract them
-// and pass them through so CalorieScreen can store and display them.
-// Nigerian local DB doesn't have micronutrients — those fields stay undefined.
 
 export interface FoodResult {
   id:          string;

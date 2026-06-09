@@ -1,21 +1,3 @@
-// src/components/MilestoneCelebration.tsx
-// ─────────────────────────────────────────────────────────────
-// Milestone Celebration — full-screen animated overlay
-// shown when user hits streak milestones (7, 14, 30, 50, 100 days)
-//
-// HOW TO TRIGGER:
-//   import { MilestoneCelebration, checkStreakMilestone } from '../components/MilestoneCelebration';
-//
-//   // After updating streak:
-//   const milestone = checkStreakMilestone(newStreakCount);
-//   if (milestone) setMilestone(milestone);
-//
-//   // In render:
-//   <MilestoneCelebration milestone={milestone} onDismiss={() => setMilestone(null)} />
-//
-// Uses pure React Native Animated — no external library needed
-// ─────────────────────────────────────────────────────────────
-
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,

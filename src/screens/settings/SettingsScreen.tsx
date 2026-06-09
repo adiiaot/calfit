@@ -236,15 +236,7 @@ export default function SettingsScreen() {
               {
                 text: 'Delete Forever',
                 style: 'destructive',
-                onPress: async () => {
-                  try {
-                    const { supabase } = await import('../../services/supabase');
-                    await supabase.functions.invoke('delete-account', { body: { userId: user?.id } });
-                    await signOut();
-                  } catch {
-                    Alert.alert('Error', 'Could not delete account. Please contact aotnetworklabs@gmail.com.');
-                  }
-                },
+                onPress: signOut,
               },
             ]
           );

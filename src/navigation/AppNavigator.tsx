@@ -1,17 +1,3 @@
-// src/navigation/AppNavigator.tsx
-//
-// KEY FIX — STEPS TRACKING:
-//   useSteps() is now called inside TabNavigator, NOT inside HomeScreen.
-//
-//   WHY: HomeScreen mounts/unmounts every time you navigate away and back.
-//   useSteps() inside HomeScreen → cleanup() runs on unmount → subscription
-//   and save timer are destroyed → pedometerBaseRef reset → steps show 0.
-//
-//   TabNavigator mounts ONCE when the user logs in and stays mounted for the
-//   entire session. useSteps() here means the pedometer subscription and save
-//   timer are never torn down by navigation. HomeScreen and ActivityScreen
-//   read `liveSteps` from Zustand (authStore) which useSteps() writes to.
-
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -24,7 +10,6 @@ import { colors } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useSteps } from '../hooks/useSteps';
 
-// Fix Android status bar overlap globally
 if (Platform.OS === 'android') {
   StatusBar.setTranslucent(true);
   StatusBar.setBackgroundColor('transparent');
@@ -42,7 +27,7 @@ import SleepScreen from '../screens/sleep/SleepScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import DownloadDataScreen from '../screens/settings/DownloadDataScreen';
-import LanguageScreen from '../screens/settings/LanguageScreen';
+
 import PrivacyScreen from '../screens/settings/PrivacyScreen';
 import GoalsScreen from '../screens/settings/GoalsScreen';
 import QuickStartScreen from '../screens/Activity/QuickStartScreen';
@@ -170,6 +155,7 @@ const tb = StyleSheet.create({
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 10 },
       android: { elevation: 8 },
+      web: { boxShadow: '0 -4px 10px rgba(0,0,0,0.12)' },
     }),
   },
   tab: {
@@ -245,7 +231,7 @@ function TabNavigator() {
       <Tab.Screen name="BodyMeasurements"     component={BodyMeasurementsScreen}     options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="EquipmentPreferences" component={EquipmentPreferencesScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="DownloadData"         component={DownloadDataScreen}         options={{ tabBarItemStyle: { display: 'none' } }} />
-      <Tab.Screen name="Language"             component={LanguageScreen}             options={{ tabBarItemStyle: { display: 'none' } }} />
+
       <Tab.Screen name="Privacy"              component={PrivacyScreen}              options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Goals"                component={GoalsScreen}                options={{ tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>

@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 // On dark mode, shadows are coloured (green tint) not pure black
 // This is what gives Apple UI its "glow" feel on dark backgrounds
 export const shadow = {
-  // Standard card shadow — used on most cards
   card: Platform.select({
     ios: {
       shadowColor:   '#000000',
@@ -12,12 +11,10 @@ export const shadow = {
       shadowOpacity: 0.25,
       shadowRadius:  8,
     },
-    android: {
-      elevation: 4,
-    },
+    android: { elevation: 4 },
+    web: { boxShadow: '0 2px 8px rgba(0,0,0,0.25)' },
   }),
 
-  // Elevated modal/sheet shadow
   modal: Platform.select({
     ios: {
       shadowColor:   '#000000',
@@ -25,13 +22,10 @@ export const shadow = {
       shadowOpacity: 0.35,
       shadowRadius:  20,
     },
-    android: {
-      elevation: 12,
-    },
+    android: { elevation: 12 },
+    web: { boxShadow: '0 8px 20px rgba(0,0,0,0.35)' },
   }),
 
-  // Accent glow — use on CTA buttons and accent elements
-  // Gives the Apple "inner glow" effect on green buttons
   accent: Platform.select({
     ios: {
       shadowColor:   '#2DDC8C',
@@ -39,12 +33,10 @@ export const shadow = {
       shadowOpacity: 0.30,
       shadowRadius:  12,
     },
-    android: {
-      elevation: 6,
-    },
+    android: { elevation: 6 },
+    web: { boxShadow: '0 4px 12px rgba(45,220,140,0.30)' },
   }),
 
-  // Subtle glow for tab bar and floating elements
   subtle: Platform.select({
     ios: {
       shadowColor:   '#000000',
@@ -52,9 +44,8 @@ export const shadow = {
       shadowOpacity: 0.15,
       shadowRadius:  4,
     },
-    android: {
-      elevation: 2,
-    },
+    android: { elevation: 2 },
+    web: { boxShadow: '0 1px 4px rgba(0,0,0,0.15)' },
   }),
 };
 

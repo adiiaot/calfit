@@ -1,15 +1,3 @@
-// src/components/ComebackBanner.tsx
-// ─────────────────────────────────────────────────────────────
-// Comeback Mode Banner — shown on Home when user inactive 2+ days
-//
-// HOW IT WORKS:
-//   - Reads last_active_at from profiles table
-//   - If gap > 2 days, shows a warm motivational banner
-//   - Dismiss stores timestamp in AsyncStorage so it doesn't reappear
-//     for another 24h after being dismissed
-//   - Banner disappears automatically once user logs food/workout
-// ─────────────────────────────────────────────────────────────
-
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,

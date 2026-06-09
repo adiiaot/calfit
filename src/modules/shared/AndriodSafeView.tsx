@@ -8,18 +8,16 @@ interface Props {
   backgroundColor?: string;
 }
 
-/**
- * AndroidSafeView — properly handles safe areas on both iOS and Android.
- * 
- * On iOS: uses SafeAreaView from react-native-safe-area-context
- *         which handles notch, Dynamic Island and home indicator.
- * 
- * On Android: uses useSafeAreaInsets to get the real status bar
- *             height and applies it as paddingTop. This is the
- *             correct fix for content rendering behind the status bar.
- */
 export function AndroidSafeView({ children, style, backgroundColor }: Props) {
   const insets = useSafeAreaInsets();
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[{ flex: 1, backgroundColor, overflow: 'hidden' }, style]}>
+        {children}
+      </View>
+    );
+  }
 
   if (Platform.OS === 'ios') {
     return (
@@ -31,7 +29,6 @@ export function AndroidSafeView({ children, style, backgroundColor }: Props) {
     );
   }
 
-  // Android — use real inset values from the device
   return (
     <View style={[{
       flex: 1,

@@ -187,23 +187,3 @@ export const removePartner = async (
   return !e1;
 };
 
-/**
- * Update the shared goal between the user and their partner.
- *
- * @param userId - The requesting user's ID.
- * @param partnerId - The partner's user ID.
- * @param goal - The new shared goal text.
- * @returns True if the update succeeded.
- */
-export const updateSharedGoal = async (
-  userId: string,
-  partnerId: string,
-  goal: string
-): Promise<boolean> => {
-  const { error } = await supabase
-    .from('partners')
-    .update({ shared_goal: goal })
-    .eq('user_id', userId)
-    .eq('partner_id', partnerId);
-  return !error;
-};

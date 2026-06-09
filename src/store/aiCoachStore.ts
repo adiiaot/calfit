@@ -42,7 +42,7 @@ interface AiCoachState {
   // Chat actions
   sendMessage: (userId: string, content: string) => Promise<void>;
   loadChatMessages: (userId: string) => Promise<void>;
-  clearChat: () => void;
+  clearChat: (userId?: string) => Promise<void>;
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -337,5 +337,13 @@ export const useAiCoachStore = create<AiCoachState>((set, get) => ({
     } catch {}
   },
 
-  clearChat: () => set({ chatMessages: [], chatError: null, chatStartedAt: null }),
+  clearChat: async (userId?: string) => {
+    set({ chatMessages: [], chatError: null, chatStartedAt: null });
+    if (userId) {
+      try {
+        const { supabase } = await import('../services/supabase');
+        await supabase.from('chat_messages').delete().eq('user_id', userId);
+      } catch {}
+    }
+  },
 }));

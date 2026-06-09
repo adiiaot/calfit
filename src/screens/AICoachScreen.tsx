@@ -215,7 +215,7 @@ export default function AICoachScreen() {
         <>
           {store.chatMessages.length > 0 && (
             <View style={[styles.chatActions, { borderBottomColor: theme.border }]}>
-              <TouchableOpacity onPress={() => store.clearChat()} style={[styles.clearChatBtn, { backgroundColor: theme.red + '12' }]}>
+              <TouchableOpacity onPress={() => user && store.clearChat(user.id)} style={[styles.clearChatBtn, { backgroundColor: theme.red + '12' }]}>
                 <Ionicons name="trash-outline" size={13} color={theme.red} />
                 <Text style={[styles.clearChatText, { color: theme.red }]}>Clear</Text>
               </TouchableOpacity>

@@ -11,10 +11,24 @@ const BASE_DELAY = 1000;
 
 async function invokeAI(body: Record<string, unknown>): Promise<{ data: any; error: string | null }> {
   try {
-    const { data, error } = await supabase.functions.invoke('ai-proxy', { body });
-    if (error) return { data: null, error: error.message || 'AI proxy error' };
-    return { data, error: null };
+    const result = await supabase.functions.invoke('ai-proxy', { body });
+    if (result.error) {
+      let detail = result.error.message;
+      try {
+        const resp = result.response || (result.error as any).context;
+        if (resp?.status) detail += ` (status=${resp.status})`;
+        const cloned = resp?.clone?.();
+        if (cloned) {
+          const text = await cloned.text();
+          if (text) detail += ` body=${text.slice(0, 300)}`;
+        }
+      } catch {}
+      if (__DEV__) console.warn('[invokeAI] error detail:', detail);
+      return { data: null, error: detail };
+    }
+    return { data: result.data, error: null };
   } catch (e: any) {
+    if (__DEV__) console.warn('[invokeAI] exception:', e?.message);
     return { data: null, error: e?.message ?? 'Network error' };
   }
 }

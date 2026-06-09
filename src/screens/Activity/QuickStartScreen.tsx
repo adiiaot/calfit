@@ -31,6 +31,10 @@ interface QuickExercise {
   instructions: string[];
   equipment: string;
   difficulty: string;
+  sets?: number;
+  reps?: string;
+  rest?: number;
+  form_tips?: string;
 }
 
 const DEFAULT_CATEGORY: ExerciseCategory = 'Full Body';
@@ -55,22 +59,26 @@ export default function QuickStartScreen() {
   // Support custom exercises passed from AI Coach
   const customExercises: { name: string; sets: number; reps: string; rest: number; form_tips: string }[] = route.params?.exercises ?? [];
 
+  const isAiWorkout = customExercises.length > 0;
+
   const categoryExercises = getExercisesByCategory(category);
-  const defaultExercises = customExercises.length > 0
+  const defaultExercises = isAiWorkout
     ? customExercises.map((e, i) => ({
         id: `ai-ex-${i}`, name: e.name, category: category as ExerciseCategory,
-        defaultDuration: e.sets * 45, caloriesPerMinute: 7,
+        defaultDuration: 0, caloriesPerMinute: 7,
         difficulty: 'beginner' as const, muscleGroups: [],
         equipment: 'None', instructions: [e.form_tips, `Sets: ${e.sets} | Reps: ${e.reps} | Rest: ${e.rest}s`],
+        sets: e.sets, reps: e.reps, rest: e.rest, form_tips: e.form_tips,
       }))
     : (categoryExercises.length > 0 ? categoryExercises : EXERCISE_LIBRARY.filter(e => e.category === DEFAULT_CATEGORY));
 
   const [exercises, setExercises] = useState<QuickExercise[]>(
-    defaultExercises.map((e) => ({
+    defaultExercises.map((e: any) => ({
       id: e.id, name: e.name, duration: e.defaultDuration,
       calories_per_minute: e.caloriesPerMinute, seconds: 0,
       calories_burned: 0, done: false, category: e.category,
       instructions: e.instructions, equipment: e.equipment, difficulty: e.difficulty,
+      sets: e.sets, reps: e.reps, rest: e.rest, form_tips: e.form_tips,
     }))
   );
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -142,26 +150,30 @@ export default function QuickStartScreen() {
 
     setActiveIndex(index);
     const ex = exercises[index];
-    setExerciseSecondsLeft(ex.duration);
-    speak(`Starting ${ex.name}. ${ex.duration} seconds. Go!`);
+    setExerciseSecondsLeft(ex.duration || 0);
 
-    exerciseTimerRef.current = setInterval(() => {
-      setExerciseSecondsLeft(prev => {
-        if (prev === SPEAK_TRIGGER.TEN_LEFT) speak('Ten seconds left! Push through!');
-        if (prev === SPEAK_TRIGGER.FIVE_FOUR) speak('5, 4, 3, 2, 1');
-        if (prev <= 1) {
-          clearInterval(exerciseTimerRef.current!);
-          completeExercise(index);
-          return 0;
-        }
-        return prev - 1;
-      });
-      setExercises(prev => prev.map((ex, i) => {
-        if (i !== index) return ex;
-        const ns = ex.seconds + 1;
-        return { ...ex, seconds: ns, calories_burned: Math.round((ex.calories_per_minute / 60) * ns) };
-      }));
-    }, 1000);
+    if (isAiWorkout && ex.sets && ex.reps) {
+      speak(`Starting ${ex.name}. ${ex.sets} sets of ${ex.reps}.`);
+    } else if (ex.duration > 0) {
+      speak(`Starting ${ex.name}. ${ex.duration} seconds. Go!`);
+      exerciseTimerRef.current = setInterval(() => {
+        setExerciseSecondsLeft(prev => {
+          if (prev === SPEAK_TRIGGER.TEN_LEFT) speak('Ten seconds left! Push through!');
+          if (prev === SPEAK_TRIGGER.FIVE_FOUR) speak('5, 4, 3, 2, 1');
+          if (prev <= 1) {
+            clearInterval(exerciseTimerRef.current!);
+            completeExercise(index);
+            return 0;
+          }
+          return prev - 1;
+        });
+        setExercises(prev => prev.map((ex, i) => {
+          if (i !== index) return ex;
+          const ns = ex.seconds + 1;
+          return { ...ex, seconds: ns, calories_burned: Math.round((ex.calories_per_minute / 60) * ns) };
+        }));
+      }, 1000);
+    }
   };
 
   const completeExercise = (index: number) => {
@@ -175,6 +187,7 @@ export default function QuickStartScreen() {
       speak(`${exercises[index].name} complete! Next up: ${exercises[nextIndex].name} in 3 seconds.`);
       setTimeout(() => startExercise(nextIndex), 3000);
     } else {
+      if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
       speak('All exercises complete! Great work!');
       setShowComplete(true);
     }
@@ -268,12 +281,62 @@ export default function QuickStartScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Active exercise banner */}
-        {activeExercise && activeExerciseData && (
+        {activeExercise && activeExerciseData && !isAiWorkout && (
           <AnimatedExerciseDemo
             exercise={activeExerciseData}
             isActive={activeIndex >= 0}
             secondsLeft={exerciseSecondsLeft}
           />
+        )}
+        {activeExercise && isAiWorkout && (
+          <View style={[styles.exCard, {
+            backgroundColor: catColor + '15',
+            borderColor: catColor,
+            borderWidth: 1.5,
+            marginBottom: 16,
+            paddingLeft: 20,
+          }]}>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8}}>
+              <View style={[styles.exIllusWrap, {backgroundColor: catColor + '20'}]}>
+                <Svg width={40} height={40} viewBox="0 0 100 100">
+                  {(() => {
+                    const IllusComp = getExerciseIllustration(activeExercise.name || category);
+                    return <IllusComp color={catColor} />;
+                  })()}
+                </Svg>
+              </View>
+              <View style={{flex: 1}}>
+                <Text style={[styles.exName, {color: theme.textPrimary, fontSize: 18, fontWeight: '700'}]}>
+                  {activeExercise.name}
+                </Text>
+                <Text style={[styles.exMeta, {color: catColor, fontSize: 14}]}>
+                  {activeExercise.sets && activeExercise.reps
+                    ? `${activeExercise.sets} sets × ${activeExercise.reps}`
+                    : ''}
+                  {activeExercise.rest ? `  ·  Rest ${activeExercise.rest}s` : ''}
+                </Text>
+                {activeExercise.form_tips && (
+                  <Text style={[styles.exMeta, {color: theme.textMuted, fontSize: 12, marginTop: 4}]}>
+                    💡 {activeExercise.form_tips}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => completeExercise(activeIndex)}
+              style={[{
+                backgroundColor: catColor,
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: 'center',
+                marginTop: 8,
+                marginBottom: 8,
+              }]}>
+              <Text style={{color: '#fff', fontSize: 16, fontWeight: '700'}}>
+                Done with this exercise
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {!activeExercise && !showComplete && (
@@ -317,7 +380,7 @@ export default function QuickStartScreen() {
               <View style={styles.exInfo}>
                 <Text style={[styles.exName, { color: isDone ? catColor : theme.textPrimary }]}>{ex.name}</Text>
                 <Text style={[styles.exMeta, { color: theme.textMuted }]}>
-                  {formatDuration(ex.duration)} · {ex.calories_per_minute} kcal/min
+                  {ex.sets && ex.reps ? `${ex.sets} sets × ${ex.reps}${ex.rest ? ` · Rest ${ex.rest}s` : ''}` : `${formatDuration(ex.duration)} · ${ex.calories_per_minute} kcal/min`}
                 </Text>
                 {ex.seconds > 0 && (
                   <Text style={[styles.exProgressText, { color: catColor }]}>
@@ -361,39 +424,40 @@ export default function QuickStartScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Complete modal */}
-        {showComplete && (
-          <View style={styles.completeOverlay}>
-            <LinearGradient colors={[theme.heroCard, '#1a1a2e'] as [string, string]}
-              style={styles.completeCard}>
-              <Text style={styles.completeEmoji}>🎉</Text>
-              <Text style={styles.completeTitle}>Workout Complete!</Text>
-              <Text style={styles.completeSub}>You crushed your {catMeta?.label || category} workout!</Text>
-              <View style={styles.completeStats}>
-                <View style={styles.completeStat}>
-                  <Ionicons name="time-outline" size={20} color="#fff" />
-                  <Text style={styles.completeStatValue}>{totalWorkoutTime()}</Text>
-                  <Text style={styles.completeStatLabel}>Duration</Text>
-                </View>
-                <View style={styles.completeStat}>
-                  <Ionicons name="flame" size={20} color="#FF6B35" />
-                  <Text style={[styles.completeStatValue, { color: '#FF6B35' }]}>{totalCalories}</Text>
-                  <Text style={styles.completeStatLabel}>Calories</Text>
-                </View>
-                <View style={styles.completeStat}>
-                  <Ionicons name="barbell-outline" size={20} color={catColor} />
-                  <Text style={[styles.completeStatValue, { color: catColor }]}>{exercises.length}</Text>
-                  <Text style={styles.completeStatLabel}>Exercises</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={finishWorkout} activeOpacity={0.85}
-                style={[styles.completeDoneBtn, { backgroundColor: catColor }]}>
-                <Text style={styles.completeDoneBtnText}>Back to Activity</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-          </View>
-        )}
       </ScrollView>
+
+      {/* Complete modal — outside ScrollView so absolute positioning works */}
+      {showComplete && (
+        <View style={styles.completeOverlay}>
+          <LinearGradient colors={[theme.heroCard, '#1a1a2e'] as [string, string]}
+            style={styles.completeCard}>
+            <Text style={styles.completeEmoji}>🎉</Text>
+            <Text style={styles.completeTitle}>Workout Complete!</Text>
+            <Text style={styles.completeSub}>You crushed your {catMeta?.label || category} workout!</Text>
+            <View style={styles.completeStats}>
+              <View style={styles.completeStat}>
+                <Ionicons name="time-outline" size={20} color="#fff" />
+                <Text style={styles.completeStatValue}>{totalWorkoutTime()}</Text>
+                <Text style={styles.completeStatLabel}>Duration</Text>
+              </View>
+              <View style={styles.completeStat}>
+                <Ionicons name="flame" size={20} color="#FF6B35" />
+                <Text style={[styles.completeStatValue, { color: '#FF6B35' }]}>{totalCalories}</Text>
+                <Text style={styles.completeStatLabel}>Calories</Text>
+              </View>
+              <View style={styles.completeStat}>
+                <Ionicons name="barbell-outline" size={20} color={catColor} />
+                <Text style={[styles.completeStatValue, { color: catColor }]}>{exercises.length}</Text>
+                <Text style={styles.completeStatLabel}>Exercises</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={finishWorkout} activeOpacity={0.85}
+              style={[styles.completeDoneBtn, { backgroundColor: catColor }]}>
+              <Text style={styles.completeDoneBtnText}>Back to Activity</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      )}
     </AndroidSafeView>
   );
 }

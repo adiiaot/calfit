@@ -21,13 +21,6 @@ import {
   requestNotificationPermissions,
 } from '../../services/reminderService';
 
-// ── WHY TOGGLES RESET ─────────────────────────────────────────
-// The old screen stored reminder state in React useState only.
-// useState resets when the component unmounts (navigation away).
-// useFocusEffect re-runs on every visit but didn't reload saved prefs.
-// Fix: persist to SecureStore on every toggle.
-// Load from SecureStore on every useFocusEffect.
-// This means preferences survive navigation, app restart, and re-login.
 
 const PREFS_KEY = 'calfit_notification_prefs';
 

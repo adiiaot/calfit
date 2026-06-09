@@ -13,14 +13,6 @@ A React Native (Expo) mobile app for calorie tracking, workouts, sleep monitorin
 
 ---
 
-## Screenshots
-
-<!-- Add app screenshots here once captured -->
-<!-- ![Home Dashboard](screenshots/home.png) ![Calorie Tracker](screenshots/calorie.png) -->
-<!-- ![AI Coach](screenshots/aicoach.png) ![Workouts](screenshots/workout.png) -->
-
----
-
 ## Features
 
 | Feature | Description |
@@ -125,16 +117,6 @@ Scan the QR code with **Expo Go (iOS)** or the **Expo app (Android)**.
 
 ---
 
-## Subscription Tiers
-
-| Tier | Price | Key Features |
-|------|-------|-------------|
-| Free | ₦0 | Basic tracking, water logging, step tracking, workout library |
-| Pro | ₦1,999/mo | 20 AI Coach prompts/day, Food Scanner, accountability partners, no ads |
-| Premium | ₦7,999/mo | Unlimited AI Coach, AI Meal Planner, Unlimited Food Scan logs, Unlimited Journal support |
-
----
-
 ## Key Architecture Decisions
 
 - **Steps tracking** lives in `TabNavigator` (not HomeScreen) so the pedometer subscription survives navigation — all screens read `liveSteps` from Zustand
@@ -170,7 +152,7 @@ Scan the QR code with **Expo Go (iOS)** or the **Expo app (Android)**.
 
 This app was built by **AOT Network**. Source code is available on GitHub for verification:
 
-- **GitHub**: [github.com/adiiaot/calfit](https://github.com/adiiaot/calfit)
+- **View Code on GitHub**: [github.com/adiiaot/calfit](https://github.com/adiiaot/calfit)
 - **Portfolio**: [aotnetwork.vercel.app](https://aotnetwork.vercel.app)
 - **Purchase the app**: [Selar - CalFit](https://selar.com/aotayo)
 

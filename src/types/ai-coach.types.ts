@@ -13,8 +13,7 @@ export type Equipment =
   | 'dumbbells'
   | 'barbell'
   | 'kettlebell'
-  | 'bands'
-  | 'machine';
+  | 'bands';
 
 export interface Exercise {
   name: string;

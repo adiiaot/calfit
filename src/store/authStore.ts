@@ -2,20 +2,18 @@ import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { Profile } from '../services/profileService';
 
-/** Supported AI coach personality styles for user interaction. */
-type CoachPersonality = 'balanced' | 'motivator' | 'strict' | 'calm' | 'friendly';
 
 /** Authentication and user profile state managed by the auth store. */
 interface AuthState {
   user: User | null; session: Session | null; profile: Profile | null;
   isLoading: boolean; isAuthenticated: boolean; isOnboarding: boolean;
-  userTier: 'free' | 'pro' | 'premium'; coachPersonality: CoachPersonality; liveSteps: number;
+  userTier: 'free' | 'pro' | 'premium';  liveSteps: number;
   setLiveSteps: (steps: number) => void;
   setSession: (session: Session | null) => void;
   setOnboarding: (v: boolean) => void;
   loadProfile: (userId: string) => Promise<Profile | null>;
   updateProfile: (updates: Partial<Profile>) => void;
-  setCoachPersonality: (personality: CoachPersonality) => void;
+  
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -35,8 +33,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setLiveSteps: (steps) => set({ liveSteps: steps }),
   setOnboarding: (v) => set({ isOnboarding: v }),
-  setCoachPersonality: (p) => set({ coachPersonality: p }),
-
   setSession: (session) => {
     if (!session) {
       set({ session: null, user: null, profile: null, isAuthenticated: false, isOnboarding: false });
@@ -107,6 +103,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { supabase } = await import('../services/supabase');
       await supabase.auth.signOut();
     } catch {}
-    set({ user: null, session: null, profile: null, isOnboarding: false, isAuthenticated: false, userTier: 'free', coachPersonality: 'balanced', liveSteps: 0 });
+    set({ user: null, session: null, profile: null, isOnboarding: false, isAuthenticated: false, userTier: 'free', liveSteps: 0 });
   },
 }));

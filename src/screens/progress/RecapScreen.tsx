@@ -85,16 +85,6 @@ interface RecapData {
 }
 
 // ── LOAD RECAP DATA ───────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────
-// RecapScreen.tsx — SURGICAL FIX
-// Replace only the loadRecapData function (lines ~55–110 approx).
-// Everything else in the file stays exactly the same.
-//
-// BUGS FIXED (same as ProgressScreen):
-//   1. workout_logs  → workout_sessions  (wrong table — no data returned)
-//   2. duration_hours → hours            (wrong column — sleep always 0)
-//   3. exercise_name  → w.name           (wrong field — topWorkout always null)
-// ─────────────────────────────────────────────────────────────────
 
 async function loadRecapData(userId: string, type: RecapType): Promise<RecapData> {
   const now = new Date();
@@ -311,7 +301,7 @@ function RecapCard({
 
         {/* ── FOOTER ── */}
         <View style={[rc.footer, { borderTopColor: t.statBorder }]}>
-          <Text style={[rc.footerText, { color: t.sub }]}>calfit.tech · Track. Grow. Win.</Text>
+          <Text style={[rc.footerText, { color: t.sub }]}>calfit AI · Track. Grow. Win.</Text>
           <View style={[rc.streak, { backgroundColor: t.badge + '22' }]}>
             <Text style={[rc.streakText, { color: t.badge }]}>🔥 {data.streakCount} day streak</Text>
           </View>
@@ -424,7 +414,7 @@ export default function RecapScreen() {
             `💧 ${(data.waterMl / 1000).toFixed(1)}L water\n` +
             `🏋️ ${data.workoutsDone} workouts\n` +
             `🔥 ${data.streakCount} day streak\n\n` +
-            `Track yours at calfit.tech`,
+            `Track yours at calfit AI`,
         });
       }
     } catch {}

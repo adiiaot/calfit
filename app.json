@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "scheme": "com.bigcutstore.calfit",
+    "scheme": "com.aotnetwork.calfit",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bigcutstore.calfit",
+      "bundleIdentifier": "com.aotnetwork.calfit",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSMotionUsageDescription": "CalFit uses motion data to count your steps automatically.",
@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "package": "com.bigcutstore.calfit",
+      "package": "com.aotnetwork.com",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080A0F"

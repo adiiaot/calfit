@@ -30,7 +30,10 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS === 'web') {
       const t = setTimeout(() => setFontTimeout(true), 5000);
-      return () => clearTimeout(t);
+      const style = document.createElement('style');
+      style.textContent = "@font-face{font-family:'Ionicons';src:url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.3/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');font-weight:normal;font-style:normal}";
+      document.head.appendChild(style);
+      return () => { clearTimeout(t); document.head.removeChild(style); };
     }
   }, []);
 

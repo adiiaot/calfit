@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
   welcomeFeatures: { width: '100%', gap: spacing.md, marginBottom: spacing.xl },
   welcomeFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   welcomeFeatureText: { fontSize: fontSize.sm, flex: 1, lineHeight: 18 },
-  getStartedWrap: { width: '100%', borderRadius: radius.lg, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 } }) },
+  getStartedWrap: { width: '100%', borderRadius: radius.lg, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 }, web: { boxShadow: '0 4px 10px rgba(45,220,140,0.3)' } }) },
   getStartedBtn: { padding: spacing.lg, alignItems: 'center' },
   getStartedText: { color: '#fff', fontSize: fontSize.xl, fontWeight: '800', letterSpacing: 0.5 },
 
@@ -827,7 +827,7 @@ const styles = StyleSheet.create({
   goalCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.sm, borderWidth: 1,
-    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 }, android: { elevation: 3 } }),
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 }, android: { elevation: 3 }, web: { boxShadow: '0 2px 6px rgba(0,0,0,0.08)' } }),
   },
   goalIconWrap: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   goalLabel: { flex: 1, fontSize: fontSize.base, fontWeight: '700' },
@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
   budgetModeCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.sm, borderWidth: 1,
-    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 }, android: { elevation: 3 } }),
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 }, android: { elevation: 3 }, web: { boxShadow: '0 2px 6px rgba(0,0,0,0.08)' } }),
   },
   budgetModeIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   budgetModeLabel: { fontSize: fontSize.base, fontWeight: '700' },
@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
   cuisineCard: {
     width: '47%', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1,
     gap: spacing.xs,
-    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 4 }, android: { elevation: 2 } }),
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 4 }, android: { elevation: 2 }, web: { boxShadow: '0 2px 4px rgba(0,0,0,0.06)' } }),
   },
   cuisineLabel: { fontSize: fontSize.base, fontWeight: '700' },
   cuisineDesc: { fontSize: fontSize.xs, lineHeight: 14 },
@@ -879,7 +879,7 @@ const styles = StyleSheet.create({
   mealCountCard: {
     flex: 1, alignItems: 'center', padding: spacing.lg,
     borderRadius: radius.lg, borderWidth: 1, gap: spacing.xs,
-    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 }, android: { elevation: 3 } }),
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6 }, android: { elevation: 3 }, web: { boxShadow: '0 2px 6px rgba(0,0,0,0.08)' } }),
   },
   mealCountNum: { fontSize: 36, fontWeight: '900', letterSpacing: -1 },
   mealCountLabel: { fontSize: fontSize.xs, fontWeight: '600' },
@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: spacing.sm, paddingVertical: spacing.lg, borderRadius: radius.lg,
     marginTop: spacing.lg, marginBottom: spacing.huge,
-    ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 } }),
+    ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 }, web: { boxShadow: '0 4px 10px rgba(45,220,140,0.3)' } }),
   },
   generateBtnText: { color: '#fff', fontSize: fontSize.xl, fontWeight: '800' },
 

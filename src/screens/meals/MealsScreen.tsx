@@ -2,7 +2,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useState, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';

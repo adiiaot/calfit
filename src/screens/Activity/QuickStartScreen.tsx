@@ -2,7 +2,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
   Dimensions, Platform,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import Svg from 'react-native-svg';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
@@ -445,7 +445,7 @@ export default function QuickStartScreen() {
         {/* Complete button */}
         {completedCount > 0 && !showComplete && (
           <TouchableOpacity onPress={finishWorkout} activeOpacity={0.85}
-            style={[styles.completeWrap, Platform.select({ ios: { shadowColor: catColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 } })]}>
+            style={[styles.completeWrap, Platform.select({ ios: { shadowColor: catColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 }, android: { elevation: 6 }, web: { boxShadow: `0 4px 10px ${catColor}4D` } })]}>
             <LinearGradient
               colors={[catColor, catColor + 'CC'] as [string, string]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}

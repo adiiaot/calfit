@@ -3,7 +3,7 @@ import {
   Share, ActivityIndicator, Dimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useState, useRef, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';

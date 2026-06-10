@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Dimensions, Platform, RefreshControl,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import Svg from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 },
   profileBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 
-  heroCard: { marginHorizontal: spacing.lg, borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 14 }, android: { elevation: 8 } }) },
+  heroCard: { marginHorizontal: spacing.lg, borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 14 }, android: { elevation: 8 }, web: { boxShadow: '0 6px 14px rgba(0,0,0,0.25)' } }) },
   heroTop: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   heroStat: { flex: 1, alignItems: 'center', gap: 2 },
   heroDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.15)' },
@@ -299,10 +299,10 @@ const styles = StyleSheet.create({
   heroProgressLabel: { fontSize: 10, color: 'rgba(255,255,255,0.55)', textAlign: 'right', letterSpacing: 0.3 },
 
   quickActions: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
-  quickBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 14, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 }, android: { elevation: 5 } }) },
+  quickBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 14, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 }, android: { elevation: 5 }, web: { boxShadow: '0 4px 8px rgba(0,0,0,0.15)' } }) },
   quickBtnText: { color: '#fff', fontSize: fontSize.base, fontWeight: '700', letterSpacing: 0.3 },
 
-  analysisCta: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: 16, borderWidth: 1, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 }, android: { elevation: 2 } }) },
+  analysisCta: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: 16, borderWidth: 1, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 }, android: { elevation: 2 }, web: { boxShadow: '0 2px 6px rgba(0,0,0,0.06)' } }) },
   analysisCtaGrad: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   analysisCtaTitle: { fontSize: fontSize.base, fontWeight: '700' },
   analysisCtaSub: { fontSize: fontSize.xs, marginTop: 1 },
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   seeAll: { fontSize: fontSize.sm, fontWeight: '700' },
 
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.lg },
-  catCard: { width: '23%', paddingVertical: spacing.sm, paddingHorizontal: 4, borderRadius: 16, borderWidth: 1, alignItems: 'center', gap: 4, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 }, android: { elevation: 2 } }) },
+  catCard: { width: '23%', paddingVertical: spacing.sm, paddingHorizontal: 4, borderRadius: 16, borderWidth: 1, alignItems: 'center', gap: 4, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 }, android: { elevation: 2 }, web: { boxShadow: '0 2px 6px rgba(0,0,0,0.06)' } }) },
   catIllusWrap: { width: 46, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   catLabel: { fontSize: 9, fontWeight: '700', textAlign: 'center' },
   catCount: { fontSize: 8, textAlign: 'center' },
@@ -322,12 +322,12 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: fontSize.sm, textAlign: 'center' },
 
   routineScroll: { paddingLeft: spacing.lg, paddingRight: spacing.sm, gap: spacing.sm, marginBottom: spacing.lg },
-  routineCard: { width: SW * 0.55, padding: spacing.md, borderRadius: 16, borderWidth: 1, borderLeftWidth: 4, gap: spacing.xs, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 8 }, android: { elevation: 4 } }) },
+  routineCard: { width: SW * 0.55, padding: spacing.md, borderRadius: 16, borderWidth: 1, borderLeftWidth: 4, gap: spacing.xs, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 8 }, android: { elevation: 4 }, web: { boxShadow: '0 3px 8px rgba(0,0,0,0.1)' } }) },
   routineName: { fontSize: fontSize.base, fontWeight: '800', letterSpacing: -0.2 },
   routineMeta: { flexDirection: 'row', gap: spacing.sm },
   routineMetaText: { fontSize: fontSize.xs },
 
-  sessionCard: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 14, overflow: 'hidden', borderWidth: 1, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 6 }, android: { elevation: 3 } }) },
+  sessionCard: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: 14, overflow: 'hidden', borderWidth: 1, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 6 }, android: { elevation: 3 }, web: { boxShadow: '0 3px 6px rgba(0,0,0,0.1)' } }) },
   sessionTop: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
   sessionName: { flex: 1, fontSize: fontSize.base, fontWeight: '700', color: '#fff' },
   sessionCal: { alignItems: 'center' },

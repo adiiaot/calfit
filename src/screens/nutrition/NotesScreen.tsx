@@ -3,7 +3,7 @@ import {
   TextInput, Alert, Modal, Keyboard, TouchableWithoutFeedback,
   KeyboardAvoidingView, Platform, Animated, Share,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';

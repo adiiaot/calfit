@@ -3,7 +3,7 @@ import {
   TouchableOpacity, Alert, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AndroidSafeView } from '../../shared/AndriodSafeView';
+import { AndroidSafeView } from '../../shared/AndroidSafeView';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';

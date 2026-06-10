@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
   Dimensions, Platform, Alert,
 } from 'react-native';
-import { AndroidSafeView } from '../../modules/shared/AndriodSafeView';
+import { AndroidSafeView } from '../../modules/shared/AndroidSafeView';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
 
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.huge },
 
-  heroCard: { borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 14 }, android: { elevation: 8 } }) },
+  heroCard: { borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 14 }, android: { elevation: 8 }, web: { boxShadow: '0 6px 14px rgba(0,0,0,0.25)' } }) },
   heroTitle: { fontSize: fontSize.sm, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginBottom: spacing.md, textTransform: 'uppercase', letterSpacing: 0.5 },
   heroStats: { flexDirection: 'row', marginBottom: spacing.md },
   heroStat: { flex: 1, alignItems: 'center', gap: 4 },

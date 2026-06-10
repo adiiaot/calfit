@@ -219,6 +219,6 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
   chipText: { fontSize: fontSize.sm },
   bioInput: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, minHeight: 80, fontSize: fontSize.sm, lineHeight: 20, textAlignVertical: 'top', marginTop: spacing.xs },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, borderRadius: radius.lg, marginTop: spacing.xxl, marginBottom: spacing.xl, ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12 }, android: { elevation: 6 } }) },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, borderRadius: radius.lg, marginTop: spacing.xxl, marginBottom: spacing.xl, ...Platform.select({ ios: { shadowColor: '#2DDC8C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12 }, android: { elevation: 6 }, web: { boxShadow: '0 4px 12px rgba(45,220,140,0.35)' } }) },
   saveBtnText: { color: '#fff', fontSize: fontSize.xl, fontWeight: '700' },
 });

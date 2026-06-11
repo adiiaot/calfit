@@ -153,6 +153,9 @@ export default function FoodScannerScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {results ? (
           <View style={styles.resultsContainer}>
+            {imageUri && (
+              <Image source={{ uri: imageUri }} style={styles.resultImage} resizeMode="cover" />
+            )}
             <LinearGradient colors={['#2DDC8C', '#0DAE6C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.resultHeader}>
               <Ionicons name="checkmark-circle" size={32} color="#fff" />
               <Text style={styles.resultTitle}>Food Detected!</Text>
@@ -293,6 +296,7 @@ const styles = StyleSheet.create({
 
   // Results mode
   resultsContainer: { padding: spacing.lg, gap: spacing.md },
+  resultImage: { width: '100%', height: 200, borderRadius: radius.xl, marginBottom: spacing.sm },
   resultHeader: { alignItems: 'center', padding: spacing.xl, borderRadius: radius.xl, gap: spacing.sm },
   resultTitle: { color: '#fff', fontSize: fontSize.display, fontWeight: '800' },
   resultSub: { color: 'rgba(255,255,255,0.8)', fontSize: fontSize.base },

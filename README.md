@@ -82,6 +82,9 @@ calfit/
 
 ## Try It Out
 
+### Web
+View the APP live on your browser with no authentication needed: [CalFit Web Version](https://dist-seven-woad-33.vercel.app/)
+
 ### Android (APK)
 Download the latest APK: [Google Drive link](https://drive.google.com/drive/folders/1YOUR_FOLDER_ID) *(link will be updated after build)*
 

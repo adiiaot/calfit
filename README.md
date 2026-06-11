@@ -182,6 +182,6 @@ This app was built by **AOT AYO UNDER THE AOT Network**. Source code is availabl
 ---
 
 ## Support
-
-[Send a tip on selar to support development](https://selar.com/39m7437811)
+<p>Love the product? Buy me a tip to support ongoing development.</p>
+  <a href="https://selar.com/showlove/aotayo" class="tip-button">Buy me a coffee ☕</a>
 

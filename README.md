@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 [![Buy on Selar](https://img.shields.io/badge/Buy_on-Selar-5B2D90)](https://selar.com/39m7437811)
 
-> **Built by [AOT Network](https://github.com/adiiaot)** — Full-stack fitness & nutrition coaching platform with AI integration.
+> **Built by [AOT AYO](https://github.com/adiiaot)** — Full-stack fitness & nutrition coaching platform with AI integration.
 
 A React Native (Expo) mobile app for calorie tracking, workouts, sleep monitoring, intermittent fasting, AI-powered coaching & journaling, and accountability partners.
 
@@ -172,7 +172,7 @@ This project is open-source for **personal and educational use** only.
 
 ## Portfolio & Verification
 
-This app was built by **AOT Network**. Source code is available on GitHub for verification:
+This app was built by **AOT AYO UNDER THE AOT Network**. Source code is available on GitHub for verification:
 
 - **View Code on GitHub**: [github.com/adiiaot/calfit](https://github.com/adiiaot/calfit)
 - **Portfolio**: [aotnetwork.vercel.app](https://aotnetwork.vercel.app)

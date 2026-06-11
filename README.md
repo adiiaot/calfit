@@ -168,7 +168,7 @@ This project is open-source for **personal and educational use** only.
 | Using as a foundation for a commercial product | ❌ Requires license |
 
 **Purchase a Commercial License:**
-- **Selar**: https://selar.com/39m7437811
+- **Buy Full Source Code Setup on Selar**: [CalFit Licensed Source Code](https://selar.com/39m7437811)
 - **Custom / Enterprise**: aotnetworklabs@gmail.com
 
 ---
@@ -177,12 +177,11 @@ This project is open-source for **personal and educational use** only.
 
 This app was built by **AOT AYO UNDER THE AOT Network**. Source code is available on GitHub for verification:
 
-- **View Code on GitHub**: [github.com/adiiaot/calfit](https://github.com/adiiaot/calfit)
 - **Portfolio**: [aotnetwork.vercel.app](https://aotnetwork.vercel.app)
 
 ---
 
 ## Support
 
-[![Buy on Selar](https://img.shields.io/badge/Buy_License_on-Selar-5B2D90)](https://selar.com/39m7437811)
+[Send a tip on selar to support development](https://selar.com/39m7437811)
 

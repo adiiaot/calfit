@@ -173,7 +173,7 @@ function WorkoutSection({ theme, userId }: { theme: typeof colors.light; userId:
 
 function BodyStatsSection({ theme, profile, navigation: nav }: { theme: typeof colors.light; profile: any; navigation: any }) {
   const height = profile?.height_cm ?? profile?.height ?? null;
-  const weight = profile?.weight_kg ?? profile?.weight ?? null;
+  const weight = profile?.current_weight_kg ?? profile?.weight_kg ?? profile?.weight ?? null;
   const bmi = height && weight ? (weight / ((height / 100) * (height / 100))).toFixed(1) : null;
   const goalWeight = profile?.goal_weight_kg ?? null;
 

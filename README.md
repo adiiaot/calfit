@@ -1,8 +1,8 @@
 # CalFit — Personal Fitness & Nutrition Coach
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Expo](https://img.shields.io/badge/Expo-54-000020?logo=expo)](https://expo.dev/)
-[![React Native](https://img.shields.io/badge/React_Native-0.81-61DAFB?logo=react)](https://reactnative.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Expo](https://img.shields.io/badge/Expo-57-000020?logo=expo)](https://expo.dev/)
+[![React Native](https://img.shields.io/badge/React_Native-0.86-61DAFB?logo=react)](https://reactnative.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase)](https://supabase.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 [![Buy on Selar](https://img.shields.io/badge/Buy_on-Selar-5B2D90)](https://selar.com/39m7437811)
@@ -39,14 +39,14 @@ A React Native (Expo) mobile app for calorie tracking, workouts, sleep monitorin
 
 | Layer | Technology |
 |-------|-----------|
-| Mobile | React Native 0.81 + Expo 54 |
-| Language | TypeScript 5.9 |
+| Mobile | React Native 0.86 + Expo 57 |
+| Language | TypeScript 6.0 |
 | Navigation | React Navigation v7 (Stack + Bottom Tabs + Radial Menu) |
 | State | Zustand v5 |
 | Backend/Auth | Supabase (Auth, PostgreSQL, Realtime, Storage) |
 | AI | NVIDIA Llama 3.1 70B (chat) + Llama 3.2 90B Vision (food scanner) |
 | Food DB | Open Food Facts API + local Nigerian food database |
-| Voice | Deepgram STT (speech-to-text for AI Coach) |
+| Voice | Deepgram STT (speech-to-text for AI Coach); recording via expo-audio, TTS via expo-speech |
 | Animations | React Native Animated + Lottie |
 | Charts | Pure React Native (no external chart library) |
 

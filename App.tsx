@@ -2,9 +2,9 @@ import { useEffect, useCallback, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans';
 import { Ionicons } from '@expo/vector-icons';
-import { View, ActivityIndicator, Platform, LayoutChangeEvent } from 'react-native';
+import { View, Text, ActivityIndicator, Platform, LayoutChangeEvent } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { supabase } from './src/services/supabase';
+import { supabase, supabaseConfigError } from './src/services/supabase';
 import { useAuthStore } from './src/store/authStore';
 import { useThemeStore } from './src/store/themeStore';
 import { colors } from './src/theme';
@@ -43,6 +43,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (supabaseConfigError) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
@@ -64,6 +65,15 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  if (supabaseConfigError) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#080A0F', padding: 24 }}>
+        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 12 }}>Configuration error</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', lineHeight: 20 }}>{supabaseConfigError}</Text>
+      </View>
+    );
+  }
 
   if (Platform.OS === 'web' && fontsError) {
     console.warn('Font loading error on web, continuing with default fonts:', fontsError);

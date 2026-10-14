@@ -34,11 +34,13 @@ export function AndroidSafeView({ children, style, backgroundColor }: Props) {
       flex: 1,
       backgroundColor,
       paddingTop: insets.top,
+      paddingBottom: insets.bottom,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
     }, style]}>
       <StatusBar
         translucent
         backgroundColor="transparent"
-        barStyle="light-content"
       />
       {children}
     </View>

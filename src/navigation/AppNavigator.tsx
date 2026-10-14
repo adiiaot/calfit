@@ -73,7 +73,7 @@ const TAB_LABELS: Record<string, string> = {
   Home: 'Home', Calorie: 'Calorie', AICoach: 'AI Coach', Notes: 'Notes',
 };
 
-function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
+function CustomTabBar({ state, navigation: nav, insets }: BottomTabBarProps) {
   const { colorScheme } = useThemeStore();
   const theme = colors[colorScheme];
   const [radialOpen, setRadialOpen] = useState(false);
@@ -106,9 +106,10 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
         theme={theme}
       />
 
-      <View style={[tb.bar, { backgroundColor: theme.tabBar, borderTopColor: theme.border }]}>
-        {visibleRoutes.map((route, index) => {
-          const isFocused = state.index === index;
+      <View style={[tb.bar, { backgroundColor: theme.tabBar, borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
+        {visibleRoutes.map((route) => {
+          const routeIndex = state.routes.findIndex((r) => r.key === route.key);
+          const isFocused = state.index === routeIndex;
           const icon = TAB_ICONS[route.name];
           const label = TAB_LABELS[route.name] || route.name;
 
@@ -118,7 +119,16 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
           };
 
           return (
-            <TouchableOpacity key={route.key} onPress={onPress} activeOpacity={0.7} style={tb.tab}>
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              activeOpacity={0.7}
+              style={tb.tab}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isFocused }}
+              accessibilityLabel={label}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Ionicons
                 name={isFocused ? icon.active : icon.inactive}
                 size={22}
@@ -136,6 +146,9 @@ function CustomTabBar({ state, navigation: nav }: BottomTabBarProps) {
           onPress={() => setRadialOpen(true)}
           activeOpacity={0.85}
           style={[tb.plusBtn, { backgroundColor: theme.accent }]}
+          accessibilityRole="button"
+          accessibilityLabel="Open quick actions"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>

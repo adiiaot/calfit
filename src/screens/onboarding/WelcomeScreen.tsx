@@ -73,7 +73,7 @@ export default function WelcomeScreen() {
           </TouchableOpacity>
 
           <Text style={[styles.disclaimer, { color: theme.textMuted }]}>
-            Your data stays on this device. No sign-up required.
+            Your profile syncs securely to your CalFit account. No email required to start.
           </Text>
         </View>
       </View>

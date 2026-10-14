@@ -6,13 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "scheme": "com.aotnetwork.calfit",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#080A0F"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aotnetwork.calfit",
@@ -34,7 +28,6 @@
         "RECORD_AUDIO",
         "INTERNET"
       ],
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -42,7 +35,7 @@
       "bundler": "metro",
       "output": "single",
       "meta": {
-        "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+        "viewport": "width=device-width, initial-scale=1"
       },
       "description": "CalFit - AI Fitness & Nutrition Coach"
     },
@@ -68,6 +61,18 @@
         "expo-image-picker",
         {
           "photosPermission": "CalFit needs access to your photos to set your avatar."
+        }
+      ],
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-audio",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#080A0F"
         }
       ]
     ],

@@ -49,7 +49,7 @@ export function useWorkoutVoice(): WorkoutVoice {
     let mounted = true;
     (async () => {
       try {
-        const voices = await Speech.getVoicesAsync();
+        const voices = await Speech.getAvailableVoicesAsync();
         if (!mounted) return;
         const selected = findBestVoice(voices);
         bestVoiceRef.current = selected;

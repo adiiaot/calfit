@@ -209,7 +209,7 @@ export default function SettingsScreen() {
   const handleSignOut = () => {
     Alert.alert(
       'Sign Out',
-      'This will clear your session. Your data stays on this device — just restart the app to pick up where you left off.',
+      'This will sign you out on this device. Your synced data stays in your CalFit account — just sign back in to pick up where you left off.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign Out', style: 'destructive', onPress: signOut },
@@ -218,7 +218,7 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert('Delete Account', 'This permanently deletes all your data from this device. This cannot be undone.', [
+    Alert.alert('Delete Account', 'This signs you out on this device. To permanently delete your synced account data, contact aotnetworklabs@gmail.com — in-app permanent deletion is not yet available.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Export Data First',

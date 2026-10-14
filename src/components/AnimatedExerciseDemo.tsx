@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,6 +87,19 @@ export default function AnimatedExerciseDemo({ exercise, isActive, secondsLeft }
   const legAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  // Plain-number mirror of armAnim (0..1) for SVG coordinate math.
+  // Animated nodes can't be used with the `*` operator (yields NaN and
+  // drops the limb paths), so we mirror the value into state instead.
+  const [armT, setArmT] = useState(0);
+  const [legT, setLegT] = useState(0);
+  useEffect(() => {
+    const armId = armAnim.addListener(({ value }) => setArmT(value));
+    const legId = legAnim.addListener(({ value }) => setLegT(value));
+    return () => {
+      armAnim.removeListener(armId);
+      legAnim.removeListener(legId);
+    };
+  }, [armAnim, legAnim]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -132,15 +145,9 @@ export default function AnimatedExerciseDemo({ exercise, isActive, secondsLeft }
     };
   }, [isActive]);
 
-  const armOffset = armAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const armOffset: number = armT;
 
-  const legSwing = legAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const legSwing: number = legT;
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],

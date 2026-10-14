@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   toolBtnGradText: { fontSize: fontSize.sm, fontWeight: '700', color: '#fff' },
 
   // Sidebar
-  sidebarOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100 },
+  sidebarOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100 },
   sidebar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 290, paddingTop: 60, zIndex: 101, elevation: 20, shadowColor: '#000', shadowOffset: { width: 4, height: 0 }, shadowOpacity: 0.3, shadowRadius: 16 },
   sidebarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, marginBottom: spacing.md },
   sidebarTitle: { fontSize: fontSize.xl, fontWeight: '800' },

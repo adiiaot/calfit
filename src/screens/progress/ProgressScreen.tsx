@@ -45,7 +45,7 @@ async function loadStats(userId: string, period: Period) {
     supabase.from('sleep_logs').select('hours,date').eq('user_id', userId).gte('date', sinceStr),
     supabase.from('step_logs').select('steps,date').eq('user_id', userId).gte('date', sinceStr),
     supabase.from('profiles')
-      .select('streak_count,weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml,height_cm')
+      .select('streak_count,weight_kg,current_weight_kg,target_weight_kg,daily_calorie_goal,water_goal_ml,height_cm')
       .eq('id', userId).single(),
     supabase.from('body_measurements').select('id,user_id,chest_cm,waist_cm,hips_cm,arms_cm,thighs_cm,neck_cm,measured_at').eq('user_id', userId).order('measured_at', { ascending: false }).limit(2),
   ]);
@@ -92,8 +92,8 @@ async function loadStats(userId: string, period: Period) {
     daysTracked: new Set(foodData.map((r:any)=>r.logged_at?.split('T')[0])).size,
     workoutsDone: workoutData.length,
     streak: p?.streak_count ?? 0,
-    weight: p?.weight_kg ?? null,
-    targetWeight: p?.target_weight_kg ?? null,
+    weight: p?.current_weight_kg ?? p?.weight_kg ?? null,
+    targetWeight: p?.target_weight_kg ?? p?.goal_weight_kg ?? null,
     calorieGoal: p?.daily_calorie_goal ?? 2000,
     waterGoal: p?.water_goal_ml ?? 2500,
     heightCm: p?.height_cm ?? null,

@@ -159,8 +159,8 @@ export function RadialMenu({ visible, onClose, onSelect, theme }: Props) {
 
 const styles = StyleSheet.create({
   overlay:      { flex: 1 },
-  backdropTouch: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
-  backdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  backdropTouch: { ...StyleSheet.absoluteFill, zIndex: 0 },
+  backdrop:     { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
   ringBg: {
     position: 'absolute',
     width: (140 + 20) * 2,

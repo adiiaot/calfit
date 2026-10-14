@@ -40,12 +40,13 @@ Copy `.env.example` to `.env` and fill in:
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-EXPO_PUBLIC_NVIDIA_API_KEY=optional-nvidia-key
-EXPO_PUBLIC_NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 EXPO_PUBLIC_NVIDIA_MODEL=meta/llama-3.1-70b-instruct
 EXPO_PUBLIC_NVIDIA_VISION_MODEL=meta/llama-3.2-90b-vision-instruct
-EXPO_PUBLIC_DEEPGRAM_KEY=optional-deepgram-key
 ```
+
+> AI keys (NVIDIA, Deepgram) are NOT client env vars. Set them as Supabase Edge Function secrets
+> (`supabase secrets set NVIDIA_API_KEY=... DEEPGRAM_API_KEY=...`) and deploy `ai-proxy` + `deepgram-proxy`.
+> See `.env.example` for the current procedure.
 
 ## 4. Run
 

@@ -39,8 +39,10 @@ We do not build advertising profiles or sell your personal information.`,
     title: 'Data Sharing',
     content: `CalFit does not sell your personal data. We share limited data with:
 
-- Supabase — our secure database and authentication provider
-- NVIDIA — powers the CalFit Coach AI (your prompts only, no health data shared)
+- Supabase — our secure database, authentication, and file storage provider (synced profile, logs, avatars)
+- NVIDIA (via our secure proxy) — powers the CalFit Coach AI and food scanner; receives your prompts plus relevant fitness context you choose to share
+- Open Food Facts — receives the food search text you type to look up nutrition info
+- Deepgram (via our secure proxy) — receives short voice clips only when you use voice input
 
 All third-party providers are contractually bound to protect your data and use it only for the services they provide.`,
   },
@@ -51,7 +53,7 @@ All third-party providers are contractually bound to protect your data and use i
 - Access: view all data stored about you in the app
 - Download: export your complete data from Settings
 - Correct: update your information in Edit Profile at any time
-- Delete: permanently delete your account and all associated data
+- Delete: request permanent deletion of your account and synced data (contact support — in-app permanent deletion is not yet available)
 - Opt out: disable AI coaching or notifications whenever you choose
 
 To exercise any of these rights, use the controls in your Settings or contact us directly.`,

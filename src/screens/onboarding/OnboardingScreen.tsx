@@ -152,7 +152,7 @@ function StepAccount({ theme, name, setName, username, setUsername, isLoading, o
       </TouchableOpacity>
       <View style={[styles.privacyNote, { backgroundColor: theme.accentDim as string, borderColor: theme.accent + '33' }]}>
         <Ionicons name="shield-checkmark-outline" size={16} color={theme.accent} />
-        <Text style={[styles.privacyText, { color: theme.textSecondary }]}>Your data stays on this device. No sign-up or email required.</Text>
+        <Text style={[styles.privacyText, { color: theme.textSecondary }]}>Your profile syncs securely to your CalFit account. No email required to start.</Text>
       </View>
     </StepWrap>
   );
@@ -290,7 +290,7 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
           {step === 'welcome' && (
             <Text style={[styles.signInText, { color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: spacing.md }]}>
-              Your data stays on this device
+              Your progress syncs to your CalFit account
             </Text>
           )}
         </View>

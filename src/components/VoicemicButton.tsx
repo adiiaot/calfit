@@ -6,9 +6,14 @@ import {
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  useAudioRecorder,
+  RecordingPresets,
+  setAudioModeAsync,
+} from 'expo-audio';
 import { colors, spacing, fontSize } from '../theme';
 import {
-  startRecording, stopRecording, cancelRecording,
+  requestMicPermission,
   transcribeAudio, formatDuration,
 } from '../services/VoiceRecorderService';
 
@@ -31,6 +36,7 @@ export function VoiceMicButton({
   const pulse = useRef(new Animated.Value(1)).current;
   const anim  = useRef<Animated.CompositeAnimation | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   useEffect(() => {
     if (isRecording) {
@@ -65,17 +71,38 @@ export function VoiceMicButton({
   };
 
   const handleStart = async () => {
-    const started = await startRecording();
-    if (!started) {
-      Alert.alert(
-        'Microphone Access Needed',
-        'CalFit needs microphone access to record voice notes. Go to your device Settings → Privacy → Microphone and enable CalFit.',
-        [{ text: 'OK' }]
-      );
+    try {
+      const granted = await requestMicPermission();
+      if (!granted) {
+        Alert.alert(
+          'Microphone Access Needed',
+          'CalFit needs microphone access to record voice notes. Go to your device Settings → Privacy → Microphone and enable CalFit.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (e) {
+      if (__DEV__) console.error('VoiceMic start error:', e);
+      Alert.alert('Recording failed', 'Could not start the microphone. Please try again.', [{ text: 'OK' }]);
       return;
     }
     setIsRecording(true);
     onRecordingChange?.(true);
+  };
+
+  const stopAndGetUri = async (): Promise<string | null> => {
+    try {
+      if (recorder.isRecording) await recorder.stop();
+      return recorder.uri ?? null;
+    } catch (e) {
+      if (__DEV__) console.error('VoiceMic stop error:', e);
+      return null;
+    } finally {
+      try { await setAudioModeAsync({ allowsRecording: false }); } catch {}
+    }
   };
 
   const handleStop = async () => {
@@ -83,7 +110,7 @@ export function VoiceMicButton({
     onRecordingChange?.(false);
     setIsProcessing(true);
 
-    const uri = await stopRecording();
+    const uri = await stopAndGetUri();
     if (!uri) { setIsProcessing(false); return; }
 
     const text = await transcribeAudio(uri);
@@ -116,7 +143,7 @@ export function VoiceMicButton({
           if (!isRecording) return;
           setIsRecording(false);
           onRecordingChange?.(false);
-          await cancelRecording();
+          await stopAndGetUri();
           setIsProcessing(false);
         }}
         delayLongPress={600}

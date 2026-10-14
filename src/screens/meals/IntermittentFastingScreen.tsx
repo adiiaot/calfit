@@ -81,7 +81,7 @@ export default function IntermittentFastingScreen() {
     if (!user?.id) return;
     try {
       const { supabase } = await import('../../services/supabase');
-      const { data } = await supabase.from('fasting_logs').select('id,user_id,started_at,ended_at,completed,duration_planned,duration_actual').eq('user_id', user.id)
+      const { data } = await supabase.from('fasting_logs').select('id,user_id,protocol,fast_hours,eating_hours,started_at,target_end_at,ended_at,completed,duration_planned,duration_actual').eq('user_id', user.id)
         .order('started_at', { ascending: false }).limit(20);
       if (data) {
         const active = data.find((f: FastingLog) => !f.completed && !f.ended_at);

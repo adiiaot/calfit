@@ -131,15 +131,14 @@ function buildCSV(data: Awaited<ReturnType<typeof fetchAllData>>, userName: stri
   if ((data.workouts as any[]).length > 0) {
     sections.push('=== WORKOUT HISTORY ===');
     sections.push(rowsToCSV(
-      ['Date', 'Exercise', 'Duration (min)', 'Calories Burned', 'Sets', 'Reps', 'Weight (kg)'],
+      ['Date', 'Workout', 'Duration (min)', 'Calories Burned', 'Exercises (count)', 'Status'],
       (data.workouts as any[]).map((r) => [
         r.completed_at?.split('T')[0] ?? '',
-        r.exercise_name ?? '',
-        String(r.duration_minutes ?? ''),
+        r.name ?? r.exercise_name ?? '',
+        r.duration_seconds != null ? String(Math.round(r.duration_seconds / 60)) : String(r.duration_minutes ?? ''),
         String(r.calories_burned ?? 0),
-        String(r.sets ?? ''),
-        String(r.reps ?? ''),
-        String(r.weight_kg ?? ''),
+        Array.isArray(r.exercises) ? String(r.exercises.length) : String(r.exercise_count ?? ''),
+        r.status ?? '',
       ])
     ));
     sections.push('');
@@ -166,7 +165,7 @@ function buildCSV(data: Awaited<ReturnType<typeof fetchAllData>>, userName: stri
       ['Date', 'Duration (h)', 'Quality', 'Bedtime', 'Wake Time'],
       (data.sleep as any[]).map((r) => [
         r.date ?? '',
-        String(r.duration_hours ?? ''),
+        String(r.hours ?? r.duration_hours ?? ''),
         r.quality ?? '',
         r.bedtime ?? '',
         r.wake_time ?? '',
@@ -182,9 +181,9 @@ function buildCSV(data: Awaited<ReturnType<typeof fetchAllData>>, userName: stri
       ['Started', 'Ended', 'Protocol', 'Status'],
       (data.fasting as any[]).map((r) => [
         r.started_at?.split('T')[0] ?? '',
-        r.completed_at?.split('T')[0] ?? '',
+        r.ended_at?.split('T')[0] ?? '',
         r.protocol ?? '',
-        r.status ?? '',
+        r.completed ? 'completed' : 'incomplete',
       ])
     ));
     sections.push('');
@@ -205,7 +204,7 @@ function buildTextReport(data: Awaited<ReturnType<typeof fetchAllData>>, userNam
   const totalWO    = workouts.length;
   const totalSteps = steps.reduce((s: number, r: any) => s + (r.steps ?? 0), 0);
   const avgSleep   = sleep.length > 0
-    ? (sleep.reduce((s: number, r: any) => s + (r.duration_hours ?? 0), 0) / sleep.length).toFixed(1)
+    ? (sleep.reduce((s: number, r: any) => s + (r.hours ?? r.duration_hours ?? 0), 0) / sleep.length).toFixed(1)
     : '—';
 
   return `
@@ -242,7 +241,7 @@ Fasting Sessions:     ${(data.fasting as any[]).length}
 RECENT WORKOUTS (last 10)
 ──────────────────────────────────────
 ${workouts.slice(0, 10).map((w: any) =>
-  `${w.completed_at?.split('T')[0] ?? '—'}  ${w.exercise_name ?? '—'}  ${w.calories_burned ?? 0} kcal`
+  `${w.completed_at?.split('T')[0] ?? '—'}  ${w.name ?? w.exercise_name ?? '—'}  ${w.calories_burned ?? 0} kcal`
 ).join('\n') || 'No workouts logged yet.'}
 
 ──────────────────────────────────────

@@ -1,46 +1,44 @@
 # CalFit — IT Defence Slides (6–8 slides, about 5 minutes; copy into PowerPoint)
 
 ## Slide 1 — Title
-- CalFit — your fitness and nutrition coach in one app
+- CalFit — one app for your fitness and food, with an AI coach
 - [INSERT NAME], [INSERT DEPARTMENT], [INSERT INSTITUTION]
-- One line: track food, workouts, sleep and fasting, with an AI coach guiding you.
+- One line underneath: I found out why people quit fitness apps, and built one they might actually keep.
 
-## Slide 2 — The real-world problem (with photos or simple icons)
-- People quit fitness within weeks. Why?
-  - Records scattered: workouts in notebooks, meals in memory, sleep nowhere.
-  - Foreign apps don't know local dishes, so food logging becomes guesswork.
-  - Same generic plan for beginners and gym regulars.
-  - Nobody checks in, so one missed week becomes quitting.
-- Punchline: people can't see progress, so they stop trying.
+## Slide 2 — The problem I saw (photos or simple icons work best here)
+- People don't quit because they're lazy. From what I observed:
+  - Records everywhere: notebooks, memory, nowhere. No full picture.
+  - Foreign apps don't know our dishes — logging food becomes guesswork.
+  - Beginners and gym regulars get the same generic plan.
+  - Nobody checks in, so one missed week quietly becomes quitting.
+- The line to land: "You can't stay motivated by progress you can't see."
 
-## Slide 3 — How CalFit solves it (one line per fix)
-- One home for everything → progress visible on one screen.
-- Nigerian dishes + photo scanner → food logging is easy.
-- AI coach + meal plans → advice that fits you.
-- Partners + streaks + reminders → someone/something nudges you daily.
-- Download your data → your effort is always yours.
+## Slide 3 — What I built to answer it
+- One home for everything → your progress finally visible on one screen.
+- Nigerian dishes plus a photo scanner → logging food stops being a chore.
+- An AI coach that knows your history → advice that fits you, not everyone.
+- Partners, streaks, reminders → a daily nudge so a missed day stays just a day.
+- Download your data → your effort is always yours to keep.
 
-## Slide 4 — Main features (show the app, not paragraphs)
+## Slide 4 — The app itself (let screenshots do the talking)
 - Screenshot: Home. Screenshot: food log. Screenshot: workout timer.
-- Say what each does in one short sentence.
+- One short sentence per screenshot. Don't read paragraphs — point and talk.
 
-## Slide 5 — How it is built (simple diagram, no jargon)
-- Phone app → your private account online → AI helper.
-- One codebase runs on Android and iPhone.
-- Your records are locked to your account; secret keys stay on the server.
+## Slide 5 — How it works (one simple diagram)
+- Your phone → your private account online → the AI helper.
+- Say it plainly: "One codebase runs on both Android and iPhone. Your records are locked to your account, and the secret keys live on the server, not in the app."
 
-## Slide 6 — Testing: what broke, what I fixed
-- Found and fixed: wrong sleep numbers in downloads, fasting timer breaking after reopening, crash on launch without setup values, retired AI model replaced, camera crashing when tapped too fast.
-- Automatic checks: 32/32 pass. App health check: 21/21 pass.
-- Honest note: full phone testing still in progress — nothing claimed until run on a real device.
+## Slide 6 — I tested it, and here's the proof
+- Name two or three real fixes: the launch crash, the retired AI model, the fasting timer that broke on reopen.
+- The numbers: 32 automatic checks pass, 21 out of 21 health checks pass.
+- The honest footnote: "Phone testing is still in progress — my report says exactly what's done and what isn't."
 
-## Slide 7 — Challenges and lessons
-- Database field names changed → always verify after changes.
-- AI provider switched off a model → keep model names in settings, have a backup.
-- Startup crash → always show a message, never crash silently.
-- During IT I also learned freelancing, client negotiation, pricing and budgeting.
+## Slide 7 — What went wrong and what I learned
+- Old database field names → verify them after every change.
+- A model switched off overnight → keep model names replaceable.
+- A crash in front of an assessor → never crash silently again.
+- And from my IT placement itself: freelancing, negotiation, pricing, budgeting.
 
-## Slide 8 — Conclusion and next steps
-- CalFit works and is demonstrable today (Expo Go + Android install file).
-- Next: tighten security, finish phone testing, then app stores.
-- Thank the panel; invite questions.
+## Slide 8 — Where it stands
+- "It runs today — I'll happily demo it. It's not a store product yet, and here's the path: harden security, finish phone testing, then publish."
+- Thank the panel. Invite questions.

@@ -1,7 +1,7 @@
 # CalFit — Industrial Training Project Report
 *(Editable source. Export to print-ready DOCX/PDF before submission. Placeholders marked [INSERT …].)*
 
-**Cover:** Project title: CalFit — AI Fitness and Nutrition Coach · Student name: [INSERT NAME] · Matriculation number: [INSERT MATRIC NUMBER] · Department: [INSERT DEPARTMENT] · Institution: [INSERT INSTITUTION] · Industrial Training organisation: [INSERT ORGANISATION] · Academic session: [INSERT SESSION] · Submission date: [INSERT DATE]
+**Cover:** Project title: CalFit — AI Fitness and Nutrition Coach · Student name: OLUWADARE TAYE AYO · Matriculation number: U2023/5570148 · Department: COMPUTER SCIENCE · Institution: UNIVERSITY OF PORT HARCOURT · Industrial Training organisation: AI HIVE · Academic session: 2026/2027 · Submission date: 14TH OCTOBER 2026
 
 ## Chapter 1 — Introduction
 - **Background.** I have watched many people around me download fitness apps in January and delete them by March. It kept happening, so I started asking why. The answer was rarely laziness. People were trying — their tools were just working against them. That observation is where CalFit started.

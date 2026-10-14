@@ -1,10 +1,10 @@
 # CalFit — Speaker Notes (about 5 minutes total)
 
 ## Opening (0:00–0:30)
-"Good morning. I'm [INSERT NAME]. My project is CalFit — one app for tracking food, workouts, sleep and fasting, with an AI coach. I'll tell you the problem I found, what I built to solve it, and how I proved my work."
+"Good morning. I'm Oluwadare Taye Ayo. My project is CalFit — one app for tracking food, workouts, sleep and fasting, with an AI coach. I'll tell you the problem I found, what I built to solve it, and how I proved my work."
 
 ## The problem (0:30–1:15)
-"I kept watching people download fitness apps in January and delete them by March. It wasn't laziness. Their records were scattered, their food wasn't in these foreign apps, every plan looked the same, and nobody checked in. My one-line summary is: you can't stay motivated by progress you can't see."
+"I kept watching people download fitness apps in January and delete them months later. It wasn't laziness. Their records were scattered, their food wasn't in these foreign apps, every plan looked the same, and nobody checked in. My one-line summary is: you can't stay motivated by progress you can't see."
 
 ## The solution and features (1:15–2:30)
 "So I built CalFit to answer each cause directly — everything in one place, local dishes plus a photo scanner, an AI coach that knows your history, and partners, streaks and reminders for the daily nudge."

@@ -2,7 +2,7 @@
 
 ## Slide 1 — Title
 - CalFit — one app for your fitness and food, with an AI coach
-- [INSERT NAME], [INSERT DEPARTMENT], [INSERT INSTITUTION]
+- OLUWADARE TAYE AYO, COMPUTER SCIENCE, UNIVERSITY OF PORT HARCOURT
 - One line underneath: I found out why people quit fitness apps, and built one they might actually keep.
 
 ## Slide 2 — The problem I saw (photos or simple icons work best here)

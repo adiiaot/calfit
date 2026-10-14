@@ -26,3 +26,9 @@
 - tsconfig excludes `supabase/functions` (Deno files, not app code).
 - Real bugs found via TS 6 strictness and fixed: fasting `loadData` select omitted `protocol/fast_hours/eating_hours/target_end_at` (progress ring NaN after restart); exercise-demo arms/legs used `AnimatedInterpolation * number` (= NaN, limbs dropped) — now mirrored to state; `formatDuration` divided ms by 60 instead of 1000; `Equipment` union missing `'machine'`.
 - tsc: 4 pre-existing type-only mismatches remain (casts in Notifications/Sleep, `estimatedDate null`, `bodyScroll` style key) — runtime-safe, Metro doesn't typecheck. `scripts/verify-fixes.js`: 29/29.
+
+## 2026-10-14 (night) — AI model swap + camera/notification fixes
+- Retired `meta/llama-3.1-70b-instruct` (410 Gone) → `deepseek-ai/deepseek-v4.1-flash` (live multimodal free endpoint) for chat AND food-scanner vision. Updated code defaults, local `.env`, `.env.example`. No edge-function change needed (model passes through). NOTE: update the same 2 vars in EAS env + rebuild for builds to pick it up.
+- FoodScanner: shutter gated on `onCameraReady` (fixes CameraOutputNotReadyException spam) + a11y label.
+- reminderService: dropped deprecated `shouldShowAlert` (use banner/list).
+- Verified: 32/32 script, doctor 21/21, tsc still only the 4 known pre-existing type-only issues.

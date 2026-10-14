@@ -3,8 +3,11 @@ import { buildSystemPrompt, generateWorkoutPrompt, buildCoachChatSystemPrompt, g
 import { extractJSON } from '../utils/json-parser';
 import type { GeneratedWorkout, GeneratedMealPlan, MealPlanParams, Exercise, WorkoutParams, ChatMessage } from '../types/ai-coach.types';
 
-const MODEL = process.env.EXPO_PUBLIC_NVIDIA_MODEL || 'meta/llama-3.1-70b-instruct';
-const VISION_MODEL = process.env.EXPO_PUBLIC_NVIDIA_VISION_MODEL || 'meta/llama-3.2-90b-vision-instruct';
+// deepseek-v4.1-flash: live NVIDIA free endpoint (multimodal text+image),
+// replaces retired meta/llama-3.1-70b-instruct (410 Gone) and
+// meta/llama-3.2-90b-vision-instruct. Override via EXPO_PUBLIC_NVIDIA_* env.
+const MODEL = process.env.EXPO_PUBLIC_NVIDIA_MODEL || 'deepseek-ai/deepseek-v4.1-flash';
+const VISION_MODEL = process.env.EXPO_PUBLIC_NVIDIA_VISION_MODEL || 'deepseek-ai/deepseek-v4.1-flash';
 
 const MAX_RETRIES = 3;
 const BASE_DELAY = 1000;

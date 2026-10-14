@@ -36,6 +36,7 @@ export default function FoodScannerScreen() {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [results, setResults] = useState<ScanResult[] | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -63,13 +64,16 @@ export default function FoodScannerScreen() {
         return;
       }
     }
-    if (cameraRef.current) {
+    if (!cameraReady || !cameraRef.current) return;
+    try {
       const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
       if (photo) {
         setImageUri(photo.uri);
         setImageBase64(photo.base64 ?? null);
         setResults(null);
       }
+    } catch (e) {
+      if (__DEV__) console.error('takePhoto error:', e);
     }
   };
 
@@ -222,7 +226,12 @@ export default function FoodScannerScreen() {
         ) : (
           <View style={styles.captureContainer}>
             <View style={styles.cameraBox}>
-              <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+              <CameraView
+                ref={cameraRef}
+                style={styles.camera}
+                facing="back"
+                onCameraReady={() => setCameraReady(true)}
+              />
             </View>
 
             <View style={styles.captureActions}>
@@ -233,7 +242,13 @@ export default function FoodScannerScreen() {
                 <Text style={[styles.captureLabel, { color: theme.textPrimary }]}>Gallery</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={takePhoto} style={styles.shutterWrap}>
+              <TouchableOpacity
+                onPress={takePhoto}
+                style={[styles.shutterWrap, !cameraReady && { opacity: 0.4 }]}
+                disabled={!cameraReady}
+                accessibilityRole="button"
+                accessibilityLabel="Take photo"
+              >
                 <View style={styles.shutterOuter}>
                   <View style={[styles.shutterInner, { backgroundColor: theme.accent }]} />
                 </View>

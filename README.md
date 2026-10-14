@@ -44,7 +44,7 @@ A React Native (Expo) mobile app for calorie tracking, workouts, sleep monitorin
 | Navigation | React Navigation v7 (Stack + Bottom Tabs + Radial Menu) |
 | State | Zustand v5 |
 | Backend/Auth | Supabase (Auth, PostgreSQL, Realtime, Storage) |
-| AI | NVIDIA Llama 3.1 70B (chat) + Llama 3.2 90B Vision (food scanner) |
+| AI | DeepSeek V4.1 Flash via NVIDIA (chat + vision food scanner) |
 | Food DB | Open Food Facts API + local Nigerian food database |
 | Voice | Deepgram STT (speech-to-text for AI Coach); recording via expo-audio, TTS via expo-speech |
 | Animations | React Native Animated + Lottie |

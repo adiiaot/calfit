@@ -1,25 +1,46 @@
-# CalFit — IT Defense Slides (6–8 slides, ~5 min; transfer to PowerPoint)
+# CalFit — IT Defence Slides (6–8 slides, about 5 minutes; copy into PowerPoint)
 
-## S1 Title + overview
-- CalFit — AI Fitness & Nutrition Coach · [INSERT NAME] · Bullets: unified tracker; Expo + Supabase + AI; APK + Expo Go demo.
+## Slide 1 — Title
+- CalFit — your fitness and nutrition coach in one app
+- [INSERT NAME], [INSERT DEPARTMENT], [INSERT INSTITUTION]
+- One line: track food, workouts, sleep and fasting, with an AI coach guiding you.
 
-## S2 Problem + objectives
-- Problem: scattered logging, no guidance. Objectives: log/track/coach/export + test-ready builds.
+## Slide 2 — The real-world problem (with photos or simple icons)
+- People quit fitness within weeks. Why?
+  - Records scattered: workouts in notebooks, meals in memory, sleep nowhere.
+  - Foreign apps don't know local dishes, so food logging becomes guesswork.
+  - Same generic plan for beginners and gym regulars.
+  - Nobody checks in, so one missed week becomes quitting.
+- Punchline: people can't see progress, so they stop trying.
 
-## S3 Main features (live demo map)
-- Calorie/water/food-scan; workouts/steps/sleep/fasting; streaks/partners/AI chat; export. Mark Subscription as stub.
+## Slide 3 — How CalFit solves it (one line per fix)
+- One home for everything → progress visible on one screen.
+- Nigerian dishes + photo scanner → food logging is easy.
+- AI coach + meal plans → advice that fits you.
+- Partners + streaks + reminders → someone/something nudges you daily.
+- Download your data → your effort is always yours.
 
-## S4 Tech + architecture
-- Stack badges; Mermaid diagram (from docs/ARCHITECTURE.md); proxy keeps keys server-side.
+## Slide 4 — Main features (show the app, not paragraphs)
+- Screenshot: Home. Screenshot: food log. Screenshot: workout timer.
+- Say what each does in one short sentence.
 
-## S5 Implementation + screenshots
-- [SCREENSHOT: Home] [SCREENSHOT: Calorie] [SCREENSHOT: QuickStart] — capture live; no mockups. Note 2026-10-14 fixes (sleep export, BMI, tab/a11y).
+## Slide 5 — How it is built (simple diagram, no jargon)
+- Phone app → your private account online → AI helper.
+- One codebase runs on Android and iPhone.
+- Your records are locked to your account; secret keys stay on the server.
 
-## S6 Testing + verification
-- 29/29 script pass; 10 fixed; manual M1–M14 pending devices; P0s proposed not hidden.
+## Slide 6 — Testing: what broke, what I fixed
+- Found and fixed: wrong sleep numbers in downloads, fasting timer breaking after reopening, crash on launch without setup values, retired AI model replaced, camera crashing when tapped too fast.
+- Automatic checks: 32/32 pass. App health check: 21/21 pass.
+- Honest note: full phone testing still in progress — nothing claimed until run on a real device.
 
-## S7 Challenges + lessons
-- Drift, proxy auth, a11y debt; IT gains: negotiation/pricing/budgeting (distinct from prior tech base); AI-assisted, human-reviewed.
+## Slide 7 — Challenges and lessons
+- Database field names changed → always verify after changes.
+- AI provider switched off a model → keep model names in settings, have a backup.
+- Startup crash → always show a message, never crash silently.
+- During IT I also learned freelancing, client negotiation, pricing and budgeting.
 
-## S8 Conclusion + next
-- Reliable demo, not yet production; next: harden proxy/RLS, device QA, preview APK. Q&A invite.
+## Slide 8 — Conclusion and next steps
+- CalFit works and is demonstrable today (Expo Go + Android install file).
+- Next: tighten security, finish phone testing, then app stores.
+- Thank the panel; invite questions.

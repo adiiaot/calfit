@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CalFit — One-Page Defence Sheet</title>
+<style>
+  @page { size: A4 portrait; margin: 9mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    color: #11162E; font-size: 8.4pt; line-height: 1.32;
+    width: 192mm; margin: 0 auto; padding: 2mm 0;
+  }
+  h1 { font-size: 15pt; margin: 0 0 1mm; letter-spacing: -.2px; }
+  .sub { color: #5B6382; font-size: 8.2pt; margin: 0 0 2.5mm; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3.2mm; }
+  section { border: 0.4pt solid #E2E5F0; border-radius: 2mm; padding: 2.2mm 2.6mm; break-inside: avoid; }
+  h2 { font-size: 8pt; text-transform: uppercase; letter-spacing: 1.1px; color: #0B8F65; margin: 0 0 1.6mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 7.7pt; }
+  td, th { text-align: left; padding: 0.9mm 1mm; vertical-align: top; border-bottom: 0.3pt solid #EDEFF6; }
+  th { color: #98A0BC; font-size: 6.8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+  td.num { font-weight: 700; color: #0B8F65; white-space: nowrap; }
+  b { color: #11162E; }
+  .tick { color: #0B8F65; }
+  ol, ul { margin: 0; padding-left: 4.2mm; }
+  li { margin-bottom: 0.9mm; }
+  .full { grid-column: 1 / -1; }
+  .num-row { display: flex; gap: 1.6mm; flex-wrap: wrap; }
+  .pill { border: 0.4pt solid #E2E5F0; border-radius: 6mm; padding: 0.8mm 2.4mm; font-size: 7.6pt; white-space: nowrap; }
+  .pill b { color: #0B8F65; }
+  .warn { color: #C2410C; font-weight: 600; }
+  .foot { margin-top: 2.4mm; color: #5B6382; font-size: 7.4pt; display: flex; justify-content: space-between; }
+  code { font-family: Consolas, monospace; background: #F2F4FA; padding: 0 0.8mm; border-radius: 1mm; }
+</style>
+</head>
+<body>
+
+<h1>CalFit — One-Page Defence Sheet</h1>
+<p class="sub"><b>5 minutes · 6 slides · then the demo.</b> Glance at this between questions, not during the talk.</p>
+
+<div class="grid">
+
+  <section class="full">
+    <h2>The clock</h2>
+    <table>
+      <tr><th>#</th><th>Slide</th><th>Say this in one line</th><th>Time</th></tr>
+      <tr><td class="num">1</td><td>Title</td><td>CalFit: one app for food, workouts, sleep, fasting — with an AI coach.</td><td class="num">0:15</td></tr>
+      <tr><td class="num">2</td><td>The problem</td><td>Four reasons people quit: scattered records, foreign food data, generic plans, nobody checking in.</td><td class="num">0:40</td></tr>
+      <tr><td class="num">3</td><td>The solution</td><td>Each cause has one answer — nothing was built that does not remove a cause.</td><td class="num">0:50</td></tr>
+      <tr><td class="num">4</td><td>The screens</td><td>Home → log food → get the plan → train. Four screens, one daily loop.</td><td class="num">0:45</td></tr>
+      <tr><td class="num">5</td><td>Under the hood</td><td>One codebase, private rows in the database, AI keys on the server.</td><td class="num">0:40</td></tr>
+      <tr><td class="num">6</td><td>Proof &amp; status</td><td>32/32, 21/21, 0 errors; three real bugs fixed; honest about what is next.</td><td class="num">0:40</td></tr>
+    </table>
+    <p style="margin:1.4mm 0 0"><b>Total talk: 3:50.</b> The demo gets the rest. Behind at slide 4? Compress slide 5 to one sentence.</p>
+  </section>
+
+  <section>
+    <h2>Numbers you must not get wrong</h2>
+    <div class="num-row">
+      <span class="pill">checks <b>32 / 32</b></span>
+      <span class="pill">Expo Doctor <b>21 / 21</b></span>
+      <span class="pill">TypeScript <b>0 errors</b></span>
+      <span class="pill">Nigerian dishes <b>25</b></span>
+      <span class="pill">exercises <b>48 / 8</b></span>
+      <span class="pill">fasting protocols <b>5</b></span>
+      <span class="pill">partners <b>3</b></span>
+    </div>
+    <p class="sub" style="margin:1.6mm 0 0">Calories remaining = <b>goal − eaten</b>. Steps → kcal at a fixed rate. Fasting timer derives from the stored start time. Streak grows by one per check-in day.</p>
+  </section>
+
+  <section>
+    <h2>Architecture — three lines</h2>
+    <ol>
+      <li><b>Phone:</b> React Native + Expo — one codebase → Android, iOS, web. Zustand state, session in secure storage.</li>
+      <li><b>Data:</b> Supabase — Postgres, Auth, Realtime chat, Storage. <b>RLS:</b> <code>user_id = auth.uid()</code> on every user table.</li>
+      <li><b>AI:</b> phone → <b>Edge Function <code>ai-proxy</code></b> → NVIDIA. Key lives in <b>Supabase secrets</b>, never in the app.</li>
+    </ol>
+  </section>
+
+  <section class="full">
+    <h2>The four answers they will actually ask</h2>
+    <table>
+      <tr><th style="width:24%">Question</th><th>Answer — say it in this shape</th></tr>
+      <tr><td><b>What problem?</b></td><td>People quit because progress is invisible: scattered records, food they cannot log, generic plans, no accountability.</td></tr>
+      <tr><td><b>You vs AI tools?</b></td><td>We defined the requirements, chose the architecture, reviewed and tested every change. AI drafted and debugged faster. If it broke, it was our call.</td></tr>
+      <tr><td><b>How did you test?</b></td><td>Three layers: read the code, 32 automated checks after every fix, written device test list. Nothing counts as passed until it runs on a phone.</td></tr>
+      <tr><td><b>What is unfinished?</b></td><td>AI proxy still accepts unauthenticated calls, account deletion is not finished server-side, long-history charts need a redesign, device testing incomplete — all in <code>KNOWN_ISSUES.md</code>.</td></tr>
+    </table>
+    <p style="margin:1.4mm 0 0"><b>Backups:</b> why Expo · where data lives · offline behaviour (message, never a crash) · what happens when the AI model is retired (config + fallback workout).</p>
+  </section>
+
+  <section>
+    <h2>Demo path — 5 steps, ~2 min</h2>
+    <ol>
+      <li><b>Home</b> — calories, water, steps, sleep, streak.</li>
+      <li><b>Calorie</b> — search <code>eba</code>, log it, watch the number drop.</li>
+      <li><b>AI Coach</b> — generate a short workout.</li>
+      <li><b>Activity</b> — start it: voice cue, timer, auto-advance.</li>
+      <li><b>Progress</b> — week view, then export.</li>
+    </ol>
+    <p style="margin:1.4mm 0 0"><b>60 seconds only?</b> 1 → 2 → 3, then: “the rest is in the deck.”</p>
+  </section>
+
+  <section>
+    <h2>If something goes wrong</h2>
+    <ul>
+      <li><b>Wi-Fi dies:</b> deployed web build → screen recording → screenshots. Keep talking; never debug on stage.</li>
+      <li><b>AI is slow:</b> narrate what should happen; cache is 5 minutes, try once more.</li>
+      <li><b>Forgot a number:</b> “I will come back to that” — and come back. Never guess.</li>
+      <li><b>Scope challenge:</b> “It runs today; it is not a store product yet, and the report says exactly what is missing.”</li>
+    </ul>
+  </section>
+
+</div>
+
+<div class="foot">
+  <span><b>Oluwadare Taye Ayo</b> · <b>Okechukwu David Chukwuebuka</b> — Computer Science, University of Port Harcourt · IT at <b>AI HIVE</b></span>
+  <span>Deck · Report in <code>docs/it-defense/</code></span>
+</div>
+
+</body>
+</html>

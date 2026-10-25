@@ -122,7 +122,17 @@ export default function NotificationsScreen() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(60);
-    setNotifications((data ?? []) as Notification[]);
+    setNotifications(
+      (data ?? []).map((row: any) => ({
+        id: String(row.id),
+        type: row.type,
+        title: row.title,
+        message: row.body,
+        read: row.read,
+        action_label: row.action_label ?? undefined,
+        created_at: row.created_at,
+      }))
+    );
   };
 
   const refresh = async () => { setIsRefreshing(true); await load(); setIsRefreshing(false); };

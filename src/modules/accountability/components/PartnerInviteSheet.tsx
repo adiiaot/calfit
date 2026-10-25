@@ -218,6 +218,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   title: { fontSize: fontSize.lg, fontWeight: '700' },
+  bodyScroll: { flex: 1 },
   body: { padding: spacing.lg, gap: spacing.md },
   label: { fontSize: fontSize.sm, fontWeight: '600' },
 

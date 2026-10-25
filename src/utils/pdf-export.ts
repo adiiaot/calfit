@@ -52,7 +52,7 @@ export async function exportWorkoutAnalysis(data: {
   recentTrend: string;
   weeklyBreakdown: { weekStart: string; totalCalories: number; sessions: number }[];
   categoryDistribution: Record<string, number>;
-  prediction: { message: string; estimatedDate?: string; milestoneNext?: { label: string; currentProgress: number }; confidence: string };
+  prediction: { message: string; estimatedDate?: string | null; milestoneNext?: { label: string; currentProgress: number } | null; confidence: string };
   suggestions: string[];
 }, period: string, userName?: string): Promise<string> {
   const html = `<!DOCTYPE html>

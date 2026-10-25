@@ -33,6 +33,8 @@ yarn-error.*
 # local env files (but allow .env.example — it's a template)
 .env*.local*
 .env
+.env.vercel
+.env.production
 !.env.example
 
 # AOTSECURE AGENT FILES

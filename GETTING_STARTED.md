@@ -40,8 +40,8 @@ Copy `.env.example` to `.env` and fill in:
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-EXPO_PUBLIC_NVIDIA_MODEL=meta/llama-3.1-70b-instruct
-EXPO_PUBLIC_NVIDIA_VISION_MODEL=meta/llama-3.2-90b-vision-instruct
+EXPO_PUBLIC_NVIDIA_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
+EXPO_PUBLIC_NVIDIA_VISION_MODEL=nvidia/nemotron-3.5-super-vl-120b-a12b
 ```
 
 > AI keys (NVIDIA, Deepgram) are NOT client env vars. Set them as Supabase Edge Function secrets

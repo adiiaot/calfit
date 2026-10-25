@@ -3,11 +3,15 @@ import { buildSystemPrompt, generateWorkoutPrompt, buildCoachChatSystemPrompt, g
 import { extractJSON } from '../utils/json-parser';
 import type { GeneratedWorkout, GeneratedMealPlan, MealPlanParams, Exercise, WorkoutParams, ChatMessage } from '../types/ai-coach.types';
 
-// deepseek-v4.1-flash: live NVIDIA free endpoint (multimodal text+image),
-// replaces retired meta/llama-3.1-70b-instruct (410 Gone) and
-// meta/llama-3.2-90b-vision-instruct. Override via EXPO_PUBLIC_NVIDIA_* env.
-const MODEL = process.env.EXPO_PUBLIC_NVIDIA_MODEL || 'deepseek-ai/deepseek-v4.1-flash';
-const VISION_MODEL = process.env.EXPO_PUBLIC_NVIDIA_VISION_MODEL || 'deepseek-ai/deepseek-v4.1-flash';
+// nemotron-3.5-lightning: live NVIDIA endpoint, fast and multimodal.
+// Replaces deepseek-v4.1-flash (it now stalls indefinitely on the free tier)
+// and the retired llama-3.1/3.2 models (HTTP 410). Override via EXPO_PUBLIC_NVIDIA_* env.
+const MODEL = process.env.EXPO_PUBLIC_NVIDIA_MODEL || 'nvidia/nemotron-3.5-lightning-30b-a3b';
+const VISION_MODEL = process.env.EXPO_PUBLIC_NVIDIA_VISION_MODEL || 'nvidia/nemotron-3.5-super-vl-120b-a12b';
+
+// Reasoning models spend max_tokens on hidden thinking and can return an empty
+// `content` field. Every CalFit call needs visible output, so thinking is off.
+const NO_THINKING = { enable_thinking: false } as const;
 
 const MAX_RETRIES = 3;
 const BASE_DELAY = 1000;
@@ -133,6 +137,7 @@ export async function generateWorkout(
         ],
         temperature: 0.7,
         max_tokens: 1500,
+        chat_template_kwargs: NO_THINKING,
       });
 
       const latencyMs = Date.now() - startTime;
@@ -247,6 +252,7 @@ export async function generateMealPlan(
         ],
         temperature: 0.7,
         max_tokens: 2000,
+        chat_template_kwargs: NO_THINKING,
       });
 
       const latencyMs = Date.now() - startTime;
@@ -326,6 +332,7 @@ export async function sendCoachChatMessage(
           messages: apiMessages,
           temperature: 0.7,
           max_tokens: 1024,
+          chat_template_kwargs: NO_THINKING,
         });
 
       const latencyMs = Date.now() - startTime;
@@ -415,6 +422,7 @@ Respond ONLY with valid JSON in this exact structure (no markdown, no preamble):
         ],
         temperature: 0.3,
         max_tokens: 1000,
+        chat_template_kwargs: NO_THINKING,
       });
 
       const latencyMs = Date.now() - startTime;
@@ -492,6 +500,7 @@ Respond ONLY with valid JSON array in this exact structure (no markdown, no prea
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 800,
+        chat_template_kwargs: NO_THINKING,
       });
 
       const latencyMs = Date.now() - startTime;
@@ -572,6 +581,7 @@ Respond ONLY with valid JSON (no markdown, no preamble):
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 300,
+        chat_template_kwargs: NO_THINKING,
       });
 
       const latencyMs = Date.now() - startTime;

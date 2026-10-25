@@ -1,7 +1,9 @@
 # CalFit — Industrial Training Project Report
 *(Editable source. Export to print-ready DOCX/PDF before submission. Placeholders marked [INSERT …].)*
 
-**Cover:** Project title: CalFit — AI Fitness and Nutrition Coach · Student name: OLUWADARE TAYE AYO · Matriculation number: U2023/5570148 · Department: COMPUTER SCIENCE · Institution: UNIVERSITY OF PORT HARCOURT · Industrial Training organisation: AI HIVE · Academic session: 2026/2027 · Submission date: 14TH OCTOBER 2026
+**Cover:** Project title: CalFit — AI Fitness and Nutrition Coach · Students: OLUWADARE TAYE AYO (U2023/5570148) and OKECHUKWU DAVID CHUKWUEBUKA · Department: COMPUTER SCIENCE · Institution: UNIVERSITY OF PORT HARCOURT · Industrial Training organisation: AI HIVE · Academic session: 2026/2027 · Submission date: 14TH OCTOBER 2026
+
+**Team.** CalFit was built and is defended by both authors. Where this report says "I", it means work carried out by the team and reviewed by both of us; every claim here can be traced to the code, the check script, or the documents in this repository.
 
 ## Chapter 1 — Introduction
 - **Background.** I have watched many people around me download fitness apps in January and delete them by March. It kept happening, so I started asking why. The answer was rarely laziness. People were trying — their tools were just working against them. That observation is where CalFit started.
@@ -23,7 +25,7 @@
 - **System constraints.** I had to work within real limits: no Play Store or Apple developer accounts (so no store release), AI answers depending on a third-party service with usage limits, and step counting needing a phone with a motion sensor.
 
 ## Chapter 3 — System Design
-- **Technology in plain terms.** I wrote the app once and it runs on both Android and iPhone. The screens sit behind a bottom menu everyone already knows how to use. Records live in a secure online database, one account per user, so your data follows you across devices. The smart features — AI chat, meal plans, food photo scanning, voice notes — reach outside services through a secure middleman, which means secret keys never sit inside the app itself.
+- **Technology in plain terms.** I wrote the app once and it runs on both Android and iPhone. The screens sit behind a bottom menu everyone already knows how to use. Records live in a secure online database, one account per user, so your data follows you across devices. The smart features — AI chat, meal plans, food photo scanning, voice notes — reach outside services through a secure middleman, which means secret keys never sit inside the app itself. The model we use today is Nemotron 3.5 Lightning, served through NVIDIA, and the model name lives in configuration rather than in the code — so a retirement can be answered by changing a setting, not by rewriting a feature. That is not theory: two models were retired mid-project and the entire recovery was one line in a configuration file. Speech-to-text for the coach's voice input comes from Deepgram through a second function.
 - **Structure.** Screens (what you see) talk to small helper services (which fetch and save), which talk to the online database and AI services. The flow diagram lives in `docs/ARCHITECTURE.md`.
 - **Data kept.** Profiles and goals; food, water, workout, step, sleep and fasting records; notes; chat messages; partner links; reminders. Nothing more than the app needs.
 - **Privacy by design.** Every record belongs to one user, and the database only ever shows you your own. Login details are locked in the phone's secure storage, not in plain files.
@@ -41,7 +43,7 @@
 - **How I tested.** Honestly, in three layers. First I read the whole codebase looking for weak spots. Then I wrote an automatic check script and ran it after every fix. Finally I prepared a step-by-step manual test list for real phones.
 - **Test environment.** My Windows computer for the code checks, a real iPhone with Expo Go for live runs, an Android install file for assessor phones, and a live test database with nothing personal in it.
 - **What I found and fixed.** The download screen showed wrong sleep numbers — fixed. Fasting and workout downloads were missing details — fixed. The fasting timer broke every time you reopened the app — fixed. The app crashed on launch if setup values were missing — now it shows a clear message instead. The AI provider switched off our model overnight — I found a live replacement and wired it in. The camera crashed if you tapped too fast — now the button waits until the camera is ready. And some privacy wording that wasn't quite true — I rewrote it honestly.
-- **Actual results.** All 32 automatic checks pass. The project's health check passes 21 out of 21. The manual phone tests are written out step by step, and I've marked every one honestly — none counts as passed until it actually runs on a device.
+- **Actual results.** All 32 automatic checks pass. The project's health check passes 21 out of 21, and `tsc --noEmit` now reports zero type errors. The manual phone tests are written out step by step, and I've marked every one honestly — none counts as passed until it actually runs on a device.
 - **Remaining limitations.** A few deeper improvements are proposed but not yet applied — tighter AI access control, stricter photo-storage rules, full account deletion. The charts also need redesigning for very long histories. I've written all of this down openly. Hiding weaknesses in a defence would be worse than having them.
 
 ## Chapter 6 — Challenges and Lessons

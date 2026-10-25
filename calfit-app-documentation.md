@@ -2,9 +2,9 @@
 
 **Tagline:** Your personal AI-powered fitness and nutrition companion  
 **Platform:** iOS, Android, Web (responsive, max-width 480px)  
-**Tech Stack:** React Native 0.81.5 + Expo SDK 54 + TypeScript 5.9  
+**Tech Stack:** React Native 0.86.3 + Expo SDK 57 + TypeScript 6.0  
 **Backend:** Supabase (PostgreSQL, Auth, Realtime, Edge Functions)  
-**AI:** NVIDIA Llama 3.1 70B (chat/workout/meal gen) + Llama 3.2 90B Vision (food scanner)  
+**AI:** Nemotron 3.5 (Lightning for text, Super VL for vision) via NVIDIA  
 **Voice:** Deepgram STT (speech-to-text) + expo-speech (TTS workout cues)  
 **Developer:** AOT Network (aotnetworklabs@gmail.com)
 

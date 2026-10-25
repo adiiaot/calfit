@@ -187,9 +187,17 @@ export default function SleepScreen() {
   const loadLogs = async () => {
     if (!user?.id) return;
     setIsLoading(true);
-    const { data, error } = await supabase.from('sleep_logs').select('id,user_id,hours,date,created_at,bedtime,wake_time').eq('user_id', user.id)
+    const { data } = await supabase.from('sleep_logs').select('id,user_id,hours,date,created_at,bedtime,wake_time,quality,notes').eq('user_id', user.id)
       .order('date', { ascending: false }).limit(30);
-    if (data) setLogs(data as SleepLog[]);
+    if (data) {
+      setLogs(data.map((row: any) => ({
+        id: String(row.id),
+        date: row.date,
+        hours: Number(row.hours),
+        quality: row.quality ?? 3,
+        notes: row.notes ?? '',
+      })));
+    }
     setIsLoading(false);
   };
 
